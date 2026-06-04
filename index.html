@@ -1331,7 +1331,17 @@ function printPage(pageId){
    INIT
 ──────────────────────────────────────── */
 document.getElementById('password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
-</script>
+</script>async function loadAssets() {
+    const querySnapshot = await getDocs(collection(window.db, "assets"));
+    assets = []; // المصفوفة المحلية الخاصة بك
+    querySnapshot.forEach((doc) => {
+        assets.push(doc.data());
+    });
+    renderAll(); // الدالة التي تعيد رسم الجداول في صفحتك
+}
+
+// تشغيل التحميل عند فتح الصفحة
+window.addEventListener('DOMContentLoaded', loadAssets);
   const firebaseConfig = {
   apiKey: "AIzaSyDHlLO8GuZJKMguRsPoV5Wz4cmer8XGlfA",
   authDomain: "asset-management-system-ab253.firebaseapp.com",
