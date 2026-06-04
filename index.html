@@ -1,6 +1,26 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
-<head>
+<head><script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+  import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+  import { collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDHlLO8GuZJKMguRsPoV5Wz4cmer8XGlfA",
+    authDomain: "asset-management-system-ab253.firebaseapp.com",
+    projectId: "asset-management-system-ab253",
+    storageBucket: "asset-management-system-ab253.firebasestorage.app",
+    messagingSenderId: "227938589369",
+    appId: "1:227938589369:web:3886eb1ab64a18222b1968"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  window.db = db; // ربط قاعدة البيانات بالنطاق العام
+  window.collection = collection;
+  window.addDoc = addDoc;
+  window.getDocs = getDocs;
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>شركة ثمار القمة المحدودة - نظام إدارة الأصول</title>
