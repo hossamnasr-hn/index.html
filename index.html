@@ -421,170 +421,117 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
 
 <div id="toast"></div>
 
-<!-- Firebase SDK -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import {
-  getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot, query, orderBy
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDHlLO8GuZJKMguRsPoV5Wz4cmer8XGlfA",
-  authDomain: "asset-management-system-ab253.firebaseapp.com",
-  projectId: "asset-management-system-ab253",
-  storageBucket: "asset-management-system-ab253.firebasestorage.app",
-  messagingSenderId: "227938589369",
-  appId: "1:227938589369:web:3886eb1ab64a18222b1968",
-  measurementId: "G-B8YG2TB5S6"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-window.db = db;
-window.fsApi = { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot, query, orderBy };
-
-console.log("✅ Firebase متصل");
-
-// ──────────────────────────────────────
-// تهيئة البيانات الافتراضية في Firestore
-// ──────────────────────────────────────
-async function initDefaultData() {
-  const usersSnap = await getDocs(collection(db, "users"));
-  if (usersSnap.empty) {
-    const defaultUsers = [
-      { name: "أحمد المدير", username: "admin", password: "123456", role: "مدير", perms: ["view","add","edit","handover","dispose","maintenance","users"] },
-      { name: "سارة المشرفة", username: "manager", password: "123456", role: "مشرف", perms: ["view","add","edit","handover","dispose","maintenance"] },
-      { name: "خالد المستخدم", username: "user1", password: "123456", role: "موظف", perms: ["view","handover","maintenance"] }
-    ];
-    for (const u of defaultUsers) await addDoc(collection(db, "users"), u);
-  }
-  const typesSnap = await getDocs(collection(db, "assetTypes"));
-  if (typesSnap.empty) {
-    const defaultTypes = ["أجهزة إلكترونية","أثاث","مركبات","معدات","حاويات","دواجن وبيض","أخرى"];
-    for (const t of defaultTypes) await addDoc(collection(db, "assetTypes"), { name: t });
-  }
-}
-
-// ──────────────────────────────────────
-// تحميل البيانات من Firestore
-// ──────────────────────────────────────
-async function loadAllData() {
-  const [usersSnap, typesSnap, assetsSnap, handoversSnap, maintsSnap, disposesSnap] = await Promise.all([
-    getDocs(collection(db, "users")),
-    getDocs(collection(db, "assetTypes")),
-    getDocs(collection(db, "assets")),
-    getDocs(collection(db, "handovers")),
-    getDocs(collection(db, "maintenances")),
-    getDocs(collection(db, "disposes"))
-  ]);
-
-  window.users = usersSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
-  window.assetTypes = typesSnap.docs.map(d => ({ name: d.data().name, _id: d.id }));
-  window.assets = assetsSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
-  window.handovers = handoversSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
-  window.maintenances = maintsSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
-  window.disposes = disposesSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
-
-  renderAll();
-  populateTypeFilters();
-}
-
-// ──────────────────────────────────────
-// تشغيل التطبيق
-// ──────────────────────────────────────
-await initDefaultData();
-await loadAllData();
-
-// إعادة التحميل بعد كل عملية حفظ
-window.reloadData = loadAllData;
-
-// ربط مستمع Enter لتسجيل الدخول
-document.getElementById('password').addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
-
-</script>
-
 <script>
 /* ────────────────────────────────────────
-   DATA (مربوط بـ Firestore - يُحمَّل من window)
+   DATA
 ──────────────────────────────────────── */
-// المتغيرات تُعبأ من Firebase في الـ module script
-let currentUser = null;
-let editingId = null;
+const users=[
+  {id:1,name:'أحمد المدير',username:'admin',password:'123456',role:'مدير',perms:['view','add','edit','handover','dispose','maintenance','users']},
+  {id:2,name:'سارة المشرفة',username:'manager',password:'123456',role:'مشرف',perms:['view','add','edit','handover','dispose','maintenance']},
+  {id:3,name:'خالد المستخدم',username:'user1',password:'123456',role:'موظف',perms:['view','handover','maintenance']},
+];
 
-// دوال مساعدة للوصول للبيانات
-function getUsers()        { return window.users || []; }
-function getAssets()       { return window.assets || []; }
-function getHandovers()    { return window.handovers || []; }
-function getMaintenances() { return window.maintenances || []; }
-function getDisposes()     { return window.disposes || []; }
-function getAssetTypes()   { return (window.assetTypes || []).map(t => t.name || t); }
+let assetTypes=['أجهزة إلكترونية','أثاث','مركبات','معدات','حاويات','دواجن وبيض','أخرى'];
+
+// Each asset has: id, code, name, type, totalQty, availableQty, clientQty, maintenanceQty, damagedQty, disposedQty, status, notes, date
+let assets=[
+  {id:1,code:'ASS-001',name:'حاسب محمول Dell',type:'أجهزة إلكترونية',totalQty:5,availableQty:3,clientQty:1,maintenanceQty:1,damagedQty:0,disposedQty:0,status:'متاح',notes:'',date:'2024-01-15'},
+  {id:2,code:'ASS-002',name:'طابعة HP LaserJet',type:'أجهزة إلكترونية',totalQty:3,availableQty:1,clientQty:2,maintenanceQty:0,damagedQty:0,disposedQty:0,status:'عند عميل',notes:'',date:'2024-02-10'},
+  {id:3,code:'ASS-003',name:'مكتب خشبي',type:'أثاث',totalQty:10,availableQty:8,clientQty:0,maintenanceQty:0,damagedQty:2,disposedQty:0,status:'متاح',notes:'',date:'2024-01-20'},
+  {id:4,code:'ASS-004',name:'سيارة تويوتا كامري',type:'مركبات',totalQty:2,availableQty:1,clientQty:1,maintenanceQty:0,damagedQty:0,disposedQty:0,status:'عند عميل',notes:'',date:'2023-11-05'},
+  {id:5,code:'ASS-005',name:'جهاز تكييف',type:'معدات',totalQty:6,availableQty:3,clientQty:0,maintenanceQty:2,damagedQty:1,disposedQty:0,status:'متاح',notes:'',date:'2023-09-12'},
+  {id:6,code:'ASS-006',name:'حاويات تخزين',type:'حاويات',totalQty:20,availableQty:15,clientQty:5,maintenanceQty:0,damagedQty:0,disposedQty:0,status:'متاح',notes:'',date:'2024-03-01'},
+];
+
+// Handover records: {id, assetId, assetName, qty, clientName, clientAddress, crNumber, phone1, phone2, responsible, date, notes, status}
+let handovers=[
+  {id:1,assetId:2,assetName:'طابعة HP LaserJet',qty:2,clientName:'شركة الأفق للتقنية',clientAddress:'جدة - حي الروضة - شارع الأمير سلطان',crNumber:'4030123456',phone1:'0552001234',phone2:'0126001234',responsible:'سارة المشرفة',date:'2024-04-12',notes:'للاستخدام المؤقت مدة شهرين',status:'مُسلَّم'},
+  {id:2,assetId:4,assetName:'سيارة تويوتا كامري',qty:1,clientName:'مؤسسة النور للتوزيع',clientAddress:'الرياض - حي العليا',crNumber:'1010098765',phone1:'0501112233',phone2:'',responsible:'أحمد المدير',date:'2024-05-01',notes:'',status:'مُسلَّم'},
+];
+
+// Maintenance records: {id, assetId, assetName, qty, vendor, fault, date, notes, status}
+let maintenances=[
+  {id:1,assetId:5,assetName:'جهاز تكييف',qty:2,vendor:'مركز الصيانة السريعة',fault:'ضعف تبريد وضوضاء في الكمبروسر',date:'2024-05-10',notes:'',status:'قيد الصيانة'},
+];
+
+// Dispose records
+let disposes=[
+  {id:1,assetId:3,assetName:'مكتب خشبي',qty:0,reason:'',approved:'',date:''},
+];
+disposes=[];
+
+let currentUser=null;
+let nextId=7;
+let editingId=null;
+let nextHandoverId=3;
+let nextMaintenanceId=2;
+let nextDisposeId=1;
 
 /* ────────────────────────────────────────
    AUTH
 ──────────────────────────────────────── */
-function doLogin() {
-  const u = document.getElementById('username').value.trim();
-  const p = document.getElementById('password').value.trim();
-  const found = getUsers().find(x => x.username === u && x.password === p);
-  if (!found) { document.getElementById('login-error').style.display = 'block'; return; }
-  currentUser = found;
-  document.getElementById('login-error').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'none';
+function doLogin(){
+  const u=document.getElementById('username').value.trim();
+  const p=document.getElementById('password').value.trim();
+  const found=users.find(x=>x.username===u&&x.password===p);
+  if(!found){document.getElementById('login-error').style.display='block';return;}
+  currentUser=found;
+  document.getElementById('login-error').style.display='none';
+  document.getElementById('login-screen').style.display='none';
   document.getElementById('app-shell').classList.remove('hidden');
-  document.getElementById('header-avatar').textContent = found.name.split(' ').map(w => w[0]).join('').slice(0, 2);
-  document.getElementById('header-name').textContent = found.name;
-  document.getElementById('header-role').textContent = found.role;
-  if (!found.perms.includes('users')) document.getElementById('nav-users').style.display = 'none';
-  if (!found.perms.includes('add')) document.getElementById('add-asset-btn').style.display = 'none';
+  document.getElementById('header-avatar').textContent=found.name.split(' ').map(w=>w[0]).join('').slice(0,2);
+  document.getElementById('header-name').textContent=found.name;
+  document.getElementById('header-role').textContent=found.role;
+  if(!found.perms.includes('users'))document.getElementById('nav-users').style.display='none';
+  if(!found.perms.includes('add'))document.getElementById('add-asset-btn').style.display='none';
   populateTypeFilters();
   renderAll();
 }
-function doLogout() {
-  currentUser = null;
-  document.getElementById('login-screen').style.display = 'flex';
+function doLogout(){
+  currentUser=null;
+  document.getElementById('login-screen').style.display='flex';
   document.getElementById('app-shell').classList.add('hidden');
 }
-function can(p) { return currentUser && currentUser.perms.includes(p); }
+function can(p){return currentUser&&currentUser.perms.includes(p);}
 
 /* ────────────────────────────────────────
    NAVIGATION
 ──────────────────────────────────────── */
-function showPage(id, el) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-' + id).classList.add('active');
-  if (el) el.classList.add('active');
+function showPage(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el)el.classList.add('active');
   renderAll();
 }
 
 /* ────────────────────────────────────────
    RENDER ALL
 ──────────────────────────────────────── */
-function renderAll() {
-  renderStats(); renderRecent(); renderAssets(); renderInventory();
-  renderHandovers(); renderMaintenances(); renderDisposes();
-  renderReports(); renderUsers(); renderTypesList();
+function renderAll(){
+  renderStats();renderRecent();renderAssets();renderInventory();
+  renderHandovers();renderMaintenances();renderDisposes();
+  renderReports();renderUsers();renderTypesList();
 }
 
 /* ────────────────────────────────────────
    STATUS BADGE
 ──────────────────────────────────────── */
-function statusBadge(s) {
-  const m = { متاح: 'badge-green', 'عند عميل': 'badge-blue', صيانة: 'badge-amber', تالف: 'badge-amber', متلف: 'badge-red', 'مُسلَّم': 'badge-blue', 'قيد الصيانة': 'badge-amber', 'مكتمل': 'badge-green', 'قيد التنفيذ': 'badge-amber' };
-  return `<span class="badge ${m[s] || 'badge-gray'}">${s}</span>`;
+function statusBadge(s){
+  const m={متاح:'badge-green','عند عميل':'badge-blue',صيانة:'badge-amber',تالف:'badge-amber',متلف:'badge-red','مُسلَّم':'badge-blue','قيد الصيانة':'badge-amber','مكتمل':'badge-green','قيد التنفيذ':'badge-amber'};
+  return`<span class="badge ${m[s]||'badge-gray'}">${s}</span>`;
 }
 
 /* ────────────────────────────────────────
    STATS
 ──────────────────────────────────────── */
-function renderStats() {
-  const assets = getAssets();
-  const totalItems = assets.reduce((s, a) => s + (a.totalQty || 0), 0);
-  const available = assets.reduce((s, a) => s + (a.availableQty || 0), 0);
-  const atClient = assets.reduce((s, a) => s + (a.clientQty || 0), 0);
-  const inMaint = assets.reduce((s, a) => s + (a.maintenanceQty || 0), 0);
-  const damaged = assets.reduce((s, a) => s + (a.damagedQty || 0), 0);
-  document.getElementById('stats-grid').innerHTML = `
+function renderStats(){
+  const totalItems=assets.reduce((s,a)=>s+a.totalQty,0);
+  const available=assets.reduce((s,a)=>s+a.availableQty,0);
+  const atClient=assets.reduce((s,a)=>s+a.clientQty,0);
+  const inMaint=assets.reduce((s,a)=>s+a.maintenanceQty,0);
+  const damaged=assets.reduce((s,a)=>s+a.damagedQty,0);
+  document.getElementById('stats-grid').innerHTML=`
     <div class="stat-card"><div class="stat-label">إجمالي الوحدات</div><div class="stat-val blue">${totalItems}</div></div>
     <div class="stat-card"><div class="stat-label">متاح في المخزون</div><div class="stat-val green">${available}</div></div>
     <div class="stat-card"><div class="stat-label">عند العملاء</div><div class="stat-val" style="color:var(--blue)">${atClient}</div></div>
@@ -597,9 +544,9 @@ function renderStats() {
 /* ────────────────────────────────────────
    RECENT
 ──────────────────────────────────────── */
-function renderRecent() {
-  const last = getAssets().slice(-5).reverse();
-  document.getElementById('recent-body').innerHTML = last.map(a => `
+function renderRecent(){
+  const last=assets.slice(-5).reverse();
+  document.getElementById('recent-body').innerHTML=last.map(a=>`
     <tr><td><code class="tag">${a.code}</code></td><td>${a.name}</td><td>${a.type}</td><td>${statusBadge(a.status)}</td><td>${a.date}</td></tr>
   `).join('');
 }
@@ -607,32 +554,32 @@ function renderRecent() {
 /* ────────────────────────────────────────
    ASSETS
 ──────────────────────────────────────── */
-function populateTypeFilters() {
-  const sel = document.getElementById('filter-type');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">جميع الأنواع</option>' + getAssetTypes().map(t => `<option value="${t}">${t}</option>`).join('');
+function populateTypeFilters(){
+  const sel=document.getElementById('filter-type');
+  if(!sel)return;
+  sel.innerHTML='<option value="">جميع الأنواع</option>'+assetTypes.map(t=>`<option value="${t}">${t}</option>`).join('');
 }
 
-function filterAssets() {
-  const q = (document.getElementById('asset-search') || {}).value?.toLowerCase() || '';
-  const st = (document.getElementById('filter-status') || {}).value || '';
-  const tp = (document.getElementById('filter-type') || {}).value || '';
-  const filtered = getAssets().filter(a =>
-    (!q || a.name.toLowerCase().includes(q) || a.code.toLowerCase().includes(q)) &&
-    (!st || a.status === st) &&
-    (!tp || a.type === tp)
+function filterAssets(){
+  const q=(document.getElementById('asset-search')||{}).value?.toLowerCase()||'';
+  const st=(document.getElementById('filter-status')||{}).value||'';
+  const tp=(document.getElementById('filter-type')||{}).value||'';
+  const filtered=assets.filter(a=>
+    (!q||a.name.toLowerCase().includes(q)||a.code.toLowerCase().includes(q))&&
+    (!st||a.status===st)&&
+    (!tp||a.type===tp)
   );
   renderAssetRows(filtered);
 }
 
-function renderAssets() { filterAssets(); }
+function renderAssets(){filterAssets();}
 
-function renderAssetRows(list) {
-  if (!list.length) {
-    document.getElementById('assets-body').innerHTML = `<tr><td colspan="10" class="empty-row">لا توجد أصول مطابقة</td></tr>`;
+function renderAssetRows(list){
+  if(!list.length){
+    document.getElementById('assets-body').innerHTML=`<tr><td colspan="10" class="empty-row">لا توجد أصول مطابقة</td></tr>`;
     return;
   }
-  document.getElementById('assets-body').innerHTML = list.map(a => `
+  document.getElementById('assets-body').innerHTML=list.map(a=>`
     <tr>
       <td><code class="tag">${a.code}</code></td>
       <td style="font-weight:600">${a.name}</td>
@@ -644,10 +591,10 @@ function renderAssetRows(list) {
       <td style="text-align:center"><span style="color:var(--red);font-weight:700">${a.damagedQty}</span></td>
       <td>${statusBadge(a.status)}</td>
       <td style="white-space:nowrap">
-        ${can('edit') ? `<button class="btn-action" onclick="openEdit('${a._id}')" title="تعديل"><i class="ti ti-edit"></i></button>` : ''}
-        ${can('handover') && a.availableQty > 0 ? `<button class="btn-action info" onclick="openHandoverFromAsset('${a._id}')" title="تسليم أصل" style="color:var(--green);border-color:#A5D6A7"><i class="ti ti-transfer"></i></button>` : ''}
-        ${can('maintenance') && a.availableQty > 0 ? `<button class="btn-action purple" onclick="openMaintenanceFromAsset('${a._id}')" title="تحويل لصيانة"><i class="ti ti-tool"></i></button>` : ''}
-        ${can('dispose') && a.totalQty > 0 ? `<button class="btn-action danger" onclick="openDisposeFromAsset('${a._id}')" title="إتلاف"><i class="ti ti-trash"></i></button>` : ''}
+        ${can('edit')?`<button class="btn-action" onclick="openEdit(${a.id})" title="تعديل"><i class="ti ti-edit"></i></button>`:''}
+        ${can('handover')&&a.availableQty>0?`<button class="btn-action info" onclick="openHandoverFromAsset(${a.id})" title="تسليم أصل" style="color:var(--green);border-color:#A5D6A7"><i class="ti ti-transfer"></i></button>`:''}
+        ${can('maintenance')&&a.availableQty>0?`<button class="btn-action purple" onclick="openMaintenanceFromAsset(${a.id})" title="تحويل لصيانة"><i class="ti ti-tool"></i></button>`:''}
+        ${can('dispose')&&a.totalQty>0?`<button class="btn-action danger" onclick="openDisposeFromAsset(${a.id})" title="إتلاف"><i class="ti ti-trash"></i></button>`:''}
       </td>
     </tr>
   `).join('');
@@ -656,12 +603,11 @@ function renderAssetRows(list) {
 /* ────────────────────────────────────────
    INVENTORY
 ──────────────────────────────────────── */
-function renderInventory() {
-  const assets = getAssets();
-  let html = '<div class="inv-grid">';
-  assets.forEach(a => {
-    const pct = a.totalQty ? Math.round(a.availableQty / a.totalQty * 100) : 0;
-    html += `
+function renderInventory(){
+  let html='<div class="inv-grid">';
+  assets.forEach(a=>{
+    const pct=a.totalQty?Math.round(a.availableQty/a.totalQty*100):0;
+    html+=`
     <div class="inv-card">
       <div class="inv-card-title"><i class="ti ti-package" style="color:var(--blue)"></i> ${a.name}</div>
       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">${a.code} · ${a.type}</div>
@@ -676,175 +622,166 @@ function renderInventory() {
       </div>
     </div>`;
   });
-  html += '</div>';
-  html += `<div class="table-card"><div class="table-toolbar"><span style="font-size:13px;font-weight:700">ملخص رصيد المخزون</span></div>
+  html+='</div>';
+  // Summary table
+  html+=`<div class="table-card"><div class="table-toolbar"><span style="font-size:13px;font-weight:700">ملخص رصيد المخزون</span></div>
   <table><thead><tr><th>الأصل</th><th>النوع</th><th>الإجمالي</th><th>متاح</th><th>عند عميل</th><th>صيانة</th><th>تالف</th><th>متلف</th></tr></thead><tbody>`;
-  assets.forEach(a => {
-    html += `<tr>
+  assets.forEach(a=>{
+    html+=`<tr>
       <td style="font-weight:600">${a.name}</td><td>${a.type}</td>
       <td style="text-align:center;font-weight:700">${a.totalQty}</td>
       <td style="text-align:center;color:var(--green);font-weight:700">${a.availableQty}</td>
       <td style="text-align:center;color:var(--blue);font-weight:700">${a.clientQty}</td>
       <td style="text-align:center;color:var(--amber);font-weight:700">${a.maintenanceQty}</td>
       <td style="text-align:center;color:var(--red);font-weight:700">${a.damagedQty}</td>
-      <td style="text-align:center;color:var(--red);font-weight:700">${a.disposedQty || 0}</td>
+      <td style="text-align:center;color:var(--red);font-weight:700">${a.disposedQty||0}</td>
     </tr>`;
   });
-  html += '</tbody></table></div>';
-  document.getElementById('inventory-content').innerHTML = html;
+  html+='</tbody></table></div>';
+  document.getElementById('inventory-content').innerHTML=html;
 }
 
 /* ────────────────────────────────────────
    ASSET FORM (Add/Edit)
 ──────────────────────────────────────── */
-function openAddAsset() {
-  if (!can('add')) return;
-  editingId = null;
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-plus"></i> إضافة أصل جديد';
-  document.getElementById('modal-body').innerHTML = assetForm({});
-  document.getElementById('modal-save-btn').className = 'btn-save';
-  document.getElementById('modal-save-btn').textContent = 'حفظ';
-  document.getElementById('modal-save-btn').onclick = saveAsset;
-  document.getElementById('modal-box').className = 'modal wide';
+function openAddAsset(){
+  if(!can('add'))return;
+  editingId=null;
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-plus"></i> إضافة أصل جديد';
+  document.getElementById('modal-body').innerHTML=assetForm({});
+  document.getElementById('modal-save-btn').className='btn-save';
+  document.getElementById('modal-save-btn').textContent='حفظ';
+  document.getElementById('modal-save-btn').onclick=saveAsset;
+  document.getElementById('modal-box').className='modal wide';
   document.getElementById('modal-overlay').classList.add('show');
 }
 
-function openEdit(id) {
-  if (!can('edit')) return;
-  editingId = id;
-  const a = getAssets().find(x => x._id === id);
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-edit"></i> تعديل الأصل';
-  document.getElementById('modal-body').innerHTML = assetForm(a);
-  document.getElementById('modal-save-btn').className = 'btn-save';
-  document.getElementById('modal-save-btn').textContent = 'حفظ التعديل';
-  document.getElementById('modal-save-btn').onclick = saveAsset;
-  document.getElementById('modal-box').className = 'modal wide';
+function openEdit(id){
+  if(!can('edit'))return;
+  editingId=id;
+  const a=assets.find(x=>x.id===id);
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-edit"></i> تعديل الأصل';
+  document.getElementById('modal-body').innerHTML=assetForm(a);
+  document.getElementById('modal-save-btn').className='btn-save';
+  document.getElementById('modal-save-btn').textContent='حفظ التعديل';
+  document.getElementById('modal-save-btn').onclick=saveAsset;
+  document.getElementById('modal-box').className='modal wide';
   document.getElementById('modal-overlay').classList.add('show');
 }
 
-function assetForm(a) {
-  const typeOpts = getAssetTypes().map(t => `<option ${a.type === t ? 'selected' : ''}>${t}</option>`).join('');
-  return `
+function assetForm(a){
+  const typeOpts=assetTypes.map(t=>`<option ${a.type===t?'selected':''}>${t}</option>`).join('');
+  return`
     <div class="form-section">معلومات الأصل</div>
     <div class="form-row" style="margin-bottom:12px">
-      <div class="field"><label>اسم الأصل *</label><input id="f-name" value="${a.name || ''}"></div>
-      <div class="field"><label>الكود</label><input id="f-code" value="${a.code || ''}"></div>
+      <div class="field"><label>اسم الأصل *</label><input id="f-name" value="${a.name||''}"></div>
+      <div class="field"><label>الكود</label><input id="f-code" value="${a.code||''}"></div>
     </div>
     <div class="form-row" style="margin-bottom:12px">
       <div class="field"><label>النوع</label><select id="f-type">${typeOpts}</select></div>
-      <div class="field"><label>ملاحظات</label><input id="f-notes" value="${a.notes || ''}"></div>
+      <div class="field"><label>ملاحظات</label><input id="f-notes" value="${a.notes||''}"></div>
     </div>
     <div class="form-section">الكميات</div>
     <div class="form-row three" style="margin-bottom:12px">
-      <div class="field"><label>الإجمالي</label><input id="f-total" type="number" min="0" value="${a.totalQty !== undefined ? a.totalQty : 1}" oninput="syncQty()"></div>
-      <div class="field"><label>متاح</label><input id="f-avail" type="number" min="0" value="${a.availableQty !== undefined ? a.availableQty : 1}"></div>
-      <div class="field"><label>عند عميل</label><input id="f-client" type="number" min="0" value="${a.clientQty || 0}"></div>
+      <div class="field"><label>الإجمالي</label><input id="f-total" type="number" min="0" value="${a.totalQty||1}" oninput="syncQty()"></div>
+      <div class="field"><label>متاح</label><input id="f-avail" type="number" min="0" value="${a.availableQty||1}"></div>
+      <div class="field"><label>عند عميل</label><input id="f-client" type="number" min="0" value="${a.clientQty||0}"></div>
     </div>
     <div class="form-row three" style="margin-bottom:0">
-      <div class="field"><label>في الصيانة</label><input id="f-maint" type="number" min="0" value="${a.maintenanceQty || 0}"></div>
-      <div class="field"><label>تالف</label><input id="f-damaged" type="number" min="0" value="${a.damagedQty || 0}"></div>
-      <div class="field"><label>متلف</label><input id="f-disposed" type="number" min="0" value="${a.disposedQty || 0}"></div>
+      <div class="field"><label>في الصيانة</label><input id="f-maint" type="number" min="0" value="${a.maintenanceQty||0}"></div>
+      <div class="field"><label>تالف</label><input id="f-damaged" type="number" min="0" value="${a.damagedQty||0}"></div>
+      <div class="field"><label>متلف</label><input id="f-disposed" type="number" min="0" value="${a.disposedQty||0}"></div>
     </div>
   `;
 }
 
-function syncQty() {
-  const t = parseInt(document.getElementById('f-total')?.value) || 0;
-  const av = document.getElementById('f-avail');
-  if (av && !av.value) av.value = t;
+function syncQty(){
+  const t=parseInt(document.getElementById('f-total')?.value)||0;
+  const av=document.getElementById('f-avail');
+  if(av&&!av.value)av.value=t;
 }
 
-async function saveAsset() {
-  const name = document.getElementById('f-name').value.trim();
-  if (!name) { showToast('يرجى إدخال اسم الأصل', 'error'); return; }
-  const totalQty = parseInt(document.getElementById('f-total').value) || 0;
-  const availableQty = parseInt(document.getElementById('f-avail').value) || 0;
-  const clientQty = parseInt(document.getElementById('f-client').value) || 0;
-  const maintenanceQty = parseInt(document.getElementById('f-maint').value) || 0;
-  const damagedQty = parseInt(document.getElementById('f-damaged').value) || 0;
-  const disposedQty = parseInt(document.getElementById('f-disposed').value) || 0;
-  const sumCheck = availableQty + clientQty + maintenanceQty + damagedQty + disposedQty;
-  if (sumCheck > totalQty) { showToast('مجموع الكميات الفرعية يتجاوز الإجمالي', 'error'); return; }
-  let status = 'متاح';
-  if (availableQty === 0 && clientQty > 0) status = 'عند عميل';
-  else if (availableQty === 0 && maintenanceQty > 0) status = 'صيانة';
-  else if (availableQty === 0 && damagedQty > 0) status = 'تالف';
-  const codeVal = document.getElementById('f-code').value || `ASS-${Date.now()}`;
-  const obj = {
-    name, code: codeVal,
-    type: document.getElementById('f-type').value,
-    totalQty, availableQty, clientQty, maintenanceQty, damagedQty, disposedQty, status,
-    notes: document.getElementById('f-notes').value,
-    date: new Date().toISOString().split('T')[0]
-  };
-  try {
-    const { collection: col, doc: docRef, addDoc: add, updateDoc: upd } = window.fsApi;
-    if (editingId) {
-      await upd(docRef(window.db, "assets", editingId), obj);
-      showToast('تم تحديث الأصل', 'success');
-    } else {
-      await add(col(window.db, "assets"), obj);
-      showToast('تمت إضافة الأصل', 'success');
-    }
-    closeModal();
-    await window.reloadData();
-    populateTypeFilters();
-  } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+function saveAsset(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){showToast('يرجى إدخال اسم الأصل','error');return;}
+  const totalQty=parseInt(document.getElementById('f-total').value)||0;
+  const availableQty=parseInt(document.getElementById('f-avail').value)||0;
+  const clientQty=parseInt(document.getElementById('f-client').value)||0;
+  const maintenanceQty=parseInt(document.getElementById('f-maint').value)||0;
+  const damagedQty=parseInt(document.getElementById('f-damaged').value)||0;
+  const disposedQty=parseInt(document.getElementById('f-disposed').value)||0;
+  const sumCheck=availableQty+clientQty+maintenanceQty+damagedQty+disposedQty;
+  if(sumCheck>totalQty){showToast('مجموع الكميات الفرعية يتجاوز الإجمالي','error');return;}
+  // auto status
+  let status='متاح';
+  if(availableQty===0&&clientQty>0)status='عند عميل';
+  else if(availableQty===0&&maintenanceQty>0)status='صيانة';
+  else if(availableQty===0&&damagedQty>0)status='تالف';
+  const obj={name,code:document.getElementById('f-code').value||`ASS-${String(nextId).padStart(3,'0')}`,
+    type:document.getElementById('f-type').value,totalQty,availableQty,clientQty,maintenanceQty,damagedQty,disposedQty,status,
+    notes:document.getElementById('f-notes').value,date:new Date().toISOString().split('T')[0]};
+  if(editingId){
+    const idx=assets.findIndex(a=>a.id===editingId);
+    assets[idx]={...assets[idx],...obj};
+    showToast('تم تحديث الأصل','success');
+  } else {
+    obj.id=nextId++;
+    assets.push(obj);
+    showToast('تمت إضافة الأصل','success');
+  }
+  closeModal();populateTypeFilters();renderAll();
 }
 
 /* ────────────────────────────────────────
    ASSET TYPES
 ──────────────────────────────────────── */
-function renderTypesList() {
-  const el = document.getElementById('types-list');
-  if (!el) return;
-  el.innerHTML = (window.assetTypes || []).map(t => `
-    <span class="type-chip">${t.name || t}
-      <span class="del-type" onclick="deleteType('${t._id || ''}')" title="حذف"><i class="ti ti-x" style="font-size:12px"></i></span>
+function renderTypesList(){
+  document.getElementById('types-list').innerHTML=assetTypes.map((t,i)=>`
+    <span class="type-chip">${t}
+      <span class="del-type" onclick="deleteType(${i})" title="حذف"><i class="ti ti-x" style="font-size:12px"></i></span>
     </span>
   `).join('');
 }
 
-async function addAssetType() {
-  const inp = document.getElementById('new-type-input');
-  const val = inp.value.trim();
-  if (!val) return;
-  if (getAssetTypes().includes(val)) { showToast('هذا النوع موجود مسبقاً', 'error'); return; }
-  try {
-    const { collection: col, addDoc: add } = window.fsApi;
-    await add(col(window.db, "assetTypes"), { name: val });
-    inp.value = '';
-    await window.reloadData();
-    populateTypeFilters();
-    showToast('تمت إضافة النوع', 'success');
-  } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+function addAssetType(){
+  const inp=document.getElementById('new-type-input');
+  const val=inp.value.trim();
+  if(!val)return;
+  if(assetTypes.includes(val)){showToast('هذا النوع موجود مسبقاً','error');return;}
+  assetTypes.push(val);
+  inp.value='';
+  populateTypeFilters();
+  renderTypesList();
+  showToast('تمت إضافة النوع','success');
 }
 
-async function deleteType(id) {
-  if (!id) return;
-  const t = (window.assetTypes || []).find(x => x._id === id);
-  if (!confirm(`حذف النوع "${t?.name}"؟`)) return;
-  try {
-    const { doc: docRef, deleteDoc: del } = window.fsApi;
-    await del(docRef(window.db, "assetTypes", id));
-    await window.reloadData();
-    populateTypeFilters();
-  } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+function deleteType(i){
+  if(!confirm(`حذف النوع "${assetTypes[i]}"؟`))return;
+  assetTypes.splice(i,1);
+  populateTypeFilters();
+  renderTypesList();
 }
 
 /* ────────────────────────────────────────
    HANDOVER
 ──────────────────────────────────────── */
-function openNewHandover() { if (!can('handover')) return; openHandoverModal(null); }
-function openHandoverFromAsset(id) { if (!can('handover')) return; openHandoverModal(id); }
+function openNewHandover(){
+  if(!can('handover'))return;
+  openHandoverModal(null);
+}
 
-function openHandoverModal(preAssetId) {
-  const availAssets = getAssets().filter(a => a.availableQty > 0);
-  if (!availAssets.length) { showToast('لا توجد أصول متاحة للتسليم', 'error'); return; }
-  const assetOpts = availAssets.map(a => `<option value="${a._id}" ${a._id === preAssetId ? 'selected' : ''}>${a.name} (متاح: ${a.availableQty})</option>`).join('');
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-transfer"></i> نموذج تسليم الأصل';
-  document.getElementById('modal-body').innerHTML = `
+function openHandoverFromAsset(id){
+  if(!can('handover'))return;
+  openHandoverModal(id);
+}
+
+function openHandoverModal(preAssetId){
+  const availAssets=assets.filter(a=>a.availableQty>0);
+  if(!availAssets.length){showToast('لا توجد أصول متاحة للتسليم','error');return;}
+  const assetOpts=availAssets.map(a=>`<option value="${a.id}" ${a.id===preAssetId?'selected':''}>${a.name} (متاح: ${a.availableQty})</option>`).join('');
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-transfer"></i> نموذج تسليم الأصل';
+  document.getElementById('modal-body').innerHTML=`
     <div class="form-section">تفاصيل الأصل</div>
     <div class="form-row" style="margin-bottom:12px">
       <div class="field"><label>الأصل *</label><select id="h-asset">${assetOpts}</select></div>
@@ -870,95 +807,90 @@ function openHandoverModal(preAssetId) {
       <div class="field"><label>ملاحظات</label><textarea id="h-notes" rows="2"></textarea></div>
     </div>
   `;
-  document.getElementById('modal-save-btn').className = 'btn-save success-btn';
-  document.getElementById('modal-save-btn').textContent = 'تأكيد التسليم';
-  document.getElementById('modal-save-btn').onclick = saveHandover;
-  document.getElementById('modal-box').className = 'modal wide';
+  document.getElementById('modal-save-btn').className='btn-save success-btn';
+  document.getElementById('modal-save-btn').textContent='تأكيد التسليم';
+  document.getElementById('modal-save-btn').onclick=saveHandover;
+  document.getElementById('modal-box').className='modal wide';
   document.getElementById('modal-overlay').classList.add('show');
 }
 
-async function saveHandover() {
-  const assetId = document.getElementById('h-asset').value;
-  const qty = parseInt(document.getElementById('h-qty').value) || 0;
-  const clientName = document.getElementById('h-name').value.trim();
-  if (!clientName) { showToast('يرجى إدخال اسم العميل', 'error'); return; }
-  if (!qty || qty < 1) { showToast('يرجى إدخال كمية صحيحة', 'error'); return; }
-  const a = getAssets().find(x => x._id === assetId);
-  if (!a || a.availableQty < qty) { showToast('الكمية المطلوبة تتجاوز المتاح', 'error'); return; }
-  try {
-    const { collection: col, doc: docRef, addDoc: add, updateDoc: upd } = window.fsApi;
-    const newAvail = a.availableQty - qty;
-    const newClient = a.clientQty + qty;
-    const newStatus = newAvail === 0 && newClient > 0 ? 'عند عميل' : a.status;
-    await upd(docRef(window.db, "assets", a._id), { availableQty: newAvail, clientQty: newClient, status: newStatus });
-    await add(col(window.db, "handovers"), {
-      assetId, assetName: a.name, qty,
-      clientName, clientAddress: document.getElementById('h-address').value,
-      crNumber: document.getElementById('h-cr').value,
-      phone1: document.getElementById('h-phone1').value,
-      phone2: document.getElementById('h-phone2').value,
-      responsible: document.getElementById('h-resp').value,
-      date: document.getElementById('h-date').value,
-      notes: document.getElementById('h-notes').value,
-      status: 'مُسلَّم'
-    });
-    showToast('تم تسجيل التسليم بنجاح', 'success');
-    closeModal(); await window.reloadData();
-  } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+function saveHandover(){
+  const assetId=parseInt(document.getElementById('h-asset').value);
+  const qty=parseInt(document.getElementById('h-qty').value)||0;
+  const clientName=document.getElementById('h-name').value.trim();
+  if(!clientName){showToast('يرجى إدخال اسم العميل','error');return;}
+  if(!qty||qty<1){showToast('يرجى إدخال كمية صحيحة','error');return;}
+  const a=assets.find(x=>x.id===assetId);
+  if(!a||a.availableQty<qty){showToast('الكمية المطلوبة تتجاوز المتاح','error');return;}
+  a.availableQty-=qty;
+  a.clientQty+=qty;
+  if(a.availableQty===0&&a.clientQty>0)a.status='عند عميل';
+  handovers.push({
+    id:nextHandoverId++,assetId,assetName:a.name,qty,
+    clientName,clientAddress:document.getElementById('h-address').value,
+    crNumber:document.getElementById('h-cr').value,
+    phone1:document.getElementById('h-phone1').value,
+    phone2:document.getElementById('h-phone2').value,
+    responsible:document.getElementById('h-resp').value,
+    date:document.getElementById('h-date').value,
+    notes:document.getElementById('h-notes').value,
+    status:'مُسلَّم'
+  });
+  showToast('تم تسجيل التسليم بنجاح','success');
+  closeModal();renderAll();
 }
 
-function renderHandovers() {
-  const handovers = getHandovers();
-  if (!handovers.length) {
-    document.getElementById('handover-body').innerHTML = `<tr><td colspan="10" class="empty-row">لا توجد عمليات تسليم مسجلة</td></tr>`;
+function renderHandovers(){
+  if(!handovers.length){
+    document.getElementById('handover-body').innerHTML=`<tr><td colspan="10" class="empty-row">لا توجد عمليات تسليم مسجلة</td></tr>`;
     return;
   }
-  document.getElementById('handover-body').innerHTML = handovers.map((h, i) => `
+  document.getElementById('handover-body').innerHTML=handovers.map((h,i)=>`
     <tr>
-      <td style="color:var(--text3);font-size:12px">${i + 1}</td>
+      <td style="color:var(--text3);font-size:12px">${i+1}</td>
       <td style="font-weight:600">${h.assetName}</td>
       <td style="text-align:center;font-weight:700">${h.qty}</td>
-      <td><div style="font-weight:600">${h.clientName}</div>${h.crNumber ? `<div style="font-size:11px;color:var(--text3)">س.ت: ${h.crNumber}</div>` : ''}</td>
-      <td style="font-size:12px;color:var(--text2)">${h.clientAddress || '-'}</td>
-      <td style="font-size:12px">${h.crNumber || '-'}</td>
-      <td><div>${h.responsible}</div>${h.phone1 ? `<div style="font-size:11px;color:var(--text3)">${h.phone1}</div>` : ''}</td>
+      <td><div style="font-weight:600">${h.clientName}</div>${h.crNumber?`<div style="font-size:11px;color:var(--text3)">س.ت: ${h.crNumber}</div>`:''}</td>
+      <td style="font-size:12px;color:var(--text2)">${h.clientAddress||'-'}</td>
+      <td style="font-size:12px">${h.crNumber||'-'}</td>
+      <td><div>${h.responsible}</div>${h.phone1?`<div style="font-size:11px;color:var(--text3)">${h.phone1}</div>`:''}</td>
       <td style="font-size:12px">${h.date}</td>
       <td>${statusBadge(h.status)}</td>
-      <td>${h.status !== 'مُرتجع' ? `<button class="btn-action info" onclick="returnFromClient('${h._id}')" title="إعادة"><i class="ti ti-corner-up-left"></i></button>` : ''}</td>
+      <td><button class="btn-action info" onclick="returnFromClient(${h.id})" title="إعادة"><i class="ti ti-corner-up-left"></i></button></td>
     </tr>
   `).join('');
 }
 
-async function returnFromClient(hid) {
-  const h = getHandovers().find(x => x._id === hid);
-  if (!h || h.status === 'مُرتجع') return;
-  if (!confirm(`إعادة ${h.qty} وحدة من "${h.assetName}" من ${h.clientName}؟`)) return;
-  try {
-    const { doc: docRef, updateDoc: upd } = window.fsApi;
-    const a = getAssets().find(x => x._id === h.assetId);
-    if (a) {
-      const newAvail = a.availableQty + h.qty;
-      const newClient = Math.max(0, a.clientQty - h.qty);
-      await upd(docRef(window.db, "assets", a._id), { availableQty: newAvail, clientQty: newClient, status: newAvail > 0 ? 'متاح' : a.status });
-    }
-    await upd(docRef(window.db, "handovers", hid), { status: 'مُرتجع' });
-    showToast('تم تسجيل الإرجاع', 'success'); await window.reloadData();
-  } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+function returnFromClient(hid){
+  const h=handovers.find(x=>x.id===hid);
+  if(!h||h.status==='مُرتجع'){return;}
+  if(!confirm(`إعادة ${h.qty} وحدة من "${h.assetName}" من ${h.clientName}؟`))return;
+  const a=assets.find(x=>x.id===h.assetId);
+  if(a){a.availableQty+=h.qty;a.clientQty=Math.max(0,a.clientQty-h.qty);if(a.availableQty>0)a.status='متاح';}
+  h.status='مُرتجع';
+  showToast('تم تسجيل الإرجاع','success');renderAll();
 }
 
 /* ────────────────────────────────────────
    MAINTENANCE
 ──────────────────────────────────────── */
-function openNewMaintenance() { if (!can('maintenance')) return; openMaintenanceModal(null); }
-function openMaintenanceFromAsset(id) { if (!can('maintenance')) return; openMaintenanceModal(id); }
+function openNewMaintenance(){
+  if(!can('maintenance'))return;
+  openMaintenanceModal(null);
+}
 
-function openMaintenanceModal(preAssetId) {
-  const availAssets = getAssets().filter(a => a.availableQty > 0);
-  if (!availAssets.length) { showToast('لا توجد أصول متاحة للتحويل', 'error'); return; }
-  const assetOpts = availAssets.map(a => `<option value="${a._id}" ${a._id === preAssetId ? 'selected' : ''}>${a.name} (متاح: ${a.availableQty})</option>`).join('');
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-tool"></i> نموذج تحويل للصيانة';
-  document.getElementById('modal-body').innerHTML = `
+function openMaintenanceFromAsset(id){
+  if(!can('maintenance'))return;
+  openMaintenanceModal(id);
+}
+
+function openMaintenanceModal(preAssetId){
+  const availAssets=assets.filter(a=>a.availableQty>0);
+  if(!availAssets.length){showToast('لا توجد أصول متاحة للتحويل','error');return;}
+  const assetOpts=availAssets.map(a=>`<option value="${a.id}" ${a.id===preAssetId?'selected':''}>${a.name} (متاح: ${a.availableQty})</option>`).join('');
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-tool"></i> نموذج تحويل للصيانة';
+  document.getElementById('modal-body').innerHTML=`
     <div class="form-row" style="margin-bottom:12px">
       <div class="field"><label>الأصل *</label><select id="m-asset">${assetOpts}</select></div>
       <div class="field"><label>الكمية *</label><input id="m-qty" type="number" min="1" value="1"></div>
@@ -974,49 +906,45 @@ function openMaintenanceModal(preAssetId) {
       <div class="field"><label>ملاحظات</label><input id="m-notes"></div>
     </div>
   `;
-  document.getElementById('modal-save-btn').className = 'btn-save';
-  document.getElementById('modal-save-btn').style.background = 'var(--amber)';
-  document.getElementById('modal-save-btn').textContent = 'تأكيد التحويل';
-  document.getElementById('modal-save-btn').onclick = saveMaintenance;
-  document.getElementById('modal-box').className = 'modal wide';
+  document.getElementById('modal-save-btn').className='btn-save';
+  document.getElementById('modal-save-btn').style.background='var(--amber)';
+  document.getElementById('modal-save-btn').textContent='تأكيد التحويل';
+  document.getElementById('modal-save-btn').onclick=saveMaintenance;
+  document.getElementById('modal-box').className='modal wide';
   document.getElementById('modal-overlay').classList.add('show');
 }
 
-async function saveMaintenance() {
-  const assetId = document.getElementById('m-asset').value;
-  const qty = parseInt(document.getElementById('m-qty').value) || 0;
-  const vendor = document.getElementById('m-vendor').value.trim();
-  const fault = document.getElementById('m-fault').value.trim();
-  if (!vendor) { showToast('يرجى إدخال جهة الصيانة', 'error'); return; }
-  if (!fault) { showToast('يرجى إدخال وصف العطل', 'error'); return; }
-  if (!qty || qty < 1) { showToast('يرجى إدخال كمية صحيحة', 'error'); return; }
-  const a = getAssets().find(x => x._id === assetId);
-  if (!a || a.availableQty < qty) { showToast('الكمية تتجاوز المتاح', 'error'); return; }
-  try {
-    const { collection: col, doc: docRef, addDoc: add, updateDoc: upd } = window.fsApi;
-    const newAvail = a.availableQty - qty;
-    const newMaint = a.maintenanceQty + qty;
-    await upd(docRef(window.db, "assets", a._id), { availableQty: newAvail, maintenanceQty: newMaint, status: newAvail === 0 ? 'صيانة' : a.status });
-    await add(col(window.db, "maintenances"), {
-      assetId, assetName: a.name, qty, vendor, fault,
-      date: document.getElementById('m-date').value,
-      notes: document.getElementById('m-notes').value,
-      status: 'قيد الصيانة'
-    });
-    showToast('تم تحويل الأصل للصيانة', 'success');
-    closeModal(); await window.reloadData();
-  } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+function saveMaintenance(){
+  const assetId=parseInt(document.getElementById('m-asset').value);
+  const qty=parseInt(document.getElementById('m-qty').value)||0;
+  const vendor=document.getElementById('m-vendor').value.trim();
+  const fault=document.getElementById('m-fault').value.trim();
+  if(!vendor){showToast('يرجى إدخال جهة الصيانة','error');return;}
+  if(!fault){showToast('يرجى إدخال وصف العطل','error');return;}
+  if(!qty||qty<1){showToast('يرجى إدخال كمية صحيحة','error');return;}
+  const a=assets.find(x=>x.id===assetId);
+  if(!a||a.availableQty<qty){showToast('الكمية تتجاوز المتاح','error');return;}
+  a.availableQty-=qty;
+  a.maintenanceQty+=qty;
+  if(a.availableQty===0)a.status='صيانة';
+  maintenances.push({
+    id:nextMaintenanceId++,assetId,assetName:a.name,qty,vendor,fault,
+    date:document.getElementById('m-date').value,
+    notes:document.getElementById('m-notes').value,
+    status:'قيد الصيانة'
+  });
+  showToast('تم تحويل الأصل للصيانة','success');
+  closeModal();renderAll();
 }
 
-function renderMaintenances() {
-  const maintenances = getMaintenances();
-  if (!maintenances.length) {
-    document.getElementById('maintenance-body').innerHTML = `<tr><td colspan="8" class="empty-row">لا توجد أصول في الصيانة</td></tr>`;
+function renderMaintenances(){
+  if(!maintenances.length){
+    document.getElementById('maintenance-body').innerHTML=`<tr><td colspan="8" class="empty-row">لا توجد أصول في الصيانة</td></tr>`;
     return;
   }
-  document.getElementById('maintenance-body').innerHTML = maintenances.map((m, i) => `
+  document.getElementById('maintenance-body').innerHTML=maintenances.map((m,i)=>`
     <tr>
-      <td style="color:var(--text3);font-size:12px">${i + 1}</td>
+      <td style="color:var(--text3);font-size:12px">${i+1}</td>
       <td style="font-weight:600">${m.assetName}</td>
       <td style="text-align:center;font-weight:700">${m.qty}</td>
       <td>${m.vendor}</td>
@@ -1024,42 +952,42 @@ function renderMaintenances() {
       <td style="font-size:12px">${m.date}</td>
       <td>${statusBadge(m.status)}</td>
       <td>
-        ${m.status === 'قيد الصيانة' ? `<button class="btn-action success" onclick="returnFromMaintenance('${m._id}')" title="إعادة للمخزون"><i class="ti ti-corner-up-left"></i></button>` : ''}
+        ${m.status==='قيد الصيانة'?`<button class="btn-action success" onclick="returnFromMaintenance(${m.id})" title="إعادة للمخزون"><i class="ti ti-corner-up-left"></i></button>`:''}
       </td>
     </tr>
   `).join('');
 }
 
-async function returnFromMaintenance(mid) {
-  const m = getMaintenances().find(x => x._id === mid);
-  if (!m || m.status !== 'قيد الصيانة') return;
-  if (!confirm(`إعادة ${m.qty} وحدة من "${m.assetName}" للمخزون بعد الصيانة؟`)) return;
-  try {
-    const { doc: docRef, updateDoc: upd } = window.fsApi;
-    const a = getAssets().find(x => x._id === m.assetId);
-    if (a) {
-      const newAvail = a.availableQty + m.qty;
-      const newMaint = Math.max(0, a.maintenanceQty - m.qty);
-      await upd(docRef(window.db, "assets", a._id), { availableQty: newAvail, maintenanceQty: newMaint, status: newAvail > 0 ? 'متاح' : a.status });
-    }
-    await upd(docRef(window.db, "maintenances", mid), { status: 'مكتمل' });
-    showToast('تم إعادة الأصل للمخزون', 'success'); await window.reloadData();
-  } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+function returnFromMaintenance(mid){
+  const m=maintenances.find(x=>x.id===mid);
+  if(!m||m.status!=='قيد الصيانة')return;
+  if(!confirm(`إعادة ${m.qty} وحدة من "${m.assetName}" للمخزون بعد الصيانة؟`))return;
+  const a=assets.find(x=>x.id===m.assetId);
+  if(a){a.availableQty+=m.qty;a.maintenanceQty=Math.max(0,a.maintenanceQty-m.qty);if(a.availableQty>0)a.status='متاح';}
+  m.status='مكتمل';
+  showToast('تم إعادة الأصل للمخزون','success');renderAll();
 }
 
 /* ────────────────────────────────────────
    DISPOSE
 ──────────────────────────────────────── */
-function openNewDispose() { if (!can('dispose')) return; openDisposeModal(null); }
-function openDisposeFromAsset(id) { if (!can('dispose')) return; openDisposeModal(id); }
+function openNewDispose(){
+  if(!can('dispose'))return;
+  openDisposeModal(null);
+}
 
-function openDisposeModal(preAssetId) {
-  const validAssets = getAssets().filter(a => a.totalQty > 0);
-  if (!validAssets.length) { showToast('لا توجد أصول للإتلاف', 'error'); return; }
-  const assetOpts = validAssets.map(a => `<option value="${a._id}" ${a._id === preAssetId ? 'selected' : ''}>${a.name} (متاح: ${a.availableQty}، تالف: ${a.damagedQty})</option>`).join('');
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-trash" style="color:var(--red)"></i> نموذج إتلاف أصل';
-  document.getElementById('modal-body').innerHTML = `
+function openDisposeFromAsset(id){
+  if(!can('dispose'))return;
+  openDisposeModal(id);
+}
+
+function openDisposeModal(preAssetId){
+  const validAssets=assets.filter(a=>a.totalQty>0);
+  if(!validAssets.length){showToast('لا توجد أصول للإتلاف','error');return;}
+  const assetOpts=validAssets.map(a=>`<option value="${a.id}" ${a.id===preAssetId?'selected':''}>${a.name} (متاح: ${a.availableQty}، تالف: ${a.damagedQty})</option>`).join('');
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-trash" style="color:var(--red)"></i> نموذج إتلاف أصل';
+  document.getElementById('modal-body').innerHTML=`
     <div class="alert alert-danger"><i class="ti ti-alert-triangle"></i> هذا الإجراء نهائي ويُخصم من رصيد الأصل</div>
     <div class="form-row" style="margin-bottom:12px">
       <div class="field"><label>الأصل *</label><select id="d-asset">${assetOpts}</select></div>
@@ -1073,53 +1001,46 @@ function openDisposeModal(preAssetId) {
       <div class="field"><label>التاريخ</label><input id="d-date" type="date" value="${today}"></div>
     </div>
   `;
-  document.getElementById('modal-save-btn').className = 'btn-save danger-btn';
-  document.getElementById('modal-save-btn').textContent = 'تأكيد الإتلاف';
-  document.getElementById('modal-save-btn').onclick = saveDispose;
-  document.getElementById('modal-box').className = 'modal wide';
+  document.getElementById('modal-save-btn').className='btn-save danger-btn';
+  document.getElementById('modal-save-btn').textContent='تأكيد الإتلاف';
+  document.getElementById('modal-save-btn').onclick=saveDispose;
+  document.getElementById('modal-box').className='modal wide';
   document.getElementById('modal-overlay').classList.add('show');
 }
 
-async function saveDispose() {
-  const assetId = document.getElementById('d-asset').value;
-  const qty = parseInt(document.getElementById('d-qty').value) || 0;
-  const reason = document.getElementById('d-reason').value.trim();
-  if (!reason) { showToast('يرجى إدخال سبب الإتلاف', 'error'); return; }
-  if (!qty || qty < 1) { showToast('يرجى إدخال كمية صحيحة', 'error'); return; }
-  const a = getAssets().find(x => x._id === assetId);
-  if (!a || a.totalQty < qty) { showToast('الكمية تتجاوز الإجمالي', 'error'); return; }
-  try {
-    const { collection: col, doc: docRef, addDoc: add, updateDoc: upd } = window.fsApi;
-    let remaining = qty;
-    let newDamaged = a.damagedQty;
-    let newAvail = a.availableQty;
-    if (newDamaged > 0) { const fd = Math.min(newDamaged, remaining); newDamaged -= fd; remaining -= fd; }
-    if (remaining > 0 && newAvail > 0) { const fa = Math.min(newAvail, remaining); newAvail -= fa; remaining -= fa; }
-    const newTotal = a.totalQty - qty;
-    const newDisposed = (a.disposedQty || 0) + qty;
-    let newStatus = a.status;
-    if (newAvail === 0 && newTotal > 0) newStatus = 'تالف';
-    if (newTotal === 0) newStatus = 'متلف';
-    await upd(docRef(window.db, "assets", a._id), { totalQty: newTotal, availableQty: newAvail, damagedQty: newDamaged, disposedQty: newDisposed, status: newStatus });
-    await add(col(window.db, "disposes"), {
-      assetId, assetName: a.name, qty, reason,
-      approved: document.getElementById('d-approved').value,
-      date: document.getElementById('d-date').value
-    });
-    showToast('تم تسجيل الإتلاف', 'success');
-    closeModal(); await window.reloadData();
-  } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+function saveDispose(){
+  const assetId=parseInt(document.getElementById('d-asset').value);
+  const qty=parseInt(document.getElementById('d-qty').value)||0;
+  const reason=document.getElementById('d-reason').value.trim();
+  if(!reason){showToast('يرجى إدخال سبب الإتلاف','error');return;}
+  if(!qty||qty<1){showToast('يرجى إدخال كمية صحيحة','error');return;}
+  const a=assets.find(x=>x.id===assetId);
+  if(!a||a.totalQty<qty){showToast('الكمية تتجاوز الإجمالي','error');return;}
+  // deduct from available or damaged first
+  let remaining=qty;
+  if(a.damagedQty>0){const fromDamaged=Math.min(a.damagedQty,remaining);a.damagedQty-=fromDamaged;remaining-=fromDamaged;}
+  if(remaining>0&&a.availableQty>0){const fromAvail=Math.min(a.availableQty,remaining);a.availableQty-=fromAvail;remaining-=fromAvail;}
+  a.totalQty-=qty;
+  a.disposedQty=(a.disposedQty||0)+qty;
+  if(a.availableQty===0&&a.totalQty>0)a.status='تالف';
+  if(a.totalQty===0)a.status='متلف';
+  disposes.push({
+    id:nextDisposeId++,assetId,assetName:a.name,qty,reason,
+    approved:document.getElementById('d-approved').value,
+    date:document.getElementById('d-date').value
+  });
+  showToast('تم تسجيل الإتلاف','success');
+  closeModal();renderAll();
 }
 
-function renderDisposes() {
-  const disposes = getDisposes();
-  if (!disposes.length) {
-    document.getElementById('dispose-body').innerHTML = `<tr><td colspan="6" class="empty-row">لا توجد أصول متلفة</td></tr>`;
+function renderDisposes(){
+  if(!disposes.length){
+    document.getElementById('dispose-body').innerHTML=`<tr><td colspan="6" class="empty-row">لا توجد أصول متلفة</td></tr>`;
     return;
   }
-  document.getElementById('dispose-body').innerHTML = disposes.map((d, i) => `
+  document.getElementById('dispose-body').innerHTML=disposes.map((d,i)=>`
     <tr>
-      <td style="color:var(--text3);font-size:12px">${i + 1}</td>
+      <td style="color:var(--text3);font-size:12px">${i+1}</td>
       <td style="font-weight:600">${d.assetName}</td>
       <td style="text-align:center;font-weight:700;color:var(--red)">${d.qty}</td>
       <td style="font-size:12px">${d.reason}</td>
@@ -1132,54 +1053,53 @@ function renderDisposes() {
 /* ────────────────────────────────────────
    REPORTS
 ──────────────────────────────────────── */
-function renderReports() {
-  const assets = getAssets();
-  const types = [...new Set(assets.map(a => a.type))];
-  const byStatus = { متاح: 0, 'عند عميل': 0, صيانة: 0, تالف: 0, متلف: 0 };
-  assets.forEach(a => {
-    byStatus['متاح'] += a.availableQty;
-    byStatus['عند عميل'] += a.clientQty;
-    byStatus['صيانة'] += a.maintenanceQty;
-    byStatus['تالف'] += a.damagedQty;
-    byStatus['متلف'] += a.disposedQty || 0;
+function renderReports(){
+  const types=[...new Set(assets.map(a=>a.type))];
+  const byStatus={'متاح':0,'عند عميل':0,'صيانة':0,'تالف':0,'متلف':0};
+  assets.forEach(a=>{
+    byStatus['متاح']+=a.availableQty;
+    byStatus['عند عميل']+=a.clientQty;
+    byStatus['صيانة']+=a.maintenanceQty;
+    byStatus['تالف']+=a.damagedQty;
+    byStatus['متلف']+=a.disposedQty||0;
   });
-  const maxS = Math.max(...Object.values(byStatus), 1);
-  const colors = { متاح: '#2E6B10', 'عند عميل': '#1A5FA8', صيانة: '#8A4F08', تالف: '#C07010', متلف: '#A32828' };
-  const total = Object.values(byStatus).reduce((s, v) => s + v, 0) || 1;
-  document.getElementById('report-cards').innerHTML = `
+  const maxS=Math.max(...Object.values(byStatus),1);
+  const colors={'متاح':'#2E6B10','عند عميل':'#1A5FA8','صيانة':'#8A4F08','تالف':'#C07010','متلف':'#A32828'};
+  const total=Object.values(byStatus).reduce((s,v)=>s+v,0)||1;
+  document.getElementById('report-cards').innerHTML=`
     <div class="report-card">
       <h4>توزيع الوحدات حسب الحالة</h4>
-      ${Object.entries(byStatus).map(([s, c]) => `
+      ${Object.entries(byStatus).map(([s,c])=>`
         <div class="bar-row">
           <span class="bar-label">${s}</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(c / maxS * 100)}%;background:${colors[s]}"></div></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(c/maxS*100)}%;background:${colors[s]}"></div></div>
           <span style="font-size:12px;font-weight:700;min-width:28px">${c}</span>
-          <span style="font-size:11px;color:var(--text3)">${Math.round(c / total * 100)}%</span>
+          <span style="font-size:11px;color:var(--text3)">${Math.round(c/total*100)}%</span>
         </div>
       `).join('')}
     </div>
     <div class="report-card">
       <h4>توزيع الأصول حسب النوع</h4>
-      ${types.map(t => { const cnt = assets.filter(a => a.type === t).reduce((s, a) => s + a.totalQty, 0); return `
+      ${types.map(t=>{const cnt=assets.filter(a=>a.type===t).reduce((s,a)=>s+a.totalQty,0);return`
         <div class="bar-row">
           <span class="bar-label" style="font-size:11px">${t}</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(cnt / assets.reduce((s, a) => s + a.totalQty, 0) * 100 || 0)}%;background:#1A5FA8"></div></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.round(cnt/assets.reduce((s,a)=>s+a.totalQty,0)*100||0)}%;background:#1A5FA8"></div></div>
           <span style="font-size:12px;font-weight:700;min-width:28px">${cnt}</span>
         </div>
-      `; }).join('')}
+      `;}).join('')}
     </div>
   `;
-  document.getElementById('report-body').innerHTML = types.map(t => {
-    const ta = assets.filter(a => a.type === t);
-    const tot = ta.reduce((s, a) => s + a.totalQty, 0);
-    return `<tr>
+  document.getElementById('report-body').innerHTML=types.map(t=>{
+    const ta=assets.filter(a=>a.type===t);
+    const tot=ta.reduce((s,a)=>s+a.totalQty,0);
+    return`<tr>
       <td style="font-weight:600">${t}</td>
       <td style="text-align:center;font-weight:700">${tot}</td>
-      <td style="text-align:center;color:var(--green);font-weight:700">${ta.reduce((s, a) => s + a.availableQty, 0)}</td>
-      <td style="text-align:center;color:var(--blue);font-weight:700">${ta.reduce((s, a) => s + a.clientQty, 0)}</td>
-      <td style="text-align:center;color:var(--amber);font-weight:700">${ta.reduce((s, a) => s + a.maintenanceQty, 0)}</td>
-      <td style="text-align:center;color:var(--red);font-weight:700">${ta.reduce((s, a) => s + a.damagedQty, 0)}</td>
-      <td style="text-align:center;color:var(--red);font-weight:700">${ta.reduce((s, a) => s + (a.disposedQty || 0), 0)}</td>
+      <td style="text-align:center;color:var(--green);font-weight:700">${ta.reduce((s,a)=>s+a.availableQty,0)}</td>
+      <td style="text-align:center;color:var(--blue);font-weight:700">${ta.reduce((s,a)=>s+a.clientQty,0)}</td>
+      <td style="text-align:center;color:var(--amber);font-weight:700">${ta.reduce((s,a)=>s+a.maintenanceQty,0)}</td>
+      <td style="text-align:center;color:var(--red);font-weight:700">${ta.reduce((s,a)=>s+a.damagedQty,0)}</td>
+      <td style="text-align:center;color:var(--red);font-weight:700">${ta.reduce((s,a)=>s+(a.disposedQty||0),0)}</td>
     </tr>`;
   }).join('');
 }
@@ -1187,72 +1107,86 @@ function renderReports() {
 /* ────────────────────────────────────────
    USERS
 ──────────────────────────────────────── */
-const ALL_PERMS = [
-  { key: 'view', label: 'عرض' }, { key: 'add', label: 'إضافة أصول' },
-  { key: 'edit', label: 'تعديل أصول' }, { key: 'handover', label: 'تسليم' },
-  { key: 'maintenance', label: 'صيانة' }, { key: 'dispose', label: 'إتلاف' },
-  { key: 'users', label: 'إدارة المستخدمين' },
+const ALL_PERMS=[
+  {key:'view',label:'عرض'},
+  {key:'add',label:'إضافة أصول'},
+  {key:'edit',label:'تعديل أصول'},
+  {key:'handover',label:'تسليم'},
+  {key:'maintenance',label:'صيانة'},
+  {key:'dispose',label:'إتلاف'},
+  {key:'users',label:'إدارة المستخدمين'},
 ];
-const PERM_LABELS = { view: 'عرض', add: 'إضافة أصول', edit: 'تعديل', handover: 'تسليم', maintenance: 'صيانة', dispose: 'إتلاف', users: 'مستخدمون' };
+const PERM_LABELS={view:'عرض',add:'إضافة أصول',edit:'تعديل',handover:'تسليم',maintenance:'صيانة',dispose:'إتلاف',users:'مستخدمون'};
 
-function renderUsers() {
-  if (!document.getElementById('users-body')) return;
-  const isAdmin = can('users');
-  document.getElementById('users-body').innerHTML = getUsers().map(u => `
+function renderUsers(){
+  if(!document.getElementById('users-body'))return;
+  const isAdmin=can('users');
+  document.getElementById('users-body').innerHTML=users.map(u=>`
     <tr>
       <td style="font-weight:600"><i class="ti ti-user-circle" style="margin-left:5px;color:var(--text3)"></i>${u.name}</td>
       <td><code class="tag">${u.username}</code></td>
-      <td><span class="badge ${u.role === 'مدير' ? 'badge-blue' : u.role === 'مشرف' ? 'badge-amber' : 'badge-gray'}">${u.role}</span></td>
-      <td style="font-size:11px">${u.perms.map(p => `<span class="badge badge-gray" style="margin:1px">${PERM_LABELS[p] || p}</span>`).join('')}</td>
-      <td>${isAdmin && u._id !== currentUser._id ? `
-        <button class="btn-action info" onclick="openEditUser('${u._id}')"><i class="ti ti-edit"></i></button>
-        <button class="btn-action danger" onclick="deleteUser('${u._id}')"><i class="ti ti-trash"></i></button>
-      ` : ''}</td>
+      <td><span class="badge ${u.role==='مدير'?'badge-blue':u.role==='مشرف'?'badge-amber':'badge-gray'}">${u.role}</span></td>
+      <td style="font-size:11px;color:var(--text2)">${u.perms.map(p=>`<span class="badge badge-gray" style="margin:1px 2px;font-size:10px">${PERM_LABELS[p]||p}</span>`).join('')}</td>
+      <td style="white-space:nowrap">
+        ${isAdmin&&u.id!==currentUser.id?`
+          <button class="btn-action info" onclick="openEditUser(${u.id})" title="تعديل"><i class="ti ti-edit"></i> تعديل</button>
+          <button class="btn-action danger" onclick="deleteUser(${u.id})" title="حذف"><i class="ti ti-trash"></i> حذف</button>
+        `:'<span style="font-size:11px;color:var(--text3)">—</span>'}
+      </td>
     </tr>
   `).join('');
 }
 
-function openAddUser() {
-  if (!can('users')) return;
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-user-plus"></i> إضافة مستخدم جديد';
-  document.getElementById('modal-body').innerHTML = userFormHTML(null);
-  document.getElementById('modal-save-btn').textContent = 'إضافة المستخدم';
-  document.getElementById('modal-save-btn').onclick = saveNewUser;
+let nextUserId=4;
+
+function openAddUser(){
+  if(!can('users')){showToast('ليس لديك صلاحية','error');return;}
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-user-plus"></i> إضافة مستخدم جديد';
+  document.getElementById('modal-body').innerHTML=userFormHTML(null);
+  document.getElementById('modal-save-btn').textContent='إضافة';
+  document.getElementById('modal-save-btn').onclick=saveNewUser;
   document.getElementById('modal-overlay').classList.add('show');
 }
 
-function openEditUser(id) {
-  const u = getUsers().find(x => x._id === id);
-  if (!u) return;
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-edit"></i> تعديل مستخدم: ' + u.name;
-  document.getElementById('modal-body').innerHTML = userFormHTML(u);
-  document.getElementById('modal-save-btn').textContent = 'حفظ التعديلات';
-  document.getElementById('modal-save-btn').onclick = () => saveEditUser(id);
+function openEditUser(id){
+  if(!can('users')){showToast('ليس لديك صلاحية','error');return;}
+  const u=users.find(x=>x.id===id);
+  if(!u)return;
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-edit"></i> تعديل مستخدم: '+u.name;
+  document.getElementById('modal-body').innerHTML=userFormHTML(u);
+  document.getElementById('modal-save-btn').textContent='حفظ التعديلات';
+  document.getElementById('modal-save-btn').onclick=()=>saveEditUser(id);
   document.getElementById('modal-overlay').classList.add('show');
 }
 
-function userFormHTML(u) {
-  return `
+function userFormHTML(u){
+  const permsHTML=ALL_PERMS.map(p=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:var(--bg);margin-bottom:6px;cursor:pointer;border:1px solid var(--border)">
+      <input type="checkbox" name="perm" value="${p.key}" ${u&&u.perms.includes(p.key)?'checked':''} style="width:15px;height:15px;accent-color:var(--blue)">
+      <span style="font-size:13px">${p.label}</span>
+    </label>
+  `).join('');
+  return`
     <div class="form-section">بيانات المستخدم</div>
     <div class="form-row" style="margin-bottom:12px">
-      <div class="field"><label>الاسم الكامل</label><input type="text" id="u-name" value="${u ? u.name : ''}" placeholder="مثال: أحمد محمد"></div>
-      <div class="field"><label>اسم المستخدم</label><input type="text" id="u-username" value="${u ? u.username : ''}" placeholder="مثال: ahmed" style="direction:ltr;text-align:right"></div>
+      <div class="field"><label>الاسم الكامل</label><input type="text" id="u-name" value="${u?u.name:''}" placeholder="مثال: أحمد محمد"></div>
+      <div class="field"><label>اسم المستخدم</label><input type="text" id="u-username" value="${u?u.username:''}" placeholder="مثال: ahmed" style="direction:ltr;text-align:right"></div>
     </div>
     <div class="form-row" style="margin-bottom:12px">
-      <div class="field"><label>كلمة المرور ${u ? '(اتركها فارغة إن لم تريد تغييرها)' : ''}</label><input type="password" id="u-password" placeholder="كلمة المرور"></div>
+      <div class="field"><label>كلمة المرور ${u?'(اتركها فارغة إن لم تريد تغييرها)':''}</label><input type="password" id="u-password" placeholder="كلمة المرور"></div>
       <div class="field"><label>الدور</label>
         <select id="u-role">
-          <option value="مدير" ${u && u.role === 'مدير' ? 'selected' : ''}>مدير</option>
-          <option value="مشرف" ${u && u.role === 'مشرف' ? 'selected' : ''}>مشرف</option>
-          <option value="موظف" ${!u || u.role === 'موظف' ? 'selected' : ''}>موظف</option>
+          <option value="مدير" ${u&&u.role==='مدير'?'selected':''}>مدير</option>
+          <option value="مشرف" ${u&&u.role==='مشرف'?'selected':''}>مشرف</option>
+          <option value="موظف" ${!u||u.role==='موظف'?'selected':''}>موظف</option>
         </select>
       </div>
     </div>
     <div class="form-section">الصلاحيات</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-      ${ALL_PERMS.map(p => `
+      ${ALL_PERMS.map(p=>`
         <label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:var(--bg);cursor:pointer;border:1px solid var(--border)">
-          <input type="checkbox" name="perm" value="${p.key}" ${u && u.perms.includes(p.key) ? 'checked' : ''} style="width:15px;height:15px;accent-color:var(--blue)">
+          <input type="checkbox" name="perm" value="${p.key}" ${u&&u.perms.includes(p.key)?'checked':''} style="width:15px;height:15px;accent-color:var(--blue)">
           <span style="font-size:13px">${p.label}</span>
         </label>
       `).join('')}
@@ -1265,69 +1199,68 @@ function userFormHTML(u) {
   `;
 }
 
-function setPresetPerms(preset) {
-  const checks = document.querySelectorAll('input[name="perm"]');
-  const presets = { admin: ['view', 'add', 'edit', 'handover', 'dispose', 'maintenance', 'users'], manager: ['view', 'add', 'edit', 'handover', 'dispose', 'maintenance'], viewer: ['view'] };
-  checks.forEach(c => c.checked = presets[preset].includes(c.value));
+function setPresetPerms(preset){
+  const checks=document.querySelectorAll('input[name="perm"]');
+  const presets={
+    admin:['view','add','edit','handover','dispose','maintenance','users'],
+    manager:['view','add','edit','handover','dispose','maintenance'],
+    viewer:['view']
+  };
+  checks.forEach(c=>c.checked=presets[preset].includes(c.value));
 }
 
-function getFormUser() {
-  const name = document.getElementById('u-name').value.trim();
-  const username = document.getElementById('u-username').value.trim();
-  const password = document.getElementById('u-password').value;
-  const role = document.getElementById('u-role').value;
-  const perms = [...document.querySelectorAll('input[name="perm"]:checked')].map(c => c.value);
-  if (!name || !username) { showToast('الاسم واسم المستخدم مطلوبان', 'error'); return null; }
-  if (!perms.length) { showToast('يجب اختيار صلاحية واحدة على الأقل', 'error'); return null; }
-  return { name, username, password, role, perms };
+function getFormUser(){
+  const name=document.getElementById('u-name').value.trim();
+  const username=document.getElementById('u-username').value.trim();
+  const password=document.getElementById('u-password').value;
+  const role=document.getElementById('u-role').value;
+  const perms=[...document.querySelectorAll('input[name="perm"]:checked')].map(c=>c.value);
+  if(!name||!username){showToast('الاسم واسم المستخدم مطلوبان','error');return null;}
+  if(!perms.length){showToast('يجب اختيار صلاحية واحدة على الأقل','error');return null;}
+  return{name,username,password,role,perms};
 }
 
-async function saveNewUser() {
-  const data = getFormUser();
-  if (!data) return;
-  if (!data.password) { showToast('كلمة المرور مطلوبة للمستخدم الجديد', 'error'); return; }
-  if (getUsers().find(u => u.username === data.username)) { showToast('اسم المستخدم موجود مسبقاً', 'error'); return; }
-  try {
-    const { collection: col, addDoc: add } = window.fsApi;
-    await add(col(window.db, "users"), data);
-    showToast('تم إضافة المستخدم بنجاح', 'success');
-    closeModal(); await window.reloadData();
-  } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+function saveNewUser(){
+  const data=getFormUser();
+  if(!data)return;
+  if(!data.password){showToast('كلمة المرور مطلوبة للمستخدم الجديد','error');return;}
+  if(users.find(u=>u.username===data.username)){showToast('اسم المستخدم موجود مسبقاً','error');return;}
+  users.push({id:nextUserId++,...data});
+  showToast('تم إضافة المستخدم بنجاح','success');
+  closeModal();renderUsers();
 }
 
-async function saveEditUser(id) {
-  const data = getFormUser();
-  if (!data) return;
-  const existing = getUsers().find(u => u.username === data.username && u._id !== id);
-  if (existing) { showToast('اسم المستخدم مستخدم من قبل شخص آخر', 'error'); return; }
-  try {
-    const { doc: docRef, updateDoc: upd } = window.fsApi;
-    const updateData = { name: data.name, username: data.username, role: data.role, perms: data.perms };
-    if (data.password) updateData.password = data.password;
-    await upd(docRef(window.db, "users", id), updateData);
-    showToast('تم تحديث بيانات المستخدم', 'success');
-    closeModal(); await window.reloadData();
-  } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+function saveEditUser(id){
+  const data=getFormUser();
+  if(!data)return;
+  const existing=users.find(u=>u.username===data.username&&u.id!==id);
+  if(existing){showToast('اسم المستخدم مستخدم من قبل شخص آخر','error');return;}
+  const u=users.find(x=>x.id===id);
+  u.name=data.name;
+  u.username=data.username;
+  if(data.password)u.password=data.password;
+  u.role=data.role;
+  u.perms=data.perms;
+  showToast('تم تحديث بيانات المستخدم','success');
+  closeModal();renderUsers();
 }
 
-async function deleteUser(id) {
-  if (!can('users')) { showToast('ليس لديك صلاحية', 'error'); return; }
-  const u = getUsers().find(x => x._id === id);
-  if (!u) return;
-  if (u._id === currentUser._id) { showToast('لا يمكنك حذف حسابك الحالي', 'error'); return; }
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-trash" style="color:var(--red)"></i> حذف مستخدم';
-  document.getElementById('modal-body').innerHTML = `
+function deleteUser(id){
+  if(!can('users')){showToast('ليس لديك صلاحية','error');return;}
+  const u=users.find(x=>x.id===id);
+  if(!u)return;
+  if(u.id===currentUser.id){showToast('لا يمكنك حذف حسابك الحالي','error');return;}
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-trash" style="color:var(--red)"></i> حذف مستخدم';
+  document.getElementById('modal-body').innerHTML=`
     <div class="alert alert-danger"><i class="ti ti-alert-triangle"></i> هل أنت متأكد من حذف المستخدم <strong>${u.name}</strong> (@${u.username})؟ لا يمكن التراجع عن هذا الإجراء.</div>
   `;
-  document.getElementById('modal-save-btn').textContent = 'حذف المستخدم';
-  document.getElementById('modal-save-btn').className = 'btn-save danger-btn';
-  document.getElementById('modal-save-btn').onclick = async () => {
-    try {
-      const { doc: docRef, deleteDoc: del } = window.fsApi;
-      await del(docRef(window.db, "users", id));
-      showToast('تم حذف المستخدم', 'success');
-      closeModal(); await window.reloadData();
-    } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+  document.getElementById('modal-save-btn').textContent='حذف المستخدم';
+  document.getElementById('modal-save-btn').className='btn-save danger-btn';
+  document.getElementById('modal-save-btn').onclick=()=>{
+    const idx=users.findIndex(x=>x.id===id);
+    if(idx>-1)users.splice(idx,1);
+    showToast('تم حذف المستخدم','success');
+    closeModal();renderUsers();
   };
   document.getElementById('modal-overlay').classList.add('show');
 }
@@ -1335,41 +1268,49 @@ async function deleteUser(id) {
 /* ────────────────────────────────────────
    MODAL
 ──────────────────────────────────────── */
-function closeModal() {
+function closeModal(){
   document.getElementById('modal-overlay').classList.remove('show');
-  document.getElementById('modal-save-btn').style.background = '';
-  document.getElementById('modal-save-btn').textContent = 'حفظ';
-  document.getElementById('modal-save-btn').className = 'btn-save';
-  document.getElementById('modal-box').className = 'modal';
+  document.getElementById('modal-save-btn').style.background='';
+  document.getElementById('modal-save-btn').textContent='حفظ';
+  document.getElementById('modal-save-btn').className='btn-save';
+  document.getElementById('modal-box').className='modal';
 }
-document.getElementById('modal-overlay').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+
+document.getElementById('modal-overlay').addEventListener('click',function(e){
+  if(e.target===this)closeModal();
+});
 
 /* ────────────────────────────────────────
    TOAST
 ──────────────────────────────────────── */
 let toastTimer;
-function showToast(msg, type = '') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = type;
-  t.style.display = 'block';
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className=type;
+  t.style.display='block';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.style.display = 'none', 3000);
+  toastTimer=setTimeout(()=>t.style.display='none',3000);
 }
 
 /* ────────────────────────────────────────
    PRINT
 ──────────────────────────────────────── */
-function printPage(pageId) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-' + pageId).classList.add('active');
-  const matching = document.querySelector(`[data-page="${pageId}"]`);
-  if (matching) matching.classList.add('active');
-  setTimeout(() => { window.print(); renderAll(); }, 200);
+function printPage(pageId){
+  const pages=document.querySelectorAll('.page');
+  const navItems=document.querySelectorAll('.nav-item');
+  pages.forEach(p=>p.classList.remove('active'));
+  navItems.forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+pageId).classList.add('active');
+  const matching=document.querySelector(`[data-page="${pageId}"]`);
+  if(matching)matching.classList.add('active');
+  setTimeout(()=>{window.print();renderAll();},200);
 }
 
-
+/* ────────────────────────────────────────
+   INIT
+──────────────────────────────────────── */
+document.getElementById('password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 </script>
 </body>
 </html>
