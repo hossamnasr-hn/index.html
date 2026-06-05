@@ -457,7 +457,7 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db, "users"));
   if (usersSnap.empty) {
     const defaultUsers = [
-      { name: "أحمد المدير", username: "admin", password: "123456", role: "مدير", perms: ["view","add","edit","handover","dispose","maintenance","users"] },
+      { name: "hossam", username: "admin", password: "123456", role: "مدير", perms: ["view","add","edit","handover","dispose","maintenance","users"] },
       { name: "سارة المشرفة", username: "manager", password: "123456", role: "مشرف", perms: ["view","add","edit","handover","dispose","maintenance"] },
       { name: "خالد المستخدم", username: "user1", password: "123456", role: "موظف", perms: ["view","handover","maintenance"] }
     ];
