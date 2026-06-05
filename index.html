@@ -399,6 +399,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="page" id="page-reports">
         <div class="page-title">
           <span><i class="ti ti-chart-bar"></i> التقارير</span>
+          <button class="report-page-btn" onclick="printReport('reports')"><i class="ti ti-printer"></i> طباعة التقارير</button>
         </div>
         <div class="report-grid" id="report-cards"></div>
         <div class="table-card">
@@ -1716,6 +1717,43 @@ function printReport(pageId) {
       <thead style="background:#1C3F8A;color:#fff"><tr><th>#</th><th>الأصل</th><th>الكمية المتلفة</th><th>سبب الإتلاف</th><th>المعتمد من</th><th>التاريخ</th></tr></thead>
       <tbody>${disposes.map((d,i) => `<tr><td style="text-align:center">${i+1}</td><td>${d.assetName}</td><td style="text-align:center;color:#C62828;font-weight:bold">${d.qty}</td><td>${d.reason}</td><td>${d.approved}</td><td>${d.date}</td></tr>`).join('')}</tbody>
     </table>`;
+  } else if (pageId === 'reports') {
+    title = 'التقارير الإجمالية';
+    const assets = getAssets();
+    const types = [...new Set(assets.map(a => a.type))];
+    const byStatus = { متاح: 0, 'عند عميل': 0, صيانة: 0, تالف: 0, متلف: 0 };
+    assets.forEach(a => {
+      byStatus['متاح'] += a.availableQty || 0;
+      byStatus['عند عميل'] += a.clientQty || 0;
+      byStatus['صيانة'] += a.maintenanceQty || 0;
+      byStatus['تالف'] += a.damagedQty || 0;
+      byStatus['متلف'] += a.disposedQty || 0;
+    });
+    const total = Object.values(byStatus).reduce((s, v) => s + v, 0) || 1;
+    const statusRows = Object.entries(byStatus).map(([s, c]) => `<tr><td>${s}</td><td style="text-align:center;font-weight:bold">${c}</td><td style="text-align:center">${Math.round(c/total*100)}%</td></tr>`).join('');
+    const typeRows = types.map(t => {
+      const ta = assets.filter(a => a.type === t);
+      return `<tr>
+        <td style="font-weight:600">${t}</td>
+        <td style="text-align:center;font-weight:bold">${ta.reduce((s,a)=>s+a.totalQty,0)}</td>
+        <td style="text-align:center;color:#2E7D32">${ta.reduce((s,a)=>s+a.availableQty,0)}</td>
+        <td style="text-align:center;color:#1C3F8A">${ta.reduce((s,a)=>s+a.clientQty,0)}</td>
+        <td style="text-align:center;color:#B45309">${ta.reduce((s,a)=>s+a.maintenanceQty,0)}</td>
+        <td style="text-align:center;color:#C62828">${ta.reduce((s,a)=>s+a.damagedQty,0)}</td>
+        <td style="text-align:center;color:#C62828">${ta.reduce((s,a)=>s+(a.disposedQty||0),0)}</td>
+      </tr>`;
+    }).join('');
+    content = `
+      <h3 style="font-size:14px;margin:0 0 8px;color:#1C3F8A;border-right:4px solid #1C3F8A;padding-right:8px">توزيع الوحدات حسب الحالة</h3>
+      <table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:20px">
+        <thead style="background:#1C3F8A;color:#fff"><tr><th>الحالة</th><th>العدد</th><th>النسبة</th></tr></thead>
+        <tbody>${statusRows}</tbody>
+      </table>
+      <h3 style="font-size:14px;margin:0 0 8px;color:#1C3F8A;border-right:4px solid #1C3F8A;padding-right:8px">تقرير تفصيلي حسب النوع</h3>
+      <table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse">
+        <thead style="background:#1C3F8A;color:#fff"><tr><th>النوع</th><th>الإجمالي</th><th>متاح</th><th>عند عميل</th><th>صيانة</th><th>تالف</th><th>متلف</th></tr></thead>
+        <tbody>${typeRows}</tbody>
+      </table>`;
   }
 
   const win = window.open('', '_blank');
