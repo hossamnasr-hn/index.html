@@ -237,7 +237,6 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="field"><label>كلمة المرور</label><input type="password" id="password" value="123456"></div>
       <div class="error-msg" id="login-error">اسم المستخدم أو كلمة المرور غير صحيحة</div>
       <button class="btn-primary" id="login-btn" style="margin-top:16px" onclick="doLogin()"><i class="ti ti-login"></i> دخول</button>
-      <div class="login-hint" style="margin-top:14px">admin · manager · user1 — كلمة المرور: 123456</div>
     </div>
   </div>
 </div>
@@ -308,7 +307,6 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
                 <option value="">جميع الأنواع</option>
               </select>
             </div>
-            <button class="print-btn" onclick="printPage('assets')"><i class="ti ti-printer"></i> طباعة</button>
           </div>
           <table>
             <thead><tr><th>الصورة</th><th>الكود</th><th>الاسم</th><th>النوع</th><th>الكمية الإجمالية</th><th>متاح</th><th>عند عميل</th><th>صيانة</th><th>تالف</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
@@ -322,7 +320,6 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
         <div class="page-title">
           <span><i class="ti ti-layout-grid"></i> رصيد المخزون</span>
           <div style="display:flex;gap:8px">
-            <button class="print-btn" onclick="printPage('inventory')"><i class="ti ti-printer"></i> طباعة</button>
             <button class="report-page-btn" onclick="printReport('inventory')"><i class="ti ti-file-analytics"></i> تقرير مفصل</button>
           </div>
         </div>
@@ -335,7 +332,6 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
           <span><i class="ti ti-transfer"></i> سجل تسليم الأصول</span>
           <div style="display:flex;gap:8px">
             <button class="add-btn" onclick="openNewHandover()"><i class="ti ti-plus"></i> تسليم أصل جديد</button>
-            <button class="print-btn" onclick="printPage('handover')"><i class="ti ti-printer"></i> طباعة</button>
             <button class="report-page-btn" onclick="printReport('handover')"><i class="ti ti-file-analytics"></i> تقرير التسليم</button>
           </div>
         </div>
@@ -354,7 +350,6 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
           <span><i class="ti ti-tool"></i> سجل تحويل الصيانة</span>
           <div style="display:flex;gap:8px">
             <button class="add-btn" onclick="openNewMaintenance()"><i class="ti ti-plus"></i> تحويل جديد</button>
-            <button class="print-btn" onclick="printPage('maintenance')"><i class="ti ti-printer"></i> طباعة</button>
             <button class="report-page-btn" onclick="printReport('maintenance')"><i class="ti ti-file-analytics"></i> تقرير الصيانة</button>
           </div>
         </div>
@@ -373,7 +368,6 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
           <span><i class="ti ti-trash"></i> سجل الإتلاف</span>
           <div style="display:flex;gap:8px">
             <button class="add-btn" style="background:var(--red)" onclick="openNewDispose()"><i class="ti ti-trash"></i> إتلاف جديد</button>
-            <button class="print-btn" onclick="printPage('dispose')"><i class="ti ti-printer"></i> طباعة</button>
             <button class="report-page-btn" onclick="printReport('dispose')"><i class="ti ti-file-analytics"></i> تقرير الإتلاف</button>
           </div>
         </div>
@@ -405,13 +399,11 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="page" id="page-reports">
         <div class="page-title">
           <span><i class="ti ti-chart-bar"></i> التقارير</span>
-          <button class="print-btn" onclick="window.print()"><i class="ti ti-printer"></i> طباعة الكل</button>
         </div>
         <div class="report-grid" id="report-cards"></div>
         <div class="table-card">
           <div class="table-toolbar">
             <span style="font-size:13px;font-weight:700">تقرير تفصيلي حسب النوع</span>
-            <button class="print-btn" onclick="printPage('reports')"><i class="ti ti-printer"></i> طباعة</button>
           </div>
           <table>
             <thead><tr><th>النوع</th><th>الإجمالي</th><th>متاح</th><th>عند عميل</th><th>صيانة</th><th>تالف</th><th>متلف</th></tr></thead>
@@ -965,15 +957,131 @@ async function saveAsset() {
     if (editingId) {
       await upd(docRef(window.db, "assets", editingId), obj);
       showToast('تم تحديث الأصل', 'success');
+      _pendingAttachments = [];
+      closeModal();
+      await window.reloadData();
+      populateTypeFilters();
     } else {
       await add(col(window.db, "assets"), obj);
       showToast('تمت إضافة الأصل', 'success');
+      _pendingAttachments = [];
+      closeModal();
+      await window.reloadData();
+      populateTypeFilters();
+      // Show barcode print dialog for new asset
+      setTimeout(() => showBarcodePrintDialog(obj), 300);
     }
-    _pendingAttachments = [];
-    closeModal();
-    await window.reloadData();
-    populateTypeFilters();
   } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+}
+
+function showBarcodePrintDialog(asset) {
+  document.getElementById('modal-title').innerHTML = '<i class="ti ti-barcode"></i> طباعة باركود الأصل';
+  document.getElementById('modal-body').innerHTML = `
+    <div style="text-align:center;padding:10px 0">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px">تم إضافة الأصل بنجاح. هل تريد طباعة الباركود؟</div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;display:inline-block;margin-bottom:16px">
+        <canvas id="barcode-canvas"></canvas>
+        <div style="margin-top:10px;font-weight:700;font-size:15px">${asset.name}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:4px">${asset.code}</div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button onclick="printBarcode('${asset.code}','${asset.name}','${asset.type}')" style="padding:9px 20px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);font-size:13px;cursor:pointer;font-family:var(--font);font-weight:600;display:inline-flex;align-items:center;gap:6px"><i class="ti ti-printer"></i> طباعة الباركود</button>
+        <button onclick="closeModal()" style="padding:9px 20px;background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:var(--radius);font-size:13px;cursor:pointer;font-family:var(--font)">تخطي</button>
+      </div>
+    </div>`;
+  document.getElementById('modal-save-btn').style.display = 'none';
+  document.getElementById('modal-box').className = 'modal';
+  document.getElementById('modal-overlay').classList.add('show');
+  // Draw barcode on canvas
+  setTimeout(() => drawBarcode('barcode-canvas', asset.code), 100);
+}
+
+function drawBarcode(canvasId, code) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  // Simple Code128-like barcode rendering
+  const barWidth = 2;
+  const barHeight = 70;
+  const padding = 10;
+  // Encode: alternate thick/thin bars per char
+  const bars = generateBars(code);
+  canvas.width = bars.length * barWidth + padding * 2;
+  canvas.height = barHeight + 20;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let x = padding;
+  bars.forEach((b, i) => {
+    ctx.fillStyle = i % 2 === 0 ? '#000' : '#fff';
+    ctx.fillRect(x, 0, b * barWidth, barHeight);
+    x += b * barWidth;
+  });
+  ctx.fillStyle = '#000';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(code, canvas.width / 2, barHeight + 14);
+}
+
+function generateBars(text) {
+  // Simple visual barcode (not real Code128, for display/print purposes)
+  const bars = [2, 1]; // start
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    bars.push((c % 3) + 1, (c % 2) + 1, ((c >> 2) % 3) + 1, 1);
+  }
+  bars.push(2, 3, 1); // stop
+  return bars;
+}
+
+function printBarcode(code, name, type) {
+  const win = window.open('', '_blank', 'width=400,height=350');
+  // Re-draw barcode in the new window using the same logic
+  const bars = generateBars(code);
+  const barWidth = 2;
+  const barHeight = 70;
+  const padding = 10;
+  const canvasW = bars.length * barWidth + padding * 2;
+
+  win.document.write(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>باركود - ${name}</title>
+<style>
+  body{font-family:'Cairo','Arial',sans-serif;margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff}
+  .card{text-align:center;padding:20px;border:1px solid #ccc;border-radius:8px;display:inline-block}
+  .asset-name{font-size:15px;font-weight:700;margin-top:10px;color:#0E1D3A}
+  .asset-code{font-size:12px;color:#7090B0;margin-top:4px}
+  .asset-type{font-size:11px;color:#B0CCE8;margin-top:2px}
+  @media print{body{background:#fff}button{display:none}}
+</style>
+</head>
+<body>
+<div class="card">
+  <canvas id="bc"></canvas>
+  <div class="asset-name">${name}</div>
+  <div class="asset-code">${code}</div>
+  <div class="asset-type">${type}</div>
+  <br>
+  <button onclick="window.print()" style="padding:8px 18px;background:#1C3F8A;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;margin-top:8px">طباعة</button>
+</div>
+<script>
+function generateBars(text){const bars=[2,1];for(let i=0;i<text.length;i++){const c=text.charCodeAt(i);bars.push((c%3)+1,(c%2)+1,((c>>2)%3)+1,1)}bars.push(2,3,1);return bars;}
+window.onload=function(){
+  const bars=generateBars('${code}');
+  const bw=2,bh=70,pad=10;
+  const cv=document.getElementById('bc');
+  cv.width=bars.length*bw+pad*2;cv.height=bh+20;
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);
+  let x=pad;
+  bars.forEach((b,i)=>{ctx.fillStyle=i%2===0?'#000':'#fff';ctx.fillRect(x,0,b*bw,bh);x+=b*bw;});
+  ctx.fillStyle='#000';ctx.font='11px monospace';ctx.textAlign='center';
+  ctx.fillText('${code}',cv.width/2,bh+14);
+};
+<\/script>
+</body></html>`);
+  win.document.close();
 }
 
 /* ────────────────────────────────────────
