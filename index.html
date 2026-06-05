@@ -201,6 +201,28 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
   .print-only{display:block!important}
 }
 .print-only{display:none}
+
+/* ── Image & Attachments ── */
+.asset-img{width:48px;height:48px;border-radius:6px;object-fit:cover;border:1px solid var(--border);cursor:pointer}
+.asset-img-placeholder{width:48px;height:48px;border-radius:6px;background:var(--bg2);border:1px dashed var(--border2);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:18px}
+.img-upload-area{border:2px dashed var(--border2);border-radius:var(--radius);padding:20px;text-align:center;cursor:pointer;color:var(--text2);font-size:13px;transition:border-color .2s;margin-bottom:8px}
+.img-upload-area:hover{border-color:var(--blue);color:var(--blue)}
+.img-preview{max-width:100%;max-height:160px;border-radius:var(--radius);margin-top:8px;display:block}
+.attach-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.attach-item{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:12px}
+.attach-item a{color:var(--blue);text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.attach-item a:hover{text-decoration:underline}
+
+/* ── Per-page Report Buttons ── */
+.report-page-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--purple-bg);color:var(--purple);border:1px solid #C0A0E0;border-radius:var(--radius);font-size:13px;cursor:pointer;font-family:var(--font);font-weight:600}
+.report-page-btn:hover{background:#DDD0F5}
+
+/* ── Print Report Styles ── */
+@media print {
+  .no-print{display:none!important}
+  .print-report-header{display:block!important;text-align:center;margin-bottom:16px;border-bottom:2px solid #1C3F8A;padding-bottom:12px}
+}
+.print-report-header{display:none}
 </style>
 </head>
 <body>
@@ -249,7 +271,10 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
 
       <!-- Dashboard -->
       <div class="page active" id="page-dashboard">
-        <div class="page-title"><span><i class="ti ti-dashboard"></i> لوحة التحكم</span></div>
+        <div class="page-title">
+          <span><i class="ti ti-dashboard"></i> لوحة التحكم</span>
+          <button class="report-page-btn" onclick="printReport('dashboard')"><i class="ti ti-printer"></i> طباعة التقرير</button>
+        </div>
         <div class="stats-grid" id="stats-grid"></div>
         <div class="table-card">
           <div class="table-toolbar"><span style="font-size:13px;font-weight:700">آخر الأصول المضافة</span></div>
@@ -262,7 +287,10 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="page" id="page-assets">
         <div class="page-title">
           <span><i class="ti ti-package"></i> سجل الأصول</span>
-          <button class="add-btn" id="add-asset-btn" onclick="openAddAsset()"><i class="ti ti-plus"></i> إضافة أصل</button>
+          <div style="display:flex;gap:8px">
+            <button class="add-btn" id="add-asset-btn" onclick="openAddAsset()"><i class="ti ti-plus"></i> إضافة أصل</button>
+            <button class="report-page-btn" onclick="printReport('assets')"><i class="ti ti-printer"></i> طباعة التقرير</button>
+          </div>
         </div>
         <div class="table-card">
           <div class="table-toolbar">
@@ -283,7 +311,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
             <button class="print-btn" onclick="printPage('assets')"><i class="ti ti-printer"></i> طباعة</button>
           </div>
           <table>
-            <thead><tr><th>الكود</th><th>الاسم</th><th>النوع</th><th>الكمية الإجمالية</th><th>متاح</th><th>عند عميل</th><th>صيانة</th><th>تالف</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+            <thead><tr><th>الصورة</th><th>الكود</th><th>الاسم</th><th>النوع</th><th>الكمية الإجمالية</th><th>متاح</th><th>عند عميل</th><th>صيانة</th><th>تالف</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
             <tbody id="assets-body"></tbody>
           </table>
         </div>
@@ -293,7 +321,10 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="page" id="page-inventory">
         <div class="page-title">
           <span><i class="ti ti-layout-grid"></i> رصيد المخزون</span>
-          <button class="print-btn" onclick="printPage('inventory')"><i class="ti ti-printer"></i> طباعة</button>
+          <div style="display:flex;gap:8px">
+            <button class="print-btn" onclick="printPage('inventory')"><i class="ti ti-printer"></i> طباعة</button>
+            <button class="report-page-btn" onclick="printReport('inventory')"><i class="ti ti-file-analytics"></i> تقرير مفصل</button>
+          </div>
         </div>
         <div id="inventory-content"></div>
       </div>
@@ -305,6 +336,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
           <div style="display:flex;gap:8px">
             <button class="add-btn" onclick="openNewHandover()"><i class="ti ti-plus"></i> تسليم أصل جديد</button>
             <button class="print-btn" onclick="printPage('handover')"><i class="ti ti-printer"></i> طباعة</button>
+            <button class="report-page-btn" onclick="printReport('handover')"><i class="ti ti-file-analytics"></i> تقرير التسليم</button>
           </div>
         </div>
         <div class="table-card">
@@ -323,6 +355,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
           <div style="display:flex;gap:8px">
             <button class="add-btn" onclick="openNewMaintenance()"><i class="ti ti-plus"></i> تحويل جديد</button>
             <button class="print-btn" onclick="printPage('maintenance')"><i class="ti ti-printer"></i> طباعة</button>
+            <button class="report-page-btn" onclick="printReport('maintenance')"><i class="ti ti-file-analytics"></i> تقرير الصيانة</button>
           </div>
         </div>
         <div class="table-card">
@@ -341,6 +374,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
           <div style="display:flex;gap:8px">
             <button class="add-btn" style="background:var(--red)" onclick="openNewDispose()"><i class="ti ti-trash"></i> إتلاف جديد</button>
             <button class="print-btn" onclick="printPage('dispose')"><i class="ti ti-printer"></i> طباعة</button>
+            <button class="report-page-btn" onclick="printReport('dispose')"><i class="ti ti-file-analytics"></i> تقرير الإتلاف</button>
           </div>
         </div>
         <div class="table-card">
@@ -457,7 +491,7 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db, "users"));
   if (usersSnap.empty) {
     const defaultUsers = [
-      { name: "حسام المدير", username: "admin", password: "123456", role: "مدير", perms: ["view","add","edit","handover","dispose","maintenance","users"] },
+      { name: "أحمد المدير", username: "admin", password: "123456", role: "مدير", perms: ["view","add","edit","handover","dispose","maintenance","users"] },
       { name: "سارة المشرفة", username: "manager", password: "123456", role: "مشرف", perms: ["view","add","edit","handover","dispose","maintenance"] },
       { name: "خالد المستخدم", username: "user1", password: "123456", role: "موظف", perms: ["view","handover","maintenance"] }
     ];
@@ -687,13 +721,14 @@ function renderAssets() { filterAssets(); }
 
 function renderAssetRows(list) {
   if (!list.length) {
-    document.getElementById('assets-body').innerHTML = `<tr><td colspan="10" class="empty-row">لا توجد أصول مطابقة</td></tr>`;
+    document.getElementById('assets-body').innerHTML = `<tr><td colspan="11" class="empty-row">لا توجد أصول مطابقة</td></tr>`;
     return;
   }
   document.getElementById('assets-body').innerHTML = list.map(a => `
     <tr>
+      <td>${a.imageUrl ? `<img src="${a.imageUrl}" class="asset-img" onclick="viewAssetImage('${a._id}')">` : `<div class="asset-img-placeholder"><i class="ti ti-photo"></i></div>`}</td>
       <td><code class="tag">${a.code}</code></td>
-      <td style="font-weight:600">${a.name}</td>
+      <td style="font-weight:600">${a.name}${(a.attachments||[]).length ? `<div style="font-size:11px;color:var(--blue);margin-top:3px"><i class="ti ti-paperclip"></i> ${a.attachments.length} مرفق</div>` : ''}</td>
       <td>${a.type}</td>
       <td style="font-weight:700;text-align:center">${a.totalQty}</td>
       <td style="text-align:center"><span style="color:var(--green);font-weight:700">${a.availableQty}</span></td>
@@ -709,6 +744,29 @@ function renderAssetRows(list) {
       </td>
     </tr>
   `).join('');
+}
+
+function viewAssetImage(id) {
+  const a = getAssets().find(x => x._id === id);
+  if (!a || !a.imageUrl) return;
+  document.getElementById('modal-title').innerHTML = `<i class="ti ti-photo"></i> صورة الأصل: ${a.name}`;
+  document.getElementById('modal-body').innerHTML = `
+    <div style="text-align:center">
+      <img src="${a.imageUrl}" style="max-width:100%;max-height:400px;border-radius:var(--radius);border:1px solid var(--border)">
+      ${(a.attachments||[]).length ? `<div style="margin-top:16px;text-align:right">
+        <div style="font-weight:700;margin-bottom:8px;font-size:13px"><i class="ti ti-paperclip"></i> المرفقات</div>
+        <div class="attach-list">${a.attachments.map(att => `
+          <div class="attach-item">
+            <i class="ti ti-file" style="color:var(--text3)"></i>
+            <a href="${att.url}" target="_blank">${att.name}</a>
+            <span style="font-size:11px;color:var(--text3)">${att.size||''}</span>
+          </div>`).join('')}
+        </div>
+      </div>` : ''}
+    </div>`;
+  document.getElementById('modal-save-btn').style.display = 'none';
+  document.getElementById('modal-overlay').classList.add('show');
+  document.getElementById('modal-save-btn').onclick = () => {};
 }
 
 /* ────────────────────────────────────────
@@ -782,6 +840,14 @@ function openEdit(id) {
 
 function assetForm(a) {
   const typeOpts = getAssetTypes().map(t => `<option ${a.type === t ? 'selected' : ''}>${t}</option>`).join('');
+  const imgPreview = a.imageUrl ? `<img src="${a.imageUrl}" class="img-preview" id="img-preview-el">` : `<div id="img-preview-el"></div>`;
+  const attachHtml = (a.attachments || []).map((att, i) => `
+    <div class="attach-item" id="att-${i}">
+      <i class="ti ti-paperclip" style="color:var(--text3)"></i>
+      <a href="${att.url}" target="_blank">${att.name}</a>
+      <span style="font-size:11px;color:var(--text3)">${att.size || ''}</span>
+    </div>
+  `).join('');
   return `
     <div class="form-section">معلومات الأصل</div>
     <div class="form-row" style="margin-bottom:12px">
@@ -792,6 +858,21 @@ function assetForm(a) {
       <div class="field"><label>النوع</label><select id="f-type">${typeOpts}</select></div>
       <div class="field"><label>ملاحظات</label><input id="f-notes" value="${a.notes || ''}"></div>
     </div>
+    <div class="form-section">صورة الأصل</div>
+    <div class="img-upload-area" onclick="document.getElementById('f-img-file').click()">
+      <i class="ti ti-photo-up" style="font-size:24px;display:block;margin-bottom:6px"></i>
+      انقر لرفع صورة للأصل (JPG, PNG)
+    </div>
+    <input type="file" id="f-img-file" accept="image/*" style="display:none" onchange="previewAssetImage(this)">
+    ${imgPreview}
+    <input type="hidden" id="f-img-url" value="${a.imageUrl || ''}">
+    <div class="form-section">المرفقات</div>
+    <div class="img-upload-area" onclick="document.getElementById('f-attach-file').click()">
+      <i class="ti ti-paperclip" style="font-size:20px;display:block;margin-bottom:6px"></i>
+      انقر لإرفاق ملف (PDF, Word, Excel, صورة)
+    </div>
+    <input type="file" id="f-attach-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" style="display:none" onchange="addAttachmentPreview(this)">
+    <div class="attach-list" id="attach-list">${attachHtml}</div>
     <div class="form-section">الكميات</div>
     <div class="form-row three" style="margin-bottom:12px">
       <div class="field"><label>الإجمالي</label><input id="f-total" type="number" min="0" value="${a.totalQty !== undefined ? a.totalQty : 1}" oninput="syncQty()"></div>
@@ -812,6 +893,41 @@ function syncQty() {
   if (av && !av.value) av.value = t;
 }
 
+function previewAssetImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const prev = document.getElementById('img-preview-el');
+    prev.outerHTML = `<img src="${e.target.result}" class="img-preview" id="img-preview-el">`;
+    document.getElementById('f-img-url').value = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Keep track of new attachments added in the form session
+let _pendingAttachments = [];
+
+function addAttachmentPreview(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const att = { name: file.name, url: e.target.result, size: (file.size / 1024).toFixed(1) + ' KB' };
+    _pendingAttachments.push(att);
+    const list = document.getElementById('attach-list');
+    const div = document.createElement('div');
+    div.className = 'attach-item';
+    div.innerHTML = `<i class="ti ti-paperclip" style="color:var(--text3)"></i>
+      <a href="${att.url}" target="_blank">${att.name}</a>
+      <span style="font-size:11px;color:var(--text3)">${att.size}</span>
+      <span style="cursor:pointer;color:var(--red)" onclick="this.parentElement.remove()"><i class="ti ti-x"></i></span>`;
+    list.appendChild(div);
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
 async function saveAsset() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { showToast('يرجى إدخال اسم الأصل', 'error'); return; }
@@ -828,12 +944,20 @@ async function saveAsset() {
   else if (availableQty === 0 && maintenanceQty > 0) status = 'صيانة';
   else if (availableQty === 0 && damagedQty > 0) status = 'تالف';
   const codeVal = document.getElementById('f-code').value || `ASS-${Date.now()}`;
+  
+  // Collect existing + new attachments
+  const existingAsset = editingId ? getAssets().find(x => x._id === editingId) : null;
+  const existingAttachments = existingAsset?.attachments || [];
+  const newAttachments = [...existingAttachments, ..._pendingAttachments];
+  
   const obj = {
     name, code: codeVal,
     type: document.getElementById('f-type').value,
     totalQty, availableQty, clientQty, maintenanceQty, damagedQty, disposedQty, status,
     notes: document.getElementById('f-notes').value,
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    imageUrl: document.getElementById('f-img-url')?.value || existingAsset?.imageUrl || '',
+    attachments: newAttachments
   };
   try {
     await waitForFirebase();
@@ -845,6 +969,7 @@ async function saveAsset() {
       await add(col(window.db, "assets"), obj);
       showToast('تمت إضافة الأصل', 'success');
     }
+    _pendingAttachments = [];
     closeModal();
     await window.reloadData();
     populateTypeFilters();
@@ -1407,9 +1532,120 @@ async function deleteUser(id) {
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('show');
   document.getElementById('modal-save-btn').style.background = '';
+  document.getElementById('modal-save-btn').style.display = '';
   document.getElementById('modal-save-btn').textContent = 'حفظ';
   document.getElementById('modal-save-btn').className = 'btn-save';
   document.getElementById('modal-box').className = 'modal';
+  _pendingAttachments = [];
+}
+
+/* ────────────────────────────────────────
+   PER-PAGE PRINT REPORTS
+──────────────────────────────────────── */
+function printReport(pageId) {
+  const now = new Date().toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' });
+  const companyName = 'شركة ثمار القمة المحدودة';
+  const user = currentUser ? currentUser.name : '';
+  let title = '', content = '';
+
+  if (pageId === 'dashboard') {
+    const assets = getAssets();
+    const totalItems = assets.reduce((s, a) => s + (a.totalQty || 0), 0);
+    const available = assets.reduce((s, a) => s + (a.availableQty || 0), 0);
+    const atClient = assets.reduce((s, a) => s + (a.clientQty || 0), 0);
+    const inMaint = assets.reduce((s, a) => s + (a.maintenanceQty || 0), 0);
+    const damaged = assets.reduce((s, a) => s + (a.damagedQty || 0), 0);
+    title = 'تقرير لوحة التحكم';
+    content = `
+      <table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:16px">
+        <thead style="background:#1C3F8A;color:#fff"><tr><th>البيان</th><th>العدد</th></tr></thead>
+        <tbody>
+          <tr><td>إجمالي الوحدات</td><td style="text-align:center;font-weight:bold">${totalItems}</td></tr>
+          <tr><td>متاح في المخزون</td><td style="text-align:center;font-weight:bold;color:#2E7D32">${available}</td></tr>
+          <tr><td>عند العملاء</td><td style="text-align:center;font-weight:bold;color:#1C3F8A">${atClient}</td></tr>
+          <tr><td>في الصيانة</td><td style="text-align:center;font-weight:bold;color:#B45309">${inMaint}</td></tr>
+          <tr><td>تالف</td><td style="text-align:center;font-weight:bold;color:#C62828">${damaged}</td></tr>
+          <tr><td>أنواع الأصول</td><td style="text-align:center;font-weight:bold">${assets.length}</td></tr>
+        </tbody>
+      </table>
+      <h3 style="font-size:14px;margin-bottom:8px;color:#1C3F8A">آخر الأصول المضافة</h3>
+      <table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse">
+        <thead style="background:#1C3F8A;color:#fff"><tr><th>الكود</th><th>الاسم</th><th>النوع</th><th>الحالة</th><th>التاريخ</th></tr></thead>
+        <tbody>${assets.slice(-10).reverse().map(a => `<tr><td>${a.code}</td><td>${a.name}</td><td>${a.type}</td><td>${a.status}</td><td>${a.date||''}</td></tr>`).join('')}</tbody>
+      </table>`;
+  } else if (pageId === 'assets') {
+    title = 'تقرير سجل الأصول';
+    const assets = getAssets();
+    content = `<table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse">
+      <thead style="background:#1C3F8A;color:#fff"><tr><th>الكود</th><th>الاسم</th><th>النوع</th><th>الإجمالي</th><th>متاح</th><th>عند عميل</th><th>صيانة</th><th>تالف</th><th>الحالة</th><th>ملاحظات</th></tr></thead>
+      <tbody>${assets.map(a => `<tr><td>${a.code}</td><td>${a.name}</td><td>${a.type}</td><td style="text-align:center">${a.totalQty}</td><td style="text-align:center;color:#2E7D32">${a.availableQty}</td><td style="text-align:center;color:#1C3F8A">${a.clientQty}</td><td style="text-align:center;color:#B45309">${a.maintenanceQty}</td><td style="text-align:center;color:#C62828">${a.damagedQty}</td><td>${a.status}</td><td>${a.notes||''}</td></tr>`).join('')}</tbody>
+    </table>`;
+  } else if (pageId === 'inventory') {
+    title = 'تقرير رصيد المخزون';
+    const assets = getAssets();
+    content = `<table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse">
+      <thead style="background:#1C3F8A;color:#fff"><tr><th>الأصل</th><th>النوع</th><th>الإجمالي</th><th>متاح</th><th>عند عميل</th><th>صيانة</th><th>تالف</th><th>متلف</th><th>نسبة الإتاحة</th></tr></thead>
+      <tbody>${assets.map(a => { const pct = a.totalQty ? Math.round(a.availableQty/a.totalQty*100) : 0; return `<tr><td>${a.name}</td><td>${a.type}</td><td style="text-align:center;font-weight:bold">${a.totalQty}</td><td style="text-align:center;color:#2E7D32;font-weight:bold">${a.availableQty}</td><td style="text-align:center;color:#1C3F8A">${a.clientQty}</td><td style="text-align:center;color:#B45309">${a.maintenanceQty}</td><td style="text-align:center;color:#C62828">${a.damagedQty}</td><td style="text-align:center">${a.disposedQty||0}</td><td style="text-align:center">${pct}%</td></tr>`; }).join('')}</tbody>
+    </table>`;
+  } else if (pageId === 'handover') {
+    title = 'تقرير عمليات التسليم';
+    const handovers = getHandovers();
+    content = `<table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse">
+      <thead style="background:#1C3F8A;color:#fff"><tr><th>#</th><th>الأصل</th><th>الكمية</th><th>العميل</th><th>السجل التجاري</th><th>العنوان</th><th>المسؤول</th><th>التاريخ</th><th>الحالة</th></tr></thead>
+      <tbody>${handovers.map((h,i) => `<tr><td style="text-align:center">${i+1}</td><td>${h.assetName}</td><td style="text-align:center">${h.qty}</td><td>${h.clientName}</td><td>${h.crNumber||'-'}</td><td>${h.clientAddress||'-'}</td><td>${h.responsible}</td><td>${h.date}</td><td>${h.status}</td></tr>`).join('')}</tbody>
+    </table>`;
+  } else if (pageId === 'maintenance') {
+    title = 'تقرير أصول الصيانة';
+    const maintenances = getMaintenances();
+    content = `<table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse">
+      <thead style="background:#1C3F8A;color:#fff"><tr><th>#</th><th>الأصل</th><th>الكمية</th><th>جهة الصيانة</th><th>وصف العطل</th><th>تاريخ التحويل</th><th>الحالة</th><th>ملاحظات</th></tr></thead>
+      <tbody>${maintenances.map((m,i) => `<tr><td style="text-align:center">${i+1}</td><td>${m.assetName}</td><td style="text-align:center">${m.qty}</td><td>${m.vendor}</td><td>${m.fault}</td><td>${m.date}</td><td>${m.status}</td><td>${m.notes||''}</td></tr>`).join('')}</tbody>
+    </table>`;
+  } else if (pageId === 'dispose') {
+    title = 'تقرير الأصول المتلفة';
+    const disposes = getDisposes();
+    content = `<table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse">
+      <thead style="background:#1C3F8A;color:#fff"><tr><th>#</th><th>الأصل</th><th>الكمية المتلفة</th><th>سبب الإتلاف</th><th>المعتمد من</th><th>التاريخ</th></tr></thead>
+      <tbody>${disposes.map((d,i) => `<tr><td style="text-align:center">${i+1}</td><td>${d.assetName}</td><td style="text-align:center;color:#C62828;font-weight:bold">${d.qty}</td><td>${d.reason}</td><td>${d.approved}</td><td>${d.date}</td></tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>${title} - ${companyName}</title>
+<style>
+  body { font-family: 'Cairo', 'Arial', sans-serif; font-size: 13px; color: #0E1D3A; margin: 20px; direction: rtl; }
+  h1 { font-size: 18px; color: #1C3F8A; margin: 0; }
+  h2 { font-size: 14px; color: #3A5070; margin: 4px 0 0; font-weight: normal; }
+  .header { border-bottom: 3px solid #1C3F8A; padding-bottom: 12px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
+  .header-info { text-align: left; font-size: 12px; color: #3A5070; line-height: 1.6; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #1C3F8A; color: #fff; padding: 8px 10px; text-align: right; font-weight: 700; }
+  td { padding: 7px 10px; border-bottom: 1px solid #C8DBF0; vertical-align: middle; }
+  tr:nth-child(even) td { background: #F0F6FF; }
+  .footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #C8DBF0; font-size: 11px; color: #7090B0; text-align: center; }
+  @media print { body { margin: 10px; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>${companyName}</h1>
+    <h2>${title}</h2>
+  </div>
+  <div class="header-info">
+    <div>تاريخ الطباعة: ${now}</div>
+    <div>أُعد بواسطة: ${user}</div>
+  </div>
+</div>
+${content}
+<div class="footer">نظام إدارة الأصول - ${companyName} &nbsp;|&nbsp; ${now}</div>
+<script>window.onload = function(){ window.print(); }<\/script>
+</body></html>`);
+  win.document.close();
 }
 document.getElementById('modal-overlay').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
 
