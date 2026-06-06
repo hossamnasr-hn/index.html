@@ -289,7 +289,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="error-msg" id="login-error">اسم المستخدم أو كلمة المرور غير صحيحة</div>
       <button class="btn-primary" id="login-btn" style="margin-top:16px" onclick="doLogin()"><i class="ti ti-login"></i> دخول</button>
     </div>
-    <div class="login-hint" id="login-hint">نظام إدارة أصول الثلاجات - محمي بكلمة مرور</div>
+    <div class="login-hint" id="login-hint">نظام إدارة أصول الثلاجات</div>
   </div>
 </div>
 
@@ -675,11 +675,30 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
 
 
 <!-- Firebase SDK -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- Firebase IIFE Definition -->
+<script>
+
+window._firebaseInit = (async function() {
+const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+const {
   getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, setDoc
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
 
 const firebaseConfig = {
   apiKey: "AIzaSyDHlLO8GuZJKMguRsPoV5Wz4cmer8XGlfA",
@@ -773,18 +792,23 @@ async function loadAllData() {
   if (!settingsSnap.empty) {
     const s = settingsSnap.docs[0].data();
     window._settings = {...s, _id:settingsSnap.docs[0].id};
-    if (s.companyName) applyCompanySettings(s.companyName, s.logoUrl||'');
+    if (s.companyName) if(window.applyCompanySettings)window.applyCompanySettings(s.companyName, s.logoUrl||'');
   }
-  renderAll();
-  populateTypeFilters();
+  // renderAll is in same scope now (IIFE converted)
+  try { renderAll(); populateTypeFilters(); } catch(e) { console.warn("Initial render:", e.message); }
 }
 
-window.reloadData = loadAllData;
+window.reloadData = async function() {
+  await loadAllData();
+  renderAll();
+  populateTypeFilters();
+};
 
 try {
   await initDefaultData();
   await loadAllData();
   window._dataReady = true;
+  console.log("✅ Data loaded, users:", window.users?.length);
 } catch(err) {
   console.error("Firebase init error:", err);
   const hint = document.getElementById('login-hint');
@@ -793,8 +817,11 @@ try {
 
 document.getElementById('password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('username').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+}); // end named IIFE - will be called after all scripts load
+
 </script>
 
+<!-- All Application Scripts (merged) -->
 <script>
 /* ────────── GLOBALS ────────── */
 let currentUser = null;
@@ -897,10 +924,13 @@ async function doLogin() {
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-shell').classList.remove('hidden');
     document.getElementById('header-avatar').textContent = found.name.split(' ').map(w=>w[0]).join('').slice(0,2);
-    document.getElementById('header-name').textContent = found.name;
+    const nameEl = document.getElementById('header-name');
+    if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
     if (!found.perms.includes('users')) document.getElementById('nav-users').style.display='none';
-    if (!found.perms.includes('add')) document.getElementById('add-asset-btn').style.display='none';
+    // Always show add button - permission checked inside the function
+    const addBtn = document.getElementById('add-asset-btn');
+    if (addBtn) addBtn.style.display = '';
     populateTypeFilters();
     renderAll();
   } catch(e) {
@@ -955,10 +985,19 @@ function showPage(id, el) {
 
 /* ────────── RENDER ALL ────────── */
 function renderAll() {
-  renderStats(); renderRecent(); renderAssets(); renderInventory();
-  renderHandovers(); renderMaintenances(); renderDisposes();
-  renderReports(); renderUsers(); renderTypesList();
-  renderCustody(); renderCustomers(); renderReturns();
+  try { renderStats(); } catch(e) { console.warn('renderStats:', e.message); }
+  try { renderRecent(); } catch(e) { console.warn('renderRecent:', e.message); }
+  try { renderAssets(); } catch(e) { console.warn('renderAssets:', e.message); }
+  try { renderInventory(); } catch(e) { console.warn('renderInventory:', e.message); }
+  try { renderHandovers(); } catch(e) { console.warn('renderHandovers:', e.message); }
+  try { renderMaintenances(); } catch(e) { console.warn('renderMaintenances:', e.message); }
+  try { renderDisposes(); } catch(e) { console.warn('renderDisposes:', e.message); }
+  try { renderReports(); } catch(e) { console.warn('renderReports:', e.message); }
+  try { renderUsers(); } catch(e) { console.warn('renderUsers:', e.message); }
+  try { renderTypesList(); } catch(e) { console.warn('renderTypesList:', e.message); }
+  try { renderCustody(); } catch(e) { console.warn('renderCustody:', e.message); }
+  try { renderCustomers(); } catch(e) { console.warn('renderCustomers:', e.message); }
+  try { renderReturns(); } catch(e) { console.warn('renderReturns:', e.message); }
 }
 
 /* ────────── STATUS BADGE ────────── */
@@ -971,9 +1010,7 @@ function statusBadge(s, assetId) {
   }
   return '<span class="badge '+(m[s]||'badge-gray')+'" title="'+label+'">'+label+'</span>';
 }
-</script>
 
-<script>
 /* ────────── STATS ────────── */
 function renderStats() {
   const assets = getAssets();
@@ -1072,16 +1109,24 @@ function viewAssetImage(id) {
 
 /* ────────── ASSET FORM ────────── */
 function openAddAsset() {
-  if (!can('add')) return;
-  editingId = null; _pendingAttachments = [];
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-plus"></i> إضافة أصل جديد';
-  document.getElementById('modal-body').innerHTML = assetForm({});
-  document.getElementById('modal-save-btn').className = 'btn-save';
-  document.getElementById('modal-save-btn').textContent = 'حفظ الأصل';
-  document.getElementById('modal-save-btn').onclick = saveAsset;
-  document.getElementById('modal-box').className = 'modal wide';
-  document.getElementById('modal-overlay').classList.add('show');
-  setTimeout(()=>{ updateSubTypeOptions(); },100);
+  try {
+    if (!can('add')) { 
+      showToast('ليس لديك صلاحية إضافة أصول', 'error'); 
+      return; 
+    }
+    editingId = null; _pendingAttachments = [];
+    document.getElementById('modal-title').innerHTML = '<i class="ti ti-plus"></i> إضافة أصل جديد';
+    document.getElementById('modal-body').innerHTML = assetForm({});
+    document.getElementById('modal-save-btn').className = 'btn-save';
+    document.getElementById('modal-save-btn').textContent = 'حفظ الأصل';
+    document.getElementById('modal-save-btn').onclick = saveAsset;
+    document.getElementById('modal-box').className = 'modal wide';
+    document.getElementById('modal-overlay').classList.add('show');
+    setTimeout(()=>{ updateSubTypeOptions(); },100);
+  } catch(e) {
+    alert('خطأ في فتح نموذج إضافة أصل: ' + e.message);
+    console.error('openAddAsset error:', e);
+  }
 }
 
 function openEdit(id) {
@@ -1148,6 +1193,7 @@ function assetForm(a) {
     (a.imageUrl?'<img src="'+a.imageUrl+'" class="img-preview" id="img-preview-el">':'<div id="img-preview-el"></div>')+
     '<input type="hidden" id="f-img-url" value="'+(a.imageUrl||'')+'">'
   );
+  } catch(e) { console.error('assetForm error:',e); return '<div>خطأ في تحميل النموذج: '+e.message+'</div>'; }
 }
 
 function updateSubTypeOptions(selected) {
@@ -1214,9 +1260,7 @@ async function saveAsset() {
     closeModal(); await window.reloadData(); populateTypeFilters();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
-</script>
 
-<script>
 /* ────────── INVENTORY ────────── */
 function renderInventory() {
   const assets = getAssets();
@@ -1435,9 +1479,7 @@ async function deleteCustomer(id) {
     showToast('تم حذف العميل','success'); await window.reloadData();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
-</script>
 
-<script>
 /* ────────── HANDOVER ────────── */
 function openNewHandover() { if (!can('handover')) return; openHandoverModal(null); }
 function openHandoverFromAsset(id) { if (!can('handover')) return; openHandoverModal(id); }
@@ -1825,9 +1867,7 @@ function renderDisposes() {
     '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+d.assetName+'</td><td style="text-align:center;font-weight:700;color:var(--red)">'+d.qty+'</td><td style="font-size:12px">'+d.reason+'</td><td>'+d.approved+'</td><td style="font-size:12px">'+d.date+'</td></tr>'
   ).join('');
 }
-</script>
 
-<script>
 /* ────────── ASSET TYPES & SUB TYPES ────────── */
 function renderTypesList() {
   const el = document.getElementById('types-list');
@@ -1989,8 +2029,17 @@ const PERM_LABELS={view:'عرض',add:'إضافة',edit:'تعديل',handover:'ت
 
 function renderUsers() {
   if (!document.getElementById('users-body')) return;
+  const users = getUsers();
+  if (!users.length && !window._dataReady) {
+    document.getElementById('users-body').innerHTML = '<tr><td colspan="5" class="empty-row"><i class="ti ti-loader"></i> جارٍ تحميل البيانات...</td></tr>';
+    return;
+  }
+  if (!users.length) {
+    document.getElementById('users-body').innerHTML = '<tr><td colspan="5" class="empty-row">لا يوجد مستخدمون</td></tr>';
+    return;
+  }
   const isAdmin = can('users');
-  document.getElementById('users-body').innerHTML = getUsers().map(u=>
+  document.getElementById('users-body').innerHTML = users.map(u=>
     '<tr>'+
     '<td style="font-weight:600"><i class="ti ti-user-circle" style="margin-left:5px;color:var(--text3)"></i>'+u.name+'</td>'+
     '<td><code class="tag">'+u.username+'</code></td>'+
@@ -2211,7 +2260,9 @@ function showToast(msg, type='') {
 }
 </script>
 
+<!-- Firebase Initialization Call (after all functions defined) -->
 <script>
+
 /* ────────── PRINT HANDOVER FORM ────────── */
 function printHandoverForm(hid) {
   const h=getHandovers().find(x=>x._id===hid);
@@ -2377,8 +2428,94 @@ function printReport(pageId) {
   '</body></html>');
   win.document.close();
 }
+
+
+/* ── Export all functions to window for Firebase module compatibility ── */
+if(typeof doLogin!=='undefined')window.doLogin=doLogin;
+if(typeof doLogout!=='undefined')window.doLogout=doLogout;
+if(typeof can!=='undefined')window.can=can;
+if(typeof showPage!=='undefined')window.showPage=showPage;
+if(typeof renderAll!=='undefined')window.renderAll=renderAll;
+if(typeof populateTypeFilters!=='undefined')window.populateTypeFilters=populateTypeFilters;
+if(typeof applyCompanySettings!=='undefined')window.applyCompanySettings=applyCompanySettings;
+if(typeof showToast!=='undefined')window.showToast=showToast;
+if(typeof closeModal!=='undefined')window.closeModal=closeModal;
+if(typeof statusBadge!=='undefined')window.statusBadge=statusBadge;
+if(typeof renderStats!=='undefined')window.renderStats=renderStats;
+if(typeof renderRecent!=='undefined')window.renderRecent=renderRecent;
+if(typeof renderAssets!=='undefined')window.renderAssets=renderAssets;
+if(typeof filterAssets!=='undefined')window.filterAssets=filterAssets;
+if(typeof renderInventory!=='undefined')window.renderInventory=renderInventory;
+if(typeof renderHandovers!=='undefined')window.renderHandovers=renderHandovers;
+if(typeof filterHandovers!=='undefined')window.filterHandovers=filterHandovers;
+if(typeof renderMaintenances!=='undefined')window.renderMaintenances=renderMaintenances;
+if(typeof renderDisposes!=='undefined')window.renderDisposes=renderDisposes;
+if(typeof renderReports!=='undefined')window.renderReports=renderReports;
+if(typeof renderUsers!=='undefined')window.renderUsers=renderUsers;
+if(typeof renderTypesList!=='undefined')window.renderTypesList=renderTypesList;
+if(typeof renderSubTypes!=='undefined')window.renderSubTypes=renderSubTypes;
+if(typeof renderCustody!=='undefined')window.renderCustody=renderCustody;
+if(typeof filterCustody!=='undefined')window.filterCustody=filterCustody;
+if(typeof renderCustomers!=='undefined')window.renderCustomers=renderCustomers;
+if(typeof filterCustomers!=='undefined')window.filterCustomers=filterCustomers;
+if(typeof renderReturns!=='undefined')window.renderReturns=renderReturns;
+if(typeof openAddAsset!=='undefined')window.openAddAsset=openAddAsset;
+if(typeof openEdit!=='undefined')window.openEdit=openEdit;
+if(typeof openAddCustomer!=='undefined')window.openAddCustomer=openAddCustomer;
+if(typeof openEditCustomer!=='undefined')window.openEditCustomer=openEditCustomer;
+if(typeof viewCustomerDetails!=='undefined')window.viewCustomerDetails=viewCustomerDetails;
+if(typeof openNewHandover!=='undefined')window.openNewHandover=openNewHandover;
+if(typeof openHandoverFromAsset!=='undefined')window.openHandoverFromAsset=openHandoverFromAsset;
+if(typeof openNewReturn!=='undefined')window.openNewReturn=openNewReturn;
+if(typeof openReturnFromHandover!=='undefined')window.openReturnFromHandover=openReturnFromHandover;
+if(typeof openNewMaintenance!=='undefined')window.openNewMaintenance=openNewMaintenance;
+if(typeof openMaintenanceFromAsset!=='undefined')window.openMaintenanceFromAsset=openMaintenanceFromAsset;
+if(typeof openNewDispose!=='undefined')window.openNewDispose=openNewDispose;
+if(typeof openDisposeFromAsset!=='undefined')window.openDisposeFromAsset=openDisposeFromAsset;
+if(typeof openAddUser!=='undefined')window.openAddUser=openAddUser;
+if(typeof openEditUser!=='undefined')window.openEditUser=openEditUser;
+if(typeof openChangePassword!=='undefined')window.openChangePassword=openChangePassword;
+if(typeof saveSettings!=='undefined')window.saveSettings=saveSettings;
+if(typeof previewSettingsLogo!=='undefined')window.previewSettingsLogo=previewSettingsLogo;
+if(typeof addAssetType!=='undefined')window.addAssetType=addAssetType;
+if(typeof deleteType!=='undefined')window.deleteType=deleteType;
+if(typeof addSubType!=='undefined')window.addSubType=addSubType;
+if(typeof deleteSubType!=='undefined')window.deleteSubType=deleteSubType;
+if(typeof addAttribute!=='undefined')window.addAttribute=addAttribute;
+if(typeof deleteAttribute!=='undefined')window.deleteAttribute=deleteAttribute;
+if(typeof switchTypesTab!=='undefined')window.switchTypesTab=switchTypesTab;
+if(typeof switchAttrsTab!=='undefined')window.switchAttrsTab=switchAttrsTab;
+if(typeof printReport!=='undefined')window.printReport=printReport;
+if(typeof printHandoverForm!=='undefined')window.printHandoverForm=printHandoverForm;
+if(typeof printCustodyForm!=='undefined')window.printCustodyForm=printCustodyForm;
+if(typeof updateSubTypeOptions!=='undefined')window.updateSubTypeOptions=updateSubTypeOptions;
+if(typeof onHandoverAssetChange!=='undefined')window.onHandoverAssetChange=onHandoverAssetChange;
+if(typeof onHandoverCustomerSelect!=='undefined')window.onHandoverCustomerSelect=onHandoverCustomerSelect;
+if(typeof onReturnHandoverChange!=='undefined')window.onReturnHandoverChange=onReturnHandoverChange;
+if(typeof selectReturnReason!=='undefined')window.selectReturnReason=selectReturnReason;
+if(typeof onReturnHandoverChange!=='undefined')window.onReturnHandoverChange=onReturnHandoverChange;
+if(typeof returnFromMaintenance!=='undefined')window.returnFromMaintenance=returnFromMaintenance;
+if(typeof returnFromClient!=='undefined')window.returnFromClient=returnFromClient;
+if(typeof approveCustody!=='undefined')window.approveCustody=approveCustody;
+if(typeof deleteCustody!=='undefined')window.deleteCustody=deleteCustody;
+if(typeof openNewCustody!=='undefined')window.openNewCustody=openNewCustody;
+if(typeof onCustodyAssetChange!=='undefined')window.onCustodyAssetChange=onCustodyAssetChange;
+if(typeof deleteUser!=='undefined')window.deleteUser=deleteUser;
+if(typeof setPresetPerms!=='undefined')window.setPresetPerms=setPresetPerms;
+if(typeof deleteCustomer!=='undefined')window.deleteCustomer=deleteCustomer;
+if(typeof saveEditCustomer!=='undefined')window.saveEditCustomer=saveEditCustomer;
+if(typeof viewAssetImage!=='undefined')window.viewAssetImage=viewAssetImage;
+if(typeof previewAssetImage!=='undefined')window.previewAssetImage=previewAssetImage;
+if(typeof onCustodyAssetChange!=='undefined')window.onCustodyAssetChange=onCustodyAssetChange;
+if(typeof filterCustody!=='undefined')window.filterCustody=filterCustody;
+
+// NOW start firebase after all functions are defined
+window._firebaseInit().catch(e => {
+  console.error("Firebase init failed:", e);
+  const hint = document.getElementById('login-hint');
+  if (hint) hint.innerHTML = '<span style="color:#C62828">⚠️ خطأ Firebase: ' + e.message + '</span>';
+});
+
 </script>
-
-
 </body>
 </html>
