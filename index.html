@@ -280,16 +280,16 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
     <div class="login-card">
       <div class="field">
         <label>اسم المستخدم</label>
-        <input type="text" id="username" placeholder="أدخل اسم المستخدم" autocomplete="username">
+        <input type="text" id="username" placeholder="أدخل اسم المستخدم" autocomplete="off" spellcheck="false">
       </div>
       <div class="field">
         <label>كلمة المرور</label>
-        <input type="password" id="password" placeholder="أدخل كلمة المرور" autocomplete="current-password">
+        <input type="password" id="password" placeholder="أدخل كلمة المرور" autocomplete="off">
       </div>
       <div class="error-msg" id="login-error">اسم المستخدم أو كلمة المرور غير صحيحة</div>
       <button class="btn-primary" id="login-btn" style="margin-top:16px" onclick="doLogin()"><i class="ti ti-login"></i> دخول</button>
     </div>
-    <div class="login-hint" id="login-hint">نظام إدارة أصول الثلاجات</div>
+    <div class="login-hint" id="login-hint">جارٍ الاتصال بقاعدة البيانات...</div>
   </div>
 </div>
 
@@ -778,6 +778,7 @@ async function loadAllData() {
     getDocs(collection(db,"settings")),
   ]);
   window.users = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
+  console.log('✅ Users loaded from Firebase:', window.users.length, window.users.map(u=>u.username));
   window.assetTypes = typesSnap.docs.map(d=>({name:d.data().name,_id:d.id}));
   window.assetSubTypes = subTypesSnap.docs.map(d=>({...d.data(),_id:d.id}));
   window.assetAttributes = attrSnap.docs.map(d=>({...d.data(),_id:d.id}));
@@ -808,7 +809,13 @@ try {
   await initDefaultData();
   await loadAllData();
   window._dataReady = true;
-  console.log("✅ Data loaded, users:", window.users?.length);
+  console.log("✅ All data loaded. Users:", window.users?.length);
+  // Update login hint to show ready
+  const hint = document.getElementById('login-hint');
+  if (hint && hint.textContent.includes('جارٍ')) {
+    hint.textContent = 'النظام جاهز - يمكنك تسجيل الدخول';
+    hint.style.color = '#2E7D32';
+  }
 } catch(err) {
   console.error("Firebase init error:", err);
   const hint = document.getElementById('login-hint');
@@ -906,17 +913,36 @@ async function doLogin() {
   const btn = document.getElementById('login-btn');
   if (btn) { btn.textContent='جارٍ التحقق...'; btn.disabled=true; }
   try {
+    // Wait for firebase to finish loading
+    if (window._firebasePromise) {
+      try { await window._firebasePromise; } catch(e) { console.warn('Firebase promise:', e); }
+    }
+    // Extra wait if still no users
     let waited = 0;
-    while ((!window.users || window.users.length===0) && waited < 8000) {
-      await new Promise(r=>setTimeout(r,200)); waited+=200;
+    while ((!window.users || window.users.length===0) && waited < 6000) {
+      await new Promise(r=>setTimeout(r,300)); waited+=300;
     }
+    // Force reload if still empty
     if (!window.users || window.users.length===0) {
-      if (window.reloadData) await window.reloadData();
+      if (window.reloadData) try { await window.reloadData(); } catch(e){}
     }
-    const found = getUsers().find(x=>x.username===u && x.password===p);
+    const allUsers = getUsers();
+    console.log('Users loaded:', allUsers.length, allUsers.map(x=>x.username));
+    
+    // Find user - case insensitive username, exact password
+    const found = allUsers.find(x => 
+      x.username && x.username.toLowerCase().trim() === u.toLowerCase().trim() && 
+      x.password === p
+    );
+    
     if (!found) {
-      document.getElementById('login-error').textContent='اسم المستخدم أو كلمة المرور غير صحيحة';
-      document.getElementById('login-error').style.display='block';
+      const errEl = document.getElementById('login-error');
+      if (allUsers.length === 0) {
+        errEl.textContent = 'لم يتم تحميل بيانات المستخدمين - تحقق من اتصال الإنترنت';
+      } else {
+        errEl.textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة (المستخدمون: ' + allUsers.map(x=>x.username).join(', ') + ')';
+      }
+      errEl.style.display='block';
       return;
     }
     currentUser = found;
@@ -2510,7 +2536,8 @@ if(typeof onCustodyAssetChange!=='undefined')window.onCustodyAssetChange=onCusto
 if(typeof filterCustody!=='undefined')window.filterCustody=filterCustody;
 
 // NOW start firebase after all functions are defined
-window._firebaseInit().catch(e => {
+// Store the promise so login can wait for it
+window._firebasePromise = window._firebaseInit().catch(e => {
   console.error("Firebase init failed:", e);
   const hint = document.getElementById('login-hint');
   if (hint) hint.innerHTML = '<span style="color:#C62828">⚠️ خطأ Firebase: ' + e.message + '</span>';
