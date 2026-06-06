@@ -1272,7 +1272,7 @@ function renderHandovers() {
       <td style="font-size:12px">${h.crNumber || '-'}</td>
       <td><div>${h.responsible}</div>${h.phone1 ? `<div style="font-size:11px;color:var(--text3)">${h.phone1}</div>` : ''}</td>
       <td style="font-size:12px">${h.date}</td>
-      <td>${statusBadge(h.status)}</td>
+      <td>${statusBadge(h.status, h.assetId)}</td>
       <td>${h.status !== 'مُرتجع' ? `<button class="btn-action info" onclick="returnFromClient('${h._id}')" title="إعادة"><i class="ti ti-corner-up-left"></i></button>` : ''}</td>
     </tr>
   `).join('');
@@ -1373,7 +1373,7 @@ function renderMaintenances() {
       <td>${m.vendor}</td>
       <td style="font-size:12px;color:var(--text2)">${m.fault}</td>
       <td style="font-size:12px">${m.date}</td>
-      <td>${statusBadge(m.status)}</td>
+      <td>${statusBadge(m.status, m.assetId)}</td>
       <td>
         ${m.status === 'قيد الصيانة' ? `<button class="btn-action success" onclick="returnFromMaintenance('${m._id}')" title="إعادة للمخزون"><i class="ti ti-corner-up-left"></i></button>` : ''}
       </td>
@@ -1504,7 +1504,7 @@ function renderReports() {
       <h4>توزيع الوحدات حسب الحالة</h4>
       ${Object.entries(byStatus).map(([s, c]) => `
         <div class="bar-row">
-          <span class="bar-label">${s}</span>
+          <span class="bar-label">${s==='عند عميل'?(()=>{const _nn=[...new Set(getHandovers().filter(h=>h.status!=='مُعاد'&&h.status!=='مُرتجع'&&h.clientName).map(h=>h.clientName))];return _nn.length?'عند عميل<br><small style="font-size:9px;font-weight:400;color:#5B7AAA">'+_nn.join('، ')+'</small>':'عند عميل';})():s}</span>
           <div class="bar-track"><div class="bar-fill" style="width:${Math.round(c / maxS * 100)}%;background:${colors[s]}"></div></div>
           <span style="font-size:12px;font-weight:700;min-width:28px">${c}</span>
           <span style="font-size:11px;color:var(--text3)">${Math.round(c / total * 100)}%</span>
@@ -1529,7 +1529,7 @@ function renderReports() {
       <td style="font-weight:600">${t}</td>
       <td style="text-align:center;font-weight:700">${tot}</td>
       <td style="text-align:center;color:var(--green);font-weight:700">${ta.reduce((s, a) => s + a.availableQty, 0)}</td>
-      <td style="text-align:center;color:var(--blue);font-weight:700">${ta.reduce((s, a) => s + a.clientQty, 0)}</td>
+      <td style="text-align:center;color:var(--blue);font-weight:700">${ta.reduce((s,a)=>s+a.clientQty,0)}${(()=>{const _nn=[...new Set(getHandovers().filter(h=>ta.some(a=>a._id===h.assetId)&&h.status!=='مُعاد'&&h.status!=='مُرتجع'&&h.clientName).map(h=>h.clientName))];return _nn.length?'<div style="font-size:10px;font-weight:400;color:var(--blue)">'+_nn.join('، ')+'</div>':''})()}</td>
       <td style="text-align:center;color:var(--amber);font-weight:700">${ta.reduce((s, a) => s + a.maintenanceQty, 0)}</td>
       <td style="text-align:center;color:var(--red);font-weight:700">${ta.reduce((s, a) => s + a.damagedQty, 0)}</td>
       <td style="text-align:center;color:var(--red);font-weight:700">${ta.reduce((s, a) => s + (a.disposedQty || 0), 0)}</td>
@@ -1783,14 +1783,15 @@ function printReport(pageId) {
       byStatus['متلف'] += a.disposedQty || 0;
     });
     const total = Object.values(byStatus).reduce((s, v) => s + v, 0) || 1;
-    const statusRows = Object.entries(byStatus).map(([s, c]) => `<tr><td>${s}</td><td style="text-align:center;font-weight:bold">${c}</td><td style="text-align:center">${Math.round(c/total*100)}%</td></tr>`).join('');
+    const clientNamesForStatus = (()=>{const hh=getHandovers().filter(h=>h.status!=='مُعاد'&&h.status!=='مُرتجع'&&h.clientName);const names=[...new Set(hh.map(h=>h.clientName))];return names.length?names.join('، '):'';})();
+    const statusRows = Object.entries(byStatus).map(([s, c]) => `<tr><td>${s==='عند عميل'&&clientNamesForStatus?s+'<br><small style="font-weight:400;color:#5B7AAA;font-size:10px">'+clientNamesForStatus+'</small>':s}</td><td style="text-align:center;font-weight:bold">${c}</td><td style="text-align:center">${Math.round(c/total*100)}%</td></tr>`).join('');
     const typeRows = types.map(t => {
       const ta = assets.filter(a => a.type === t);
       return `<tr>
         <td style="font-weight:600">${t}</td>
         <td style="text-align:center;font-weight:bold">${ta.reduce((s,a)=>s+a.totalQty,0)}</td>
         <td style="text-align:center;color:#2E7D32">${ta.reduce((s,a)=>s+a.availableQty,0)}</td>
-        <td style="text-align:center;color:#1C3F8A">${ta.reduce((s,a)=>s+a.clientQty,0)}</td>
+        <td style="text-align:center;color:#1C3F8A">${ta.reduce((s,a)=>s+a.clientQty,0)}${(()=>{const names=[...new Set(getHandovers().filter(h=>ta.some(a=>a._id===h.assetId)&&h.status!=='مُعاد'&&h.status!=='مُرتجع'&&h.clientName).map(h=>h.clientName))];return names.length?'<br><small style="font-weight:400;font-size:10px">'+names.join('، ')+'</small>':''})()}</td>
         <td style="text-align:center;color:#B45309">${ta.reduce((s,a)=>s+a.maintenanceQty,0)}</td>
         <td style="text-align:center;color:#C62828">${ta.reduce((s,a)=>s+a.damagedQty,0)}</td>
         <td style="text-align:center;color:#C62828">${ta.reduce((s,a)=>s+(a.disposedQty||0),0)}</td>
