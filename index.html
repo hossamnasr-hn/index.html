@@ -732,17 +732,25 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db,"users"));
   const existingUsers = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   
+  const NEW_PERMS = ["custody","settings"];
   if (usersSnap.empty || existingUsers.length === 0) {
-    // No users at all - create admin
-    await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers"] });
-    console.log("✅ Admin user created");
+    await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","settings"] });
+    console.log("Admin user created");
   } else {
-    // Users exist but may be missing username field - fix them
     for (const d of usersSnap.docs) {
       const data = d.data();
+      const updates = {};
       if (!data.username) {
-        await updateDoc(doc(db,"users",d.id), { username: data.name==="مدير النظام"?"admin": data.name.replace(/\s+/g,'_').toLowerCase(), password: data.password||"admin123" });
-        console.log("✅ Fixed missing username for:", data.name);
+        updates.username = data.name==="مدير النظام"?"admin": data.name.replace(/\s+/g,"_").toLowerCase();
+        updates.password = data.password||"admin123";
+      }
+      const currentPerms = data.perms || [];
+      const missingPerms = NEW_PERMS.filter(p => !currentPerms.includes(p));
+      if (missingPerms.length > 0 && currentPerms.includes("users")) {
+        updates.perms = [...currentPerms, ...missingPerms];
+      }
+      if (Object.keys(updates).length > 0) {
+        await updateDoc(doc(db,"users",d.id), updates);
       }
     }
   }
@@ -975,6 +983,15 @@ async function doLogin() {
     const nameEl = document.getElementById('header-name');
     if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
+    // Auto-grant custody & settings to any user who has 'users' permission (backward compat)
+    if (found.perms.includes('users') && (!found.perms.includes('custody') || !found.perms.includes('settings'))) {
+      const upgraded = [...new Set([...found.perms, 'custody', 'settings'])];
+      found.perms = upgraded;
+      // Also persist to Firebase silently
+      try {
+        await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",found._id), {perms: upgraded});
+      } catch(e) { console.warn('perm upgrade:', e); }
+    }
     if (!found.perms.includes('users')) document.getElementById('nav-users').style.display='none';
     const custodyNav = document.getElementById('nav-custody');
     if (custodyNav) custodyNav.style.display = found.perms.includes('custody') ? '' : 'none';
