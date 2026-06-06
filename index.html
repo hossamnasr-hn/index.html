@@ -223,6 +223,17 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
   .print-report-header{display:block!important;text-align:center;margin-bottom:16px;border-bottom:2px solid #1C3F8A;padding-bottom:12px}
 }
 .print-report-header{display:none}
+
+/* ── Custody Request Styles ── */
+.custody-badge-pending{background:#FEF3C7;color:#B45309;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
+.custody-badge-approved{background:#E8F5E9;color:#2E7D32;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
+.custody-badge-rejected{background:#FFEBEE;color:#C62828;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
+
+/* ── Print Custody Form ── */
+@media print {
+  .no-print-custody { display: none !important; }
+}
+.custody-print-form { direction: rtl; font-family: 'Cairo', Arial, sans-serif; }
 </style>
 </head>
 <body>
@@ -261,6 +272,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="nav-item" onclick="showPage('handover',this)" data-page="handover"><i class="ti ti-transfer"></i> تسليم أصل</div>
       <div class="nav-item" onclick="showPage('maintenance',this)" data-page="maintenance"><i class="ti ti-tool"></i> تحويل للصيانة</div>
       <div class="nav-item" onclick="showPage('dispose',this)" data-page="dispose"><i class="ti ti-trash"></i> الإتلاف</div>
+      <div class="nav-item" onclick="showPage('custody',this)" data-page="custody"><i class="ti ti-file-invoice"></i> طلبات العهدة</div>
       <div class="nav-section">الإدارة</div>
       <div class="nav-item" onclick="showPage('types',this)" data-page="types"><i class="ti ti-tags"></i> أنواع الأصول</div>
       <div class="nav-item" onclick="showPage('reports',this)" data-page="reports"><i class="ti ti-chart-bar"></i> التقارير</div>
@@ -413,6 +425,33 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
         </div>
       </div>
 
+      <!-- Custody Requests -->
+      <div class="page" id="page-custody">
+        <div class="page-title">
+          <span><i class="ti ti-file-invoice"></i> طلبات عهدة الثلاجات</span>
+          <div style="display:flex;gap:8px">
+            <button class="add-btn" onclick="openNewCustody()"><i class="ti ti-plus"></i> طلب عهدة جديد</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar">
+            <div class="toolbar-left">
+              <div class="search-box"><i class="ti ti-search" style="font-size:14px;color:var(--text3)"></i><input type="text" id="custody-search" placeholder="بحث باسم أو باركود..." oninput="filterCustody()"></div>
+              <select class="filter-select" id="custody-filter-status" onchange="filterCustody()">
+                <option value="">جميع الحالات</option>
+                <option value="متاح">متاح</option>
+                <option value="عند عميل">عند عميل</option>
+                <option value="صيانة">صيانة</option>
+              </select>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>#</th><th>التاريخ</th><th>اسم طالب العهدة</th><th>الثلاجة / الباركود</th><th>الحالة</th><th>المطلوب</th><th>الوصف</th><th>حالة الطلب</th><th>إجراءات</th></tr></thead>
+            <tbody id="custody-body"></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Users -->
       <div class="page" id="page-users">
         <div class="page-title">
@@ -516,6 +555,12 @@ async function loadAllData() {
   window.handovers = handoversSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
   window.maintenances = maintsSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
   window.disposes = disposesSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
+
+  // load custody
+  try {
+    const custodySnap = await getDocs(collection(db, "custodyRequests"));
+    window.custodyRequests = custodySnap.docs.map(d => ({ ...d.data(), _id: d.id }));
+  } catch(e) { window.custodyRequests = []; }
 
   renderAll();
   populateTypeFilters();
@@ -647,7 +692,7 @@ function showPage(id, el) {
 ──────────────────────────────────────── */
 function renderAll() {
   renderStats(); renderRecent(); renderAssets(); renderInventory();
-  renderHandovers(); renderMaintenances(); renderDisposes();
+  renderHandovers(); renderMaintenances(); renderDisposes(); renderCustody();
   renderReports(); renderUsers(); renderTypesList();
 }
 
@@ -1793,6 +1838,298 @@ ${content}
 </body></html>`);
   win.document.close();
 }
+
+/* ────────────────────────────────────────
+   CUSTODY REQUESTS - طلبات العهدة
+──────────────────────────────────────── */
+window.custodyRequests = window.custodyRequests || [];
+
+function getCustodyRequests() { return window.custodyRequests || []; }
+
+async function loadCustodyRequests() {
+  if (!window.db || !window.fsApi) return;
+  const { collection, getDocs } = window.fsApi;
+  const snap = await getDocs(collection(window.db, "custodyRequests"));
+  window.custodyRequests = snap.docs.map(d => ({ ...d.data(), _id: d.id }));
+  renderCustody();
+}
+
+function renderCustody() {
+  const tbody = document.getElementById('custody-body');
+  if (!tbody) return;
+  const list = getCustodyRequests();
+  const search = (document.getElementById('custody-search')?.value || '').toLowerCase();
+  const statusF = document.getElementById('custody-filter-status')?.value || '';
+  let filtered = list.filter(c => {
+    const matchSearch = !search || (c.requesterName||'').toLowerCase().includes(search) || (c.barcode||'').toLowerCase().includes(search) || (c.assetName||'').toLowerCase().includes(search);
+    const matchStatus = !statusF || c.assetStatus === statusF;
+    return matchSearch && matchStatus;
+  });
+  if (!filtered.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-row">لا توجد طلبات عهدة</td></tr>`; return; }
+  tbody.innerHTML = filtered.map((c, i) => {
+    const statusBadge = c.requestStatus === 'معتمد' ? `<span class="custody-badge-approved">معتمد</span>` :
+                        c.requestStatus === 'مرفوض' ? `<span class="custody-badge-rejected">مرفوض</span>` :
+                        `<span class="custody-badge-pending">قيد المراجعة</span>`;
+    const assetStatusBadge = c.assetStatus === 'متاح' ? `<span class="badge badge-green">متاح</span>` :
+                             c.assetStatus === 'عند عميل' ? `<span class="badge badge-blue">عند عميل</span>` :
+                             c.assetStatus === 'صيانة' ? `<span class="badge badge-amber">صيانة</span>` :
+                             `<span class="badge badge-gray">${c.assetStatus||'-'}</span>`;
+    return `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td>${c.date||'-'}</td>
+      <td style="font-weight:600">${c.requesterName||'-'}</td>
+      <td>
+        <div style="font-size:12px;font-weight:700">${c.assetName||'-'}</div>
+        <code class="tag">${c.barcode||'-'}</code>
+      </td>
+      <td>${assetStatusBadge}</td>
+      <td style="max-width:160px;font-size:12px">${c.purpose||'-'}</td>
+      <td style="max-width:120px;font-size:12px;color:var(--text2)">${c.notes||'-'}</td>
+      <td>${statusBadge}</td>
+      <td>
+        <button class="btn-action info" onclick="printCustodyForm('${c._id}')"><i class="ti ti-printer"></i> طباعة</button>
+        ${can('edit') ? `<button class="btn-action success" onclick="approveCustody('${c._id}','معتمد')"><i class="ti ti-check"></i></button>` : ''}
+        ${can('edit') ? `<button class="btn-action danger" onclick="approveCustody('${c._id}','مرفوض')"><i class="ti ti-x"></i></button>` : ''}
+        ${can('edit') ? `<button class="btn-action danger" onclick="deleteCustody('${c._id}')"><i class="ti ti-trash"></i></button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterCustody() { renderCustody(); }
+
+function openNewCustody() {
+  const assets = getAssets();
+  const assetOptions = assets.map(a =>
+    `<option value="${a._id}" data-barcode="${a.barcode||a.code||a._id}" data-status="${a.status||'متاح'}" data-name="${a.name}">${a.name} ${a.barcode ? '- '+a.barcode : ''} (${a.status||'متاح'})</option>`
+  ).join('');
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('modal-title').innerHTML = '<i class="ti ti-file-invoice"></i> طلب عهدة ثلاجة جديد';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="form-row">
+      <div class="field"><label>التاريخ *</label><input type="date" id="cus-date" value="${today}"></div>
+      <div class="field"><label>اسم طالب العهدة *</label><input type="text" id="cus-requester" placeholder="الاسم الكامل"></div>
+    </div>
+    <div class="field"><label>الثلاجة المطلوبة *</label>
+      <select id="cus-asset" onchange="onCustodyAssetChange()">
+        <option value="">-- اختر الثلاجة --</option>
+        ${assetOptions}
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>الباركود</label><input type="text" id="cus-barcode" placeholder="يملأ تلقائياً" readonly style="background:var(--bg2)"></div>
+      <div class="field"><label>حالة الثلاجة</label><input type="text" id="cus-status" placeholder="يملأ تلقائياً" readonly style="background:var(--bg2)"></div>
+    </div>
+    <div class="field"><label>المطلوب / الغرض من العهدة *</label><textarea id="cus-purpose" placeholder="اذكر سبب وغرض طلب العهدة..."></textarea></div>
+    <div class="field"><label>ملاحظات إضافية</label><textarea id="cus-notes" placeholder="أي ملاحظات إضافية..."></textarea></div>
+    <div class="alert alert-info"><i class="ti ti-info-circle"></i> سيتم إنشاء نموذج الطلب وإتاحته للطباعة والتوقيع بعد الحفظ.</div>
+  `;
+  document.getElementById('modal-box').classList.remove('wide');
+  document.getElementById('modal-box').classList.add('wide');
+  document.getElementById('modal-save-btn').textContent = 'حفظ الطلب';
+  document.getElementById('modal-save-btn').onclick = saveCustodyRequest;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function onCustodyAssetChange() {
+  const sel = document.getElementById('cus-asset');
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('cus-barcode').value = opt.dataset.barcode || '';
+  document.getElementById('cus-status').value = opt.dataset.status || '';
+}
+
+async function saveCustodyRequest() {
+  const date = document.getElementById('cus-date').value;
+  const requesterName = document.getElementById('cus-requester').value.trim();
+  const assetId = document.getElementById('cus-asset').value;
+  const purpose = document.getElementById('cus-purpose').value.trim();
+  const notes = document.getElementById('cus-notes').value.trim();
+
+  if (!date || !requesterName || !assetId || !purpose) {
+    showToast('يرجى ملء جميع الحقول الإلزامية', 'error'); return;
+  }
+
+  const sel = document.getElementById('cus-asset');
+  const opt = sel.options[sel.selectedIndex];
+  const assetName = opt.dataset.name || opt.text;
+  const barcode = document.getElementById('cus-barcode').value;
+  const assetStatus = document.getElementById('cus-status').value;
+
+  await waitForFirebase();
+  const { collection, addDoc } = window.fsApi;
+  const rec = { date, requesterName, assetId, assetName, barcode, assetStatus, purpose, notes, requestStatus: 'قيد المراجعة', createdBy: currentUser?.name || '', createdAt: new Date().toISOString() };
+  const docRef = await addDoc(collection(window.db, "custodyRequests"), rec);
+  rec._id = docRef.id;
+  window.custodyRequests = window.custodyRequests || [];
+  window.custodyRequests.push(rec);
+  closeModal();
+  renderCustody();
+  showToast('تم حفظ طلب العهدة بنجاح', 'success');
+  setTimeout(() => printCustodyForm(rec._id), 400);
+}
+
+async function approveCustody(id, status) {
+  await waitForFirebase();
+  const { doc: docRef, updateDoc } = window.fsApi;
+  await updateDoc(docRef(window.db, "custodyRequests", id), { requestStatus: status });
+  const idx = (window.custodyRequests||[]).findIndex(c => c._id === id);
+  if (idx >= 0) window.custodyRequests[idx].requestStatus = status;
+  renderCustody();
+  showToast('تم تحديث حالة الطلب', 'success');
+}
+
+async function deleteCustody(id) {
+  if (!confirm('هل أنت متأكد من حذف هذا الطلب؟')) return;
+  await waitForFirebase();
+  const { doc: docRef, deleteDoc } = window.fsApi;
+  await deleteDoc(docRef(window.db, "custodyRequests", id));
+  window.custodyRequests = (window.custodyRequests||[]).filter(c => c._id !== id);
+  renderCustody();
+  showToast('تم حذف الطلب', 'success');
+}
+
+function printCustodyForm(id) {
+  const c = (window.custodyRequests||[]).find(x => x._id === id);
+  if (!c) { showToast('لم يتم العثور على الطلب', 'error'); return; }
+  const companyName = 'شركة ثمار القمة المحدودة';
+  const statusBadgeColor = c.assetStatus === 'متاح' ? '#2E7D32' : c.assetStatus === 'صيانة' ? '#B45309' : '#1C3F8A';
+  const reqStatusColor = c.requestStatus === 'معتمد' ? '#2E7D32' : c.requestStatus === 'مرفوض' ? '#C62828' : '#B45309';
+
+  // Generate simple barcode visual using text
+  const barcodeDisplay = c.barcode ? `
+    <div style="text-align:center;margin:6px 0">
+      <div style="font-family:monospace;font-size:13px;letter-spacing:4px;border:1px solid #333;padding:4px 12px;display:inline-block;background:#fff">${c.barcode}</div>
+      <div style="font-size:10px;margin-top:2px;color:#555">باركود الأصل</div>
+    </div>` : '';
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>نموذج طلب عهدة - ${c.requesterName}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Cairo', Arial, sans-serif; font-size: 13px; color: #0E1D3A; direction: rtl; background: #fff; padding: 20px; }
+  .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #1C3F8A; padding-bottom: 14px; margin-bottom: 18px; }
+  .header-logo { display: flex; align-items: center; gap: 10px; }
+  .header-title { font-size: 20px; font-weight: 700; color: #1C3F8A; }
+  .header-sub { font-size: 13px; color: #5B7AAA; margin-top: 3px; }
+  .doc-info { text-align: left; font-size: 11px; color: #5B7AAA; line-height: 1.8; }
+  .form-title { text-align: center; font-size: 17px; font-weight: 700; color: #1C3F8A; margin: 0 0 16px; padding: 10px; background: #DBEAFE; border-radius: 6px; border: 2px solid #1C3F8A; }
+  .info-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  .info-table td { border: 1px solid #C8DBF0; padding: 8px 12px; font-size: 13px; vertical-align: middle; }
+  .info-table .label { background: #F0F6FF; font-weight: 700; color: #1C3F8A; width: 30%; white-space: nowrap; }
+  .info-table .value { color: #0E1D3A; font-weight: 500; }
+  .status-badge { display: inline-block; padding: 3px 12px; border-radius: 100px; font-size: 12px; font-weight: 700; }
+  .notes-box { border: 1px solid #C8DBF0; border-radius: 6px; padding: 12px; margin-bottom: 18px; min-height: 60px; background: #F8FBFF; }
+  .notes-box h4 { font-size: 12px; font-weight: 700; color: #3A5070; margin-bottom: 6px; }
+  .sign-section { display: flex; gap: 20px; margin-top: 24px; }
+  .sign-box { flex: 1; border: 1.5px solid #C8DBF0; border-radius: 8px; padding: 14px 16px; min-height: 110px; display: flex; flex-direction: column; justify-content: space-between; background: #FAFCFF; }
+  .sign-box-title { font-size: 13px; font-weight: 700; color: #1C3F8A; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .sign-box-title::before { content: ''; display: inline-block; width: 4px; height: 16px; background: #1C3F8A; border-radius: 2px; }
+  .sign-line { border-top: 2px dashed #B0CCE8; margin-top: 30px; padding-top: 6px; font-size: 11px; color: #7090B0; text-align: center; }
+  .footer { margin-top: 22px; padding-top: 10px; border-top: 1px solid #C8DBF0; font-size: 10px; color: #7090B0; text-align: center; line-height: 1.6; }
+  .barcode-area { display: flex; align-items: center; gap: 12px; }
+  .alert-box { background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 6px; padding: 8px 12px; font-size: 11px; color: #92400E; margin-bottom: 14px; }
+  @media print { 
+    body { padding: 10px; } 
+    .no-print { display: none !important; }
+    @page { margin: 1.5cm; }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-logo">
+    <div>
+      <div class="header-title">${companyName}</div>
+      <div class="header-sub">نظام إدارة الأصول</div>
+    </div>
+  </div>
+  <div class="doc-info">
+    <div><strong>رقم الطلب:</strong> CUS-${Date.now().toString().slice(-6)}</div>
+    <div><strong>تاريخ الطلب:</strong> ${c.date}</div>
+    <div><strong>تاريخ الطباعة:</strong> ${new Date().toLocaleDateString('ar-SA')}</div>
+    <div><strong>حالة الطلب:</strong> <span style="color:${reqStatusColor};font-weight:700">${c.requestStatus}</span></div>
+  </div>
+</div>
+
+<div class="form-title">📋 نموذج طلب عهدة صيانة ثلاجة</div>
+
+<div class="alert-box">⚠️ يُرجى مراجعة بيانات الطلب قبل التوقيع والتأكد من صحتها</div>
+
+<table class="info-table">
+  <tr>
+    <td class="label">اسم طالب العهدة</td>
+    <td class="value" style="font-size:14px;font-weight:700;color:#1C3F8A">${c.requesterName}</td>
+    <td class="label">التاريخ</td>
+    <td class="value">${c.date}</td>
+  </tr>
+  <tr>
+    <td class="label">الثلاجة المطلوبة</td>
+    <td class="value" colspan="3">
+      <div class="barcode-area">
+        <div>
+          <div style="font-weight:700;font-size:14px">${c.assetName}</div>
+          <div style="font-size:11px;color:#5B7AAA;margin-top:3px">اسم الأصل</div>
+        </div>
+        <div style="flex:1">
+          ${barcodeDisplay}
+        </div>
+        <div>
+          <span class="status-badge" style="background:${c.assetStatus==='متاح'?'#E8F5E9':c.assetStatus==='صيانة'?'#FEF3C7':'#DBEAFE'};color:${statusBadgeColor}">${c.assetStatus||'غير محدد'}</span>
+          <div style="font-size:10px;color:#5B7AAA;margin-top:3px;text-align:center">حالة الثلاجة</div>
+        </div>
+      </div>
+    </td>
+  </tr>
+  <tr>
+    <td class="label">حالة الثلاجة الحالية</td>
+    <td class="value"><span class="status-badge" style="background:${c.assetStatus==='متاح'?'#E8F5E9':c.assetStatus==='صيانة'?'#FEF3C7':'#DBEAFE'};color:${statusBadgeColor}">${c.assetStatus||'غير محدد'}</span></td>
+    <td class="label">أُعد بواسطة</td>
+    <td class="value">${c.createdBy||currentUser?.name||'-'}</td>
+  </tr>
+</table>
+
+<div class="notes-box">
+  <h4>📌 المطلوب / الغرض من العهدة:</h4>
+  <div style="font-size:13px;line-height:1.7;color:#0E1D3A">${c.purpose || '-'}</div>
+</div>
+
+${c.notes ? `<div class="notes-box">
+  <h4>🗒️ ملاحظات إضافية:</h4>
+  <div style="font-size:12px;color:#3A5070;line-height:1.6">${c.notes}</div>
+</div>` : ''}
+
+<div class="sign-section">
+  <div class="sign-box">
+    <div class="sign-box-title">توقيع طالب العهدة</div>
+    <div style="font-size:12px;color:#5B7AAA">الاسم: ${c.requesterName}</div>
+    <div class="sign-line">التوقيع / الختم</div>
+  </div>
+  <div class="sign-box">
+    <div class="sign-box-title">اعتماد المدير المسؤول</div>
+    <div style="font-size:12px;color:#5B7AAA">الاسم: ________________________</div>
+    <div class="sign-line">التوقيع / الختم</div>
+  </div>
+</div>
+
+<div class="footer">
+  ${companyName} &nbsp;|&nbsp; نظام إدارة الأصول &nbsp;|&nbsp; جميع الحقوق محفوظة<br>
+  تاريخ الطباعة: ${new Date().toLocaleString('ar-SA')}
+</div>
+
+<div class="no-print" style="text-align:center;margin-top:20px">
+  <button onclick="window.print()" style="padding:10px 28px;background:#1C3F8A;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-family:'Cairo',sans-serif;font-weight:600"><i>🖨️</i> طباعة النموذج</button>
+  <button onclick="window.close()" style="padding:10px 20px;background:#eee;color:#333;border:1px solid #ccc;border-radius:6px;font-size:14px;cursor:pointer;font-family:'Cairo',sans-serif;margin-right:10px">إغلاق</button>
+</div>
+</body></html>`);
+  win.document.close();
+}
+
+
 document.getElementById('modal-overlay').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
 
 /* ────────────────────────────────────────
