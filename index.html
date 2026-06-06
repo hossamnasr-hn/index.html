@@ -290,6 +290,16 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <button class="btn-primary" id="login-btn" style="margin-top:16px" onclick="doLogin()"><i class="ti ti-login"></i> دخول</button>
     </div>
     <div class="login-hint" id="login-hint">جارٍ الاتصال بقاعدة البيانات...</div>
+    <div id="emergency-wrap" style="display:none;margin-top:8px;width:100%">
+      <div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:14px;text-align:center;font-size:13px;color:#92400E;margin-bottom:8px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;display:block;margin-bottom:6px"></i>
+        <strong>لا يوجد مستخدمون في قاعدة البيانات</strong><br>
+        اضغط الزر أدناه لإنشاء حساب المدير
+      </div>
+      <button onclick="createAdminUser()" style="width:100%;padding:10px;background:#C62828;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font)">
+        <i class="ti ti-user-plus"></i> إنشاء حساب المدير الآن
+      </button>
+    </div>
   </div>
 </div>
 
@@ -721,7 +731,7 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db,"users"));
   if (usersSnap.empty) {
     const defaultUsers = [
-      { name:"مدير النظام", username:"admin", password:"", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers"] },
+      { name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers"] },
     ];
     for (const u of defaultUsers) await addDoc(collection(db,"users"),u);
   }
@@ -929,6 +939,12 @@ async function doLogin() {
     const allUsers = getUsers();
     console.log('Users loaded:', allUsers.length, allUsers.map(x=>x.username));
     
+    // Show emergency button if no users exist
+    if (allUsers.length === 0) {
+      const ew = document.getElementById('emergency-wrap');
+      if (ew) ew.style.display = 'block';
+    }
+    
     // Find user - case insensitive username, exact password
     const found = allUsers.find(x => 
       x.username && x.username.toLowerCase().trim() === u.toLowerCase().trim() && 
@@ -971,6 +987,46 @@ function doLogout() {
   currentUser = null;
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('app-shell').classList.add('hidden');
+}
+
+async function createAdminUser() {
+  const btn = event.target.closest('button');
+  btn.textContent = 'جارٍ الإنشاء...';
+  btn.disabled = true;
+  try {
+    if (window._firebasePromise) {
+      try { await window._firebasePromise; } catch(e) {}
+    }
+    await waitForFirebase();
+    const {collection:col, addDoc:add} = window.fsApi;
+    const adminData = {
+      name: "مدير النظام",
+      username: "admin",
+      password: "admin123",
+      role: "مدير",
+      perms: ["view","add","edit","handover","dispose","maintenance","users","return","customers"]
+    };
+    await add(col(window.db, "users"), adminData);
+    if (window.reloadData) await window.reloadData();
+    // Hide emergency wrap
+    const ew = document.getElementById('emergency-wrap');
+    if (ew) ew.style.display = 'none';
+    // Fill login fields
+    document.getElementById('username').value = 'admin';
+    document.getElementById('password').value = 'admin123';
+    // Show success hint
+    const hint = document.getElementById('login-hint');
+    if (hint) {
+      hint.innerHTML = '<span style="color:#2E7D32;font-weight:700">✅ تم إنشاء المدير — اسم المستخدم: admin | كلمة المرور: admin123</span>';
+    }
+    // Auto login
+    await doLogin();
+  } catch(e) {
+    btn.textContent = 'إنشاء حساب المدير الآن';
+    btn.disabled = false;
+    const hint = document.getElementById('login-hint');
+    if (hint) hint.innerHTML = '<span style="color:#C62828">⚠️ خطأ: ' + e.message + '</span>';
+  }
 }
 
 function can(p) { return currentUser && currentUser.perms && currentUser.perms.includes(p); }
@@ -1190,7 +1246,7 @@ function assetForm(a) {
     '<div class="form-section">خصائص الأصل</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
       '<div class="field"><label>الشركة المصنعة</label>'+
-        '<select id="f-manufacturer" onchange="document.getElementById('f-manufacturer-other').style.display=this.value==='__other__'?'block':'none'">'+
+        '<select id="f-manufacturer" onchange="document.getElementById(\'f-manufacturer-other\').style.display=this.value===\'__other__\'?\'block\':\'none\'">'+
           '<option value="">-- اختر --</option>'+
           manufacturers.map(v=>'<option value="'+v+'" '+(mfg===v&&!mfgIsOther?'selected':'')+'>'+v+'</option>').join('')+
           '<option value="__other__" '+(mfgIsOther?'selected':'')+'>أخرى (أدخل يدوياً)</option>'+
@@ -1198,7 +1254,7 @@ function assetForm(a) {
         '<input type="text" id="f-manufacturer-other" placeholder="اسم الشركة" value="'+(mfgIsOther?mfg:'')+'" style="margin-top:6px;display:'+(mfgIsOther?'block':'none')+';width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font);background:var(--bg)">'+
       '</div>'+
       '<div class="field"><label>السعة</label>'+
-        '<select id="f-capacity" onchange="document.getElementById('f-capacity-other').style.display=this.value==='__other__'?'block':'none'">'+
+        '<select id="f-capacity" onchange="document.getElementById(\'f-capacity-other\').style.display=this.value===\'__other__\'?\'block\':\'none\'">'+
           '<option value="">-- اختر --</option>'+
           capacities.map(v=>'<option value="'+v+'" '+(cap===v&&!capIsOther?'selected':'')+'>'+v+'</option>').join('')+
           '<option value="__other__" '+(capIsOther?'selected':'')+'>أخرى</option>'+
@@ -1214,7 +1270,7 @@ function assetForm(a) {
       '<div class="field"><label>تاريخ الإضافة</label><input id="f-date" type="date" value="'+(a.date||new Date().toISOString().split('T')[0])+'"></div>'+
     '</div>'+
     '<div class="form-section">صورة الأصل</div>'+
-    '<div class="img-upload-area" onclick="document.getElementById('f-img-file').click()"><i class="ti ti-photo-up" style="font-size:24px;display:block;margin-bottom:6px"></i>انقر لرفع صورة</div>'+
+    '<div class="img-upload-area" onclick="document.getElementById(\'f-img-file\').click()"><i class="ti ti-photo-up" style="font-size:24px;display:block;margin-bottom:6px"></i>انقر لرفع صورة</div>'+
     '<input type="file" id="f-img-file" accept="image/*" style="display:none" onchange="previewAssetImage(this)">'+
     (a.imageUrl?'<img src="'+a.imageUrl+'" class="img-preview" id="img-preview-el">':'<div id="img-preview-el"></div>')+
     '<input type="hidden" id="f-img-url" value="'+(a.imageUrl||'')+'">'
@@ -2459,6 +2515,7 @@ function printReport(pageId) {
 /* ── Export all functions to window for Firebase module compatibility ── */
 if(typeof doLogin!=='undefined')window.doLogin=doLogin;
 if(typeof doLogout!=='undefined')window.doLogout=doLogout;
+if(typeof createAdminUser!=='undefined')window.createAdminUser=createAdminUser;
 if(typeof can!=='undefined')window.can=can;
 if(typeof showPage!=='undefined')window.showPage=showPage;
 if(typeof renderAll!=='undefined')window.renderAll=renderAll;
