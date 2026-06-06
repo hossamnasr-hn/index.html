@@ -946,17 +946,19 @@ async function doLogin() {
     }
     
     // Find user - case insensitive username, exact password
-    const found = allUsers.find(x => 
-      x.username && x.username.toLowerCase().trim() === u.toLowerCase().trim() && 
-      x.password === p
-    );
+    const found = allUsers.find(x => {
+      const uMatch = x.username 
+        ? x.username.toLowerCase().trim() === u.toLowerCase().trim()
+        : x.name && x.name.toLowerCase().trim() === u.toLowerCase().trim();
+      return uMatch && x.password === p;
+    });
     
     if (!found) {
       const errEl = document.getElementById('login-error');
       if (allUsers.length === 0) {
         errEl.textContent = 'لم يتم تحميل بيانات المستخدمين - تحقق من اتصال الإنترنت';
       } else {
-        errEl.textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة (المستخدمون: ' + allUsers.map(x=>x.username).join(', ') + ')';
+        errEl.textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة (المستخدمون: ' + allUsers.map(x=>x.username||x.name).join(', ') + ')';
       }
       errEl.style.display='block';
       return;
@@ -998,15 +1000,34 @@ async function createAdminUser() {
       try { await window._firebasePromise; } catch(e) {}
     }
     await waitForFirebase();
-    const {collection:col, addDoc:add} = window.fsApi;
-    const adminData = {
-      name: "مدير النظام",
-      username: "admin",
-      password: "admin123",
-      role: "مدير",
-      perms: ["view","add","edit","handover","dispose","maintenance","users","return","customers"]
-    };
-    await add(col(window.db, "users"), adminData);
+    const {collection:col, addDoc:add, getDocs:gDocs, doc:docRef, updateDoc:upd} = window.fsApi;
+    
+    // Check if a user exists but is missing username field — fix it
+    const snap = await gDocs(col(window.db, "users"));
+    if (!snap.empty) {
+      for (const d of snap.docs) {
+        const data = d.data();
+        if (!data.username) {
+          await upd(docRef(window.db, "users", d.id), {
+            username: "admin",
+            password: "admin123",
+            role: data.role || "مدير",
+            perms: data.perms || ["view","add","edit","handover","dispose","maintenance","users","return","customers"]
+          });
+        }
+      }
+    } else {
+      // No users at all — create fresh
+      const adminData = {
+        name: "مدير النظام",
+        username: "admin",
+        password: "admin123",
+        role: "مدير",
+        perms: ["view","add","edit","handover","dispose","maintenance","users","return","customers"]
+      };
+      await add(col(window.db, "users"), adminData);
+    }
+    
     if (window.reloadData) await window.reloadData();
     // Hide emergency wrap
     const ew = document.getElementById('emergency-wrap');
