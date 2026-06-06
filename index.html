@@ -728,19 +728,30 @@ window._firebaseReady = true;
 console.log("✅ Firebase connected");
 
 async function initDefaultData() {
+  // Always check users first
   const usersSnap = await getDocs(collection(db,"users"));
-  if (usersSnap.empty) {
-    const defaultUsers = [
-      { name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers"] },
-    ];
-    for (const u of defaultUsers) await addDoc(collection(db,"users"),u);
+  const existingUsers = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
+  
+  if (usersSnap.empty || existingUsers.length === 0) {
+    // No users at all - create admin
+    await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers"] });
+    console.log("✅ Admin user created");
+  } else {
+    // Users exist but may be missing username field - fix them
+    for (const d of usersSnap.docs) {
+      const data = d.data();
+      if (!data.username) {
+        await updateDoc(doc(db,"users",d.id), { username: data.name==="مدير النظام"?"admin": data.name.replace(/\s+/g,'_').toLowerCase(), password: data.password||"admin123" });
+        console.log("✅ Fixed missing username for:", data.name);
+      }
+    }
   }
+  
   const typesSnap = await getDocs(collection(db,"assetTypes"));
   if (typesSnap.empty) {
     const defaultTypes = ["ثلاجات العرض","معدات المطبخ","أجهزة إلكترونية","أثاث","مركبات","أخرى"];
     for (const t of defaultTypes) await addDoc(collection(db,"assetTypes"),{name:t});
   }
-  // Init sub types for display fridges
   const subTypesSnap = await getDocs(collection(db,"assetSubTypes"));
   if (subTypesSnap.empty) {
     const defaults = [
@@ -751,7 +762,6 @@ async function initDefaultData() {
     ];
     for (const s of defaults) await addDoc(collection(db,"assetSubTypes"),s);
   }
-  // Init attributes
   const attrSnap = await getDocs(collection(db,"attributes"));
   if (attrSnap.empty) {
     const defaults = [
@@ -763,7 +773,6 @@ async function initDefaultData() {
     ];
     for (const a of defaults) await addDoc(collection(db,"attributes"),a);
   }
-  // Init settings
   try {
     const settingsSnap = await getDocs(collection(db,"settings"));
     if (settingsSnap.empty) {
@@ -923,46 +932,41 @@ async function doLogin() {
   const btn = document.getElementById('login-btn');
   if (btn) { btn.textContent='جارٍ التحقق...'; btn.disabled=true; }
   try {
-    // Wait for firebase to finish loading
+    // Wait for firebase
     if (window._firebasePromise) {
       try { await window._firebasePromise; } catch(e) { console.warn('Firebase promise:', e); }
     }
-    // Extra wait if still no users
-    let waited = 0;
-    while ((!window.users || window.users.length===0) && waited < 6000) {
-      await new Promise(r=>setTimeout(r,300)); waited+=300;
-    }
-    // Force reload if still empty
-    if (!window.users || window.users.length===0) {
-      if (window.reloadData) try { await window.reloadData(); } catch(e){}
-    }
-    const allUsers = getUsers();
-    console.log('Users loaded:', allUsers.length, allUsers.map(x=>x.username));
-    
-    // Show emergency button if no users exist
-    if (allUsers.length === 0) {
-      const ew = document.getElementById('emergency-wrap');
-      if (ew) ew.style.display = 'block';
-    }
-    
-    // Find user - case insensitive username, exact password
-    const found = allUsers.find(x => {
-      const uMatch = x.username 
-        ? x.username.toLowerCase().trim() === u.toLowerCase().trim()
-        : x.name && x.name.toLowerCase().trim() === u.toLowerCase().trim();
-      return uMatch && x.password === p;
-    });
-    
-    if (!found) {
+    await waitForFirebase();
+
+    // Always fetch users DIRECTLY from Firestore (bypass cache)
+    const {collection:col, getDocs:gDocs} = window.fsApi;
+    const snap = await gDocs(col(window.db, "users"));
+    const freshUsers = snap.docs.map(d=>({...d.data(), _id:d.id}));
+    window.users = freshUsers;
+    console.log('Direct Firestore users:', freshUsers.length, JSON.stringify(freshUsers.map(x=>({u:x.username,n:x.name}))));
+
+    // No users at all
+    if (freshUsers.length === 0) {
+      document.getElementById('emergency-wrap').style.display = 'block';
       const errEl = document.getElementById('login-error');
-      if (allUsers.length === 0) {
-        errEl.textContent = 'لم يتم تحميل بيانات المستخدمين - تحقق من اتصال الإنترنت';
-      } else {
-        errEl.textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة (المستخدمون: ' + allUsers.map(x=>x.username||x.name).join(', ') + ')';
-      }
+      errEl.textContent = 'لا يوجد مستخدمون - اضغط زر إنشاء المدير أدناه';
       errEl.style.display='block';
       return;
     }
+
+    // Match: username or name, exact password
+    const found = freshUsers.find(x => {
+      const uField = (x.username || x.name || '').toLowerCase().trim();
+      return uField === u.toLowerCase().trim() && x.password === p;
+    });
+
+    if (!found) {
+      const errEl = document.getElementById('login-error');
+      errEl.textContent = 'خطأ في الدخول — المستخدمون: ' + freshUsers.map(x=>(x.username||x.name)).join(', ');
+      errEl.style.display='block';
+      return;
+    }
+
     currentUser = found;
     document.getElementById('login-error').style.display='none';
     document.getElementById('login-screen').style.display='none';
@@ -972,7 +976,6 @@ async function doLogin() {
     if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
     if (!found.perms.includes('users')) document.getElementById('nav-users').style.display='none';
-    // Always show add button - permission checked inside the function
     const addBtn = document.getElementById('add-asset-btn');
     if (addBtn) addBtn.style.display = '';
     populateTypeFilters();
