@@ -333,12 +333,12 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="nav-item" onclick="showPage('returns',this)" data-page="returns"><i class="ti ti-corner-up-left"></i> استرداد أصل</div>
       <div class="nav-item" onclick="showPage('maintenance',this)" data-page="maintenance"><i class="ti ti-tool"></i> الصيانة</div>
       <div class="nav-item" onclick="showPage('dispose',this)" data-page="dispose"><i class="ti ti-trash"></i> الإتلاف</div>
-      <div class="nav-item" onclick="showPage('custody',this)" data-page="custody"><i class="ti ti-file-invoice"></i> طلبات العهدة</div>
+      <div class="nav-item" id="nav-custody" onclick="showPage('custody',this)" data-page="custody"><i class="ti ti-file-invoice"></i> طلبات العهدة</div>
       <div class="nav-section">الإدارة</div>
       <div class="nav-item" onclick="showPage('types',this)" data-page="types"><i class="ti ti-tags"></i> أنواع الأصول</div>
       <div class="nav-item" onclick="showPage('reports',this)" data-page="reports"><i class="ti ti-chart-bar"></i> التقارير</div>
       <div class="nav-item" id="nav-users" onclick="showPage('users',this)" data-page="users"><i class="ti ti-user-shield"></i> المستخدمون</div>
-      <div class="nav-item" onclick="showPage('settings',this)" data-page="settings"><i class="ti ti-settings"></i> الإعدادات</div>
+      <div class="nav-item" id="nav-settings" onclick="showPage('settings',this)" data-page="settings"><i class="ti ti-settings"></i> الإعدادات</div>
     </div>
     <div id="content">
 
@@ -976,6 +976,10 @@ async function doLogin() {
     if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
     if (!found.perms.includes('users')) document.getElementById('nav-users').style.display='none';
+    const custodyNav = document.getElementById('nav-custody');
+    if (custodyNav) custodyNav.style.display = found.perms.includes('custody') ? '' : 'none';
+    const settingsNav = document.getElementById('nav-settings');
+    if (settingsNav) settingsNav.style.display = found.perms.includes('settings') ? '' : 'none';
     const addBtn = document.getElementById('add-asset-btn');
     if (addBtn) addBtn.style.display = '';
     populateTypeFilters();
@@ -1360,12 +1364,100 @@ async function saveAsset() {
     if (editingId) {
       await upd(docRef(window.db,"assets",editingId), obj);
       showToast('تم تحديث الأصل','success');
+      closeModal(); await window.reloadData(); populateTypeFilters();
     } else {
-      await add(col(window.db,"assets"), obj);
+      const newDocRef = await add(col(window.db,"assets"), obj);
       showToast('تمت إضافة الأصل','success');
+      closeModal(); await window.reloadData(); populateTypeFilters();
+      // Ask about barcode printing
+      const savedAsset = {...obj, _id: newDocRef.id};
+      setTimeout(()=>promptPrintBarcode(savedAsset), 300);
     }
-    closeModal(); await window.reloadData(); populateTypeFilters();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+/* ────────── BARCODE PRINT ────────── */
+function promptPrintBarcode(asset) {
+  document.getElementById('modal-title').innerHTML = '<i class="ti ti-barcode"></i> طباعة الباركود';
+  document.getElementById('modal-body').innerHTML =
+    '<div class="alert alert-success"><i class="ti ti-check"></i> تمت إضافة الأصل بنجاح!</div>'+
+    '<div style="text-align:center;padding:16px">'+
+      '<div style="font-size:15px;font-weight:700;margin-bottom:6px">'+asset.name+'</div>'+
+      '<code class="tag" style="font-size:14px;padding:6px 14px">'+asset.code+'</code>'+
+      '<div style="font-size:12px;color:var(--text2);margin-top:10px">هل تريد طباعة الباركود لهذا الأصل؟</div>'+
+    '</div>';
+  document.getElementById('modal-save-btn').textContent = 'طباعة الباركود';
+  document.getElementById('modal-save-btn').className = 'btn-save success-btn';
+  document.getElementById('modal-save-btn').onclick = () => { closeModal(); printAssetBarcode(asset); };
+  const footer = document.querySelector('.modal-footer');
+  const skipBtn = document.createElement('button');
+  skipBtn.className = 'btn-cancel';
+  skipBtn.textContent = 'تخطي';
+  skipBtn.onclick = closeModal;
+  // Insert skip before save button
+  const saveBtn = document.getElementById('modal-save-btn');
+  footer.insertBefore(skipBtn, saveBtn);
+  document.getElementById('modal-box').className = 'modal';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function printAssetBarcode(asset) {
+  const cn = window._settings?.companyName || 'نظام إدارة الأصول';
+  const code = asset.code || '';
+  const win = window.open('', '_blank');
+  // Generate simple Code128-like barcode using SVG bars
+  function generateBarsFromCode(str) {
+    let bars = '';
+    const w = 2;
+    let x = 10;
+    // Simple pattern: vary bar widths based on char codes
+    for (let i = 0; i < str.length; i++) {
+      const c = str.charCodeAt(i);
+      const bw1 = (c % 3) + 1;
+      const bw2 = ((c >> 2) % 3) + 1;
+      bars += '<rect x="' + x + '" y="10" width="' + (bw1 * w) + '" height="60" fill="#000"/>'; x += bw1 * w + w;
+      bars += '<rect x="' + x + '" y="10" width="' + (bw2 * w) + '" height="60" fill="#000"/>'; x += bw2 * w + 2 * w;
+    }
+    return { bars, width: x + 10 };
+  }
+  const { bars, width } = generateBarsFromCode(code);
+  win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>باركود - ' + asset.name + '</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">' +
+    '<style>body{font-family:\'Cairo\',sans-serif;direction:rtl;margin:0;padding:0;background:#fff}' +
+    '.label-wrap{display:flex;flex-wrap:wrap;gap:10px;padding:16px;justify-content:center}' +
+    '.label{border:1px solid #ccc;border-radius:6px;padding:12px 16px;text-align:center;width:200px;page-break-inside:avoid}' +
+    '.cn{font-size:10px;color:#555;margin-bottom:4px;font-weight:600}' +
+    '.aname{font-size:12px;font-weight:700;color:#0E1D3A;margin-bottom:6px}' +
+    '.code-txt{font-size:11px;font-family:monospace;color:#333;margin-top:4px;letter-spacing:1px}' +
+    '.type-txt{font-size:10px;color:#7090B0;margin-top:2px}' +
+    '.print-ctrl{padding:14px;text-align:center;border-bottom:1px solid #eee;margin-bottom:10px}' +
+    '@media print{.print-ctrl{display:none}}</style></head><body>' +
+    '<div class="print-ctrl">' +
+    '<span style="font-size:13px;color:#555;margin-left:12px">عدد النسخ: </span>' +
+    '<input type="number" id="copies" value="1" min="1" max="50" style="width:60px;padding:4px;font-size:13px;border:1px solid #ccc;border-radius:4px;margin-left:10px">' +
+    '<button onclick="generateLabels()" style="padding:7px 16px;background:#1C3F8A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:\'Cairo\',sans-serif;font-size:13px;font-weight:600;margin-left:8px">إنشاء</button>' +
+    '<button onclick="window.print()" style="padding:7px 16px;background:#2E7D32;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:\'Cairo\',sans-serif;font-size:13px;font-weight:600">🖨️ طباعة</button>' +
+    '</div>' +
+    '<div class="label-wrap" id="labels-wrap"></div>' +
+    '<script>' +
+    'const assetData=' + JSON.stringify({name: asset.name, code, type: asset.type||'', subType: asset.subType||'', cn}) + ';' +
+    'function generateLabels(){' +
+    '  const n=parseInt(document.getElementById("copies").value)||1;' +
+    '  let html="";' +
+    '  for(let i=0;i<n;i++){' +
+    '    html+=\'<div class="label">\'' +
+    '    +\'<div class="cn">\'+assetData.cn+\'</div>\'' +
+    '    +\'<div class="aname">\'+assetData.name+\'</div>\'' +
+    '    +\'<svg viewBox="0 0 ' + width + ' 90" width="160" height="55">' + bars + '<text x="' + (width/2) + '" y="85" text-anchor="middle" font-size="10" font-family="monospace">' + code + '</text></svg>\'' +
+    '    +\'<div class="code-txt">\'+assetData.code+\'</div>\'' +
+    '    +(assetData.subType?\'<div class="type-txt">\'+assetData.subType+\'</div>\':"") +' +
+    '    \'</div>\';' +
+    '  }' +
+    '  document.getElementById("labels-wrap").innerHTML=html;' +
+    '}' +
+    'generateLabels();' +
+    '<\/script></body></html>');
+  win.document.close();
 }
 
 /* ────────── INVENTORY ────────── */
@@ -2131,8 +2223,9 @@ const ALL_PERMS=[
   {key:'view',label:'عرض'},{key:'add',label:'إضافة أصول'},{key:'edit',label:'تعديل أصول'},
   {key:'handover',label:'تسليم'},{key:'maintenance',label:'صيانة'},{key:'dispose',label:'إتلاف'},
   {key:'users',label:'مستخدمون'},{key:'return',label:'استرداد'},{key:'customers',label:'العملاء'},
+  {key:'custody',label:'طلبات العهدة'},{key:'settings',label:'الإعدادات'},
 ];
-const PERM_LABELS={view:'عرض',add:'إضافة',edit:'تعديل',handover:'تسليم',maintenance:'صيانة',dispose:'إتلاف',users:'مستخدمون',return:'استرداد',customers:'العملاء'};
+const PERM_LABELS={view:'عرض',add:'إضافة',edit:'تعديل',handover:'تسليم',maintenance:'صيانة',dispose:'إتلاف',users:'مستخدمون',return:'استرداد',customers:'العملاء',custody:'طلبات العهدة',settings:'الإعدادات'};
 
 function renderUsers() {
   if (!document.getElementById('users-body')) return;
@@ -2198,7 +2291,7 @@ function userFormHTML(u) {
     '</div>';
 }
 function setPresetPerms(p) {
-  const pre={admin:['view','add','edit','handover','dispose','maintenance','users','return','customers'],manager:['view','add','edit','handover','dispose','maintenance','return','customers'],viewer:['view']};
+  const pre={admin:['view','add','edit','handover','dispose','maintenance','users','return','customers','custody','settings'],manager:['view','add','edit','handover','dispose','maintenance','return','customers','custody'],viewer:['view']};
   document.querySelectorAll('input[name="perm"]').forEach(c=>c.checked=pre[p].includes(c.value));
 }
 function getFormUser() {
@@ -2260,8 +2353,9 @@ function renderCustody() {
   if (!filtered.length) { tbody.innerHTML='<tr><td colspan="8" class="empty-row">لا توجد طلبات عهدة</td></tr>'; return; }
   tbody.innerHTML=filtered.map((c,i)=>{
     const sb=c.requestStatus==='معتمد'?'<span class="custody-badge-approved">معتمد</span>':c.requestStatus==='مرفوض'?'<span class="custody-badge-rejected">مرفوض</span>':'<span class="custody-badge-pending">قيد المراجعة</span>';
+    const custNum = c.custodyNumber || ('CUS-'+c._id.slice(-6));
     return '<tr>'+
-      '<td style="text-align:center">'+(i+1)+'</td>'+
+      '<td style="text-align:center"><code class="tag">'+custNum+'</code></td>'+
       '<td>'+(c.date||'-')+'</td>'+
       '<td style="font-weight:600">'+(c.requesterName||'-')+'</td>'+
       '<td><div style="font-weight:600">'+(c.assetName||'-')+'</div><code class="tag">'+(c.barcode||'-')+'</code></td>'+
@@ -2316,7 +2410,8 @@ async function saveCustodyRequest() {
   if (!date||!requesterName||!assetId||!purpose) { showToast('يرجى ملء الحقول الإلزامية','error'); return; }
   const sel=document.getElementById('cus-asset');
   const opt=sel.options[sel.selectedIndex];
-  const rec={date,requesterName,assetId,assetName:opt.dataset.name||opt.text,barcode:document.getElementById('cus-barcode').value,assetStatus:document.getElementById('cus-status').value,purpose,notes:document.getElementById('cus-notes').value,requestStatus:'قيد المراجعة',createdBy:currentUser?.name||'',createdAt:new Date().toISOString()};
+  const custodyNum='CUS-'+Date.now().toString().slice(-6);
+  const rec={date,requesterName,assetId,assetName:opt.dataset.name||opt.text,barcode:document.getElementById('cus-barcode').value,assetStatus:document.getElementById('cus-status').value,purpose,notes:document.getElementById('cus-notes').value,requestStatus:'قيد المراجعة',createdBy:currentUser?.name||'',createdAt:new Date().toISOString(),custodyNumber:custodyNum};
   try {
     await waitForFirebase();
     const docRef=await window.fsApi.addDoc(window.fsApi.collection(window.db,"custodyRequests"),rec);
@@ -2355,6 +2450,9 @@ function closeModal() {
   btn.className='btn-save';
   document.getElementById('modal-box').className='modal';
   _pendingAttachments=[];
+  // Remove any extra buttons added dynamically to footer
+  const footer = document.querySelector('.modal-footer');
+  footer.querySelectorAll('button:not(#modal-save-btn):not(.btn-cancel)').forEach(b=>b.remove());
 }
 document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
 
@@ -2422,7 +2520,7 @@ function printCustodyForm(id) {
   '.notes{border:1px solid #C8DBF0;border-radius:6px;padding:12px;margin:14px 0;min-height:60px;background:#F8FBFF}'+
   '@media print{.noprint{display:none}}</style></head><body>'+
   '<div class="hdr"><div><div style="font-size:18px;font-weight:700;color:#1C3F8A">'+cn+'</div><div style="color:#5B7AAA">طلب عهدة أصل</div></div>'+
-  '<div style="font-size:12px;color:#5B7AAA;line-height:1.8"><div>رقم: CUS-'+Date.now().toString().slice(-6)+'</div><div>التاريخ: '+(c.date||'-')+'</div><div>الحالة: <strong style="color:'+reqColor+'">'+c.requestStatus+'</strong></div></div></div>'+
+  '<div style="font-size:12px;color:#5B7AAA;line-height:1.8"><div>رقم: '+(c.custodyNumber||'CUS-'+c._id.slice(-6))+'</div><div>التاريخ: '+(c.date||'-')+'</div><div>الحالة: <strong style="color:'+reqColor+'">'+c.requestStatus+'</strong></div></div></div>'+
   '<div style="text-align:center;font-size:16px;font-weight:700;color:#1C3F8A;background:#DBEAFE;padding:10px;border-radius:6px;margin-bottom:16px">📋 نموذج طلب عهدة</div>'+
   '<table style="margin-bottom:14px">'+
     '<tr><td class="lbl">اسم الطالب</td><td style="font-weight:700;color:#1C3F8A">'+(c.requesterName||'-')+'</td><td class="lbl">التاريخ</td><td>'+(c.date||'-')+'</td></tr>'+
