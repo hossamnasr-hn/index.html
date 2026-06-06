@@ -280,16 +280,26 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
     <div class="login-card">
       <div class="field">
         <label>اسم المستخدم</label>
-        <input type="text" id="username" placeholder="أدخل اسم المستخدم" autocomplete="username">
+        <input type="text" id="username" placeholder="أدخل اسم المستخدم" autocomplete="off" spellcheck="false">
       </div>
       <div class="field">
         <label>كلمة المرور</label>
-        <input type="password" id="password" placeholder="أدخل كلمة المرور" autocomplete="current-password">
+        <input type="password" id="password" placeholder="أدخل كلمة المرور" autocomplete="off">
       </div>
       <div class="error-msg" id="login-error">اسم المستخدم أو كلمة المرور غير صحيحة</div>
       <button class="btn-primary" id="login-btn" style="margin-top:16px" onclick="doLogin()"><i class="ti ti-login"></i> دخول</button>
     </div>
-    <div class="login-hint" id="login-hint">نظام إدارة أصول الثلاجات - محمي بكلمة مرور</div>
+    <div class="login-hint" id="login-hint">جارٍ الاتصال بقاعدة البيانات...</div>
+    <div id="emergency-wrap" style="display:none;margin-top:8px;width:100%">
+      <div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:14px;text-align:center;font-size:13px;color:#92400E;margin-bottom:8px">
+        <i class="ti ti-alert-triangle" style="font-size:18px;display:block;margin-bottom:6px"></i>
+        <strong>لا يوجد مستخدمون في قاعدة البيانات</strong><br>
+        اضغط الزر أدناه لإنشاء حساب المدير
+      </div>
+      <button onclick="createAdminUser()" style="width:100%;padding:10px;background:#C62828;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font)">
+        <i class="ti ti-user-plus"></i> إنشاء حساب المدير الآن
+      </button>
+    </div>
   </div>
 </div>
 
@@ -675,11 +685,30 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
 
 
 <!-- Firebase SDK -->
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- Firebase IIFE Definition -->
+<script>
+
+window._firebaseInit = (async function() {
+const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+const {
   getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, setDoc
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
 
 const firebaseConfig = {
   apiKey: "AIzaSyDHlLO8GuZJKMguRsPoV5Wz4cmer8XGlfA",
@@ -702,7 +731,7 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db,"users"));
   if (usersSnap.empty) {
     const defaultUsers = [
-      { name:"مدير النظام", username:"admin", password:"", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers"] },
+      { name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers"] },
     ];
     for (const u of defaultUsers) await addDoc(collection(db,"users"),u);
   }
@@ -759,6 +788,7 @@ async function loadAllData() {
     getDocs(collection(db,"settings")),
   ]);
   window.users = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
+  console.log('✅ Users loaded from Firebase:', window.users.length, window.users.map(u=>u.username));
   window.assetTypes = typesSnap.docs.map(d=>({name:d.data().name,_id:d.id}));
   window.assetSubTypes = subTypesSnap.docs.map(d=>({...d.data(),_id:d.id}));
   window.assetAttributes = attrSnap.docs.map(d=>({...d.data(),_id:d.id}));
@@ -773,18 +803,29 @@ async function loadAllData() {
   if (!settingsSnap.empty) {
     const s = settingsSnap.docs[0].data();
     window._settings = {...s, _id:settingsSnap.docs[0].id};
-    if (s.companyName) applyCompanySettings(s.companyName, s.logoUrl||'');
+    if (s.companyName) if(window.applyCompanySettings)window.applyCompanySettings(s.companyName, s.logoUrl||'');
   }
-  renderAll();
-  populateTypeFilters();
+  // renderAll is in same scope now (IIFE converted)
+  try { renderAll(); populateTypeFilters(); } catch(e) { console.warn("Initial render:", e.message); }
 }
 
-window.reloadData = loadAllData;
+window.reloadData = async function() {
+  await loadAllData();
+  renderAll();
+  populateTypeFilters();
+};
 
 try {
   await initDefaultData();
   await loadAllData();
   window._dataReady = true;
+  console.log("✅ All data loaded. Users:", window.users?.length);
+  // Update login hint to show ready
+  const hint = document.getElementById('login-hint');
+  if (hint && hint.textContent.includes('جارٍ')) {
+    hint.textContent = 'النظام جاهز - يمكنك تسجيل الدخول';
+    hint.style.color = '#2E7D32';
+  }
 } catch(err) {
   console.error("Firebase init error:", err);
   const hint = document.getElementById('login-hint');
@@ -793,8 +834,11 @@ try {
 
 document.getElementById('password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('username').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+}); // end named IIFE - will be called after all scripts load
+
 </script>
 
+<!-- All Application Scripts (merged) -->
 <script>
 /* ────────── GLOBALS ────────── */
 let currentUser = null;
@@ -879,17 +923,42 @@ async function doLogin() {
   const btn = document.getElementById('login-btn');
   if (btn) { btn.textContent='جارٍ التحقق...'; btn.disabled=true; }
   try {
+    // Wait for firebase to finish loading
+    if (window._firebasePromise) {
+      try { await window._firebasePromise; } catch(e) { console.warn('Firebase promise:', e); }
+    }
+    // Extra wait if still no users
     let waited = 0;
-    while ((!window.users || window.users.length===0) && waited < 8000) {
-      await new Promise(r=>setTimeout(r,200)); waited+=200;
+    while ((!window.users || window.users.length===0) && waited < 6000) {
+      await new Promise(r=>setTimeout(r,300)); waited+=300;
     }
+    // Force reload if still empty
     if (!window.users || window.users.length===0) {
-      if (window.reloadData) await window.reloadData();
+      if (window.reloadData) try { await window.reloadData(); } catch(e){}
     }
-    const found = getUsers().find(x=>x.username===u && x.password===p);
+    const allUsers = getUsers();
+    console.log('Users loaded:', allUsers.length, allUsers.map(x=>x.username));
+    
+    // Show emergency button if no users exist
+    if (allUsers.length === 0) {
+      const ew = document.getElementById('emergency-wrap');
+      if (ew) ew.style.display = 'block';
+    }
+    
+    // Find user - case insensitive username, exact password
+    const found = allUsers.find(x => 
+      x.username && x.username.toLowerCase().trim() === u.toLowerCase().trim() && 
+      x.password === p
+    );
+    
     if (!found) {
-      document.getElementById('login-error').textContent='اسم المستخدم أو كلمة المرور غير صحيحة';
-      document.getElementById('login-error').style.display='block';
+      const errEl = document.getElementById('login-error');
+      if (allUsers.length === 0) {
+        errEl.textContent = 'لم يتم تحميل بيانات المستخدمين - تحقق من اتصال الإنترنت';
+      } else {
+        errEl.textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة (المستخدمون: ' + allUsers.map(x=>x.username).join(', ') + ')';
+      }
+      errEl.style.display='block';
       return;
     }
     currentUser = found;
@@ -897,10 +966,13 @@ async function doLogin() {
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-shell').classList.remove('hidden');
     document.getElementById('header-avatar').textContent = found.name.split(' ').map(w=>w[0]).join('').slice(0,2);
-    document.getElementById('header-name').textContent = found.name;
+    const nameEl = document.getElementById('header-name');
+    if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
     if (!found.perms.includes('users')) document.getElementById('nav-users').style.display='none';
-    if (!found.perms.includes('add')) document.getElementById('add-asset-btn').style.display='none';
+    // Always show add button - permission checked inside the function
+    const addBtn = document.getElementById('add-asset-btn');
+    if (addBtn) addBtn.style.display = '';
     populateTypeFilters();
     renderAll();
   } catch(e) {
@@ -915,6 +987,46 @@ function doLogout() {
   currentUser = null;
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('app-shell').classList.add('hidden');
+}
+
+async function createAdminUser() {
+  const btn = event.target.closest('button');
+  btn.textContent = 'جارٍ الإنشاء...';
+  btn.disabled = true;
+  try {
+    if (window._firebasePromise) {
+      try { await window._firebasePromise; } catch(e) {}
+    }
+    await waitForFirebase();
+    const {collection:col, addDoc:add} = window.fsApi;
+    const adminData = {
+      name: "مدير النظام",
+      username: "admin",
+      password: "admin123",
+      role: "مدير",
+      perms: ["view","add","edit","handover","dispose","maintenance","users","return","customers"]
+    };
+    await add(col(window.db, "users"), adminData);
+    if (window.reloadData) await window.reloadData();
+    // Hide emergency wrap
+    const ew = document.getElementById('emergency-wrap');
+    if (ew) ew.style.display = 'none';
+    // Fill login fields
+    document.getElementById('username').value = 'admin';
+    document.getElementById('password').value = 'admin123';
+    // Show success hint
+    const hint = document.getElementById('login-hint');
+    if (hint) {
+      hint.innerHTML = '<span style="color:#2E7D32;font-weight:700">✅ تم إنشاء المدير — اسم المستخدم: admin | كلمة المرور: admin123</span>';
+    }
+    // Auto login
+    await doLogin();
+  } catch(e) {
+    btn.textContent = 'إنشاء حساب المدير الآن';
+    btn.disabled = false;
+    const hint = document.getElementById('login-hint');
+    if (hint) hint.innerHTML = '<span style="color:#C62828">⚠️ خطأ: ' + e.message + '</span>';
+  }
 }
 
 function can(p) { return currentUser && currentUser.perms && currentUser.perms.includes(p); }
@@ -955,10 +1067,19 @@ function showPage(id, el) {
 
 /* ────────── RENDER ALL ────────── */
 function renderAll() {
-  renderStats(); renderRecent(); renderAssets(); renderInventory();
-  renderHandovers(); renderMaintenances(); renderDisposes();
-  renderReports(); renderUsers(); renderTypesList();
-  renderCustody(); renderCustomers(); renderReturns();
+  try { renderStats(); } catch(e) { console.warn('renderStats:', e.message); }
+  try { renderRecent(); } catch(e) { console.warn('renderRecent:', e.message); }
+  try { renderAssets(); } catch(e) { console.warn('renderAssets:', e.message); }
+  try { renderInventory(); } catch(e) { console.warn('renderInventory:', e.message); }
+  try { renderHandovers(); } catch(e) { console.warn('renderHandovers:', e.message); }
+  try { renderMaintenances(); } catch(e) { console.warn('renderMaintenances:', e.message); }
+  try { renderDisposes(); } catch(e) { console.warn('renderDisposes:', e.message); }
+  try { renderReports(); } catch(e) { console.warn('renderReports:', e.message); }
+  try { renderUsers(); } catch(e) { console.warn('renderUsers:', e.message); }
+  try { renderTypesList(); } catch(e) { console.warn('renderTypesList:', e.message); }
+  try { renderCustody(); } catch(e) { console.warn('renderCustody:', e.message); }
+  try { renderCustomers(); } catch(e) { console.warn('renderCustomers:', e.message); }
+  try { renderReturns(); } catch(e) { console.warn('renderReturns:', e.message); }
 }
 
 /* ────────── STATUS BADGE ────────── */
@@ -971,9 +1092,7 @@ function statusBadge(s, assetId) {
   }
   return '<span class="badge '+(m[s]||'badge-gray')+'" title="'+label+'">'+label+'</span>';
 }
-</script>
 
-<script>
 /* ────────── STATS ────────── */
 function renderStats() {
   const assets = getAssets();
@@ -1072,16 +1191,24 @@ function viewAssetImage(id) {
 
 /* ────────── ASSET FORM ────────── */
 function openAddAsset() {
-  if (!can('add')) return;
-  editingId = null; _pendingAttachments = [];
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-plus"></i> إضافة أصل جديد';
-  document.getElementById('modal-body').innerHTML = assetForm({});
-  document.getElementById('modal-save-btn').className = 'btn-save';
-  document.getElementById('modal-save-btn').textContent = 'حفظ الأصل';
-  document.getElementById('modal-save-btn').onclick = saveAsset;
-  document.getElementById('modal-box').className = 'modal wide';
-  document.getElementById('modal-overlay').classList.add('show');
-  setTimeout(()=>{ updateSubTypeOptions(); },100);
+  try {
+    if (!can('add')) { 
+      showToast('ليس لديك صلاحية إضافة أصول', 'error'); 
+      return; 
+    }
+    editingId = null; _pendingAttachments = [];
+    document.getElementById('modal-title').innerHTML = '<i class="ti ti-plus"></i> إضافة أصل جديد';
+    document.getElementById('modal-body').innerHTML = assetForm({});
+    document.getElementById('modal-save-btn').className = 'btn-save';
+    document.getElementById('modal-save-btn').textContent = 'حفظ الأصل';
+    document.getElementById('modal-save-btn').onclick = saveAsset;
+    document.getElementById('modal-box').className = 'modal wide';
+    document.getElementById('modal-overlay').classList.add('show');
+    setTimeout(()=>{ updateSubTypeOptions(); },100);
+  } catch(e) {
+    alert('خطأ في فتح نموذج إضافة أصل: ' + e.message);
+    console.error('openAddAsset error:', e);
+  }
 }
 
 function openEdit(id) {
@@ -1119,7 +1246,7 @@ function assetForm(a) {
     '<div class="form-section">خصائص الأصل</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
       '<div class="field"><label>الشركة المصنعة</label>'+
-        '<select id="f-manufacturer" onchange="document.getElementById('f-manufacturer-other').style.display=this.value==='__other__'?'block':'none'">'+
+        '<select id="f-manufacturer" onchange="document.getElementById(\'f-manufacturer-other\').style.display=this.value===\'__other__\'?\'block\':\'none\'">'+
           '<option value="">-- اختر --</option>'+
           manufacturers.map(v=>'<option value="'+v+'" '+(mfg===v&&!mfgIsOther?'selected':'')+'>'+v+'</option>').join('')+
           '<option value="__other__" '+(mfgIsOther?'selected':'')+'>أخرى (أدخل يدوياً)</option>'+
@@ -1127,7 +1254,7 @@ function assetForm(a) {
         '<input type="text" id="f-manufacturer-other" placeholder="اسم الشركة" value="'+(mfgIsOther?mfg:'')+'" style="margin-top:6px;display:'+(mfgIsOther?'block':'none')+';width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font);background:var(--bg)">'+
       '</div>'+
       '<div class="field"><label>السعة</label>'+
-        '<select id="f-capacity" onchange="document.getElementById('f-capacity-other').style.display=this.value==='__other__'?'block':'none'">'+
+        '<select id="f-capacity" onchange="document.getElementById(\'f-capacity-other\').style.display=this.value===\'__other__\'?\'block\':\'none\'">'+
           '<option value="">-- اختر --</option>'+
           capacities.map(v=>'<option value="'+v+'" '+(cap===v&&!capIsOther?'selected':'')+'>'+v+'</option>').join('')+
           '<option value="__other__" '+(capIsOther?'selected':'')+'>أخرى</option>'+
@@ -1143,11 +1270,12 @@ function assetForm(a) {
       '<div class="field"><label>تاريخ الإضافة</label><input id="f-date" type="date" value="'+(a.date||new Date().toISOString().split('T')[0])+'"></div>'+
     '</div>'+
     '<div class="form-section">صورة الأصل</div>'+
-    '<div class="img-upload-area" onclick="document.getElementById('f-img-file').click()"><i class="ti ti-photo-up" style="font-size:24px;display:block;margin-bottom:6px"></i>انقر لرفع صورة</div>'+
+    '<div class="img-upload-area" onclick="document.getElementById(\'f-img-file\').click()"><i class="ti ti-photo-up" style="font-size:24px;display:block;margin-bottom:6px"></i>انقر لرفع صورة</div>'+
     '<input type="file" id="f-img-file" accept="image/*" style="display:none" onchange="previewAssetImage(this)">'+
     (a.imageUrl?'<img src="'+a.imageUrl+'" class="img-preview" id="img-preview-el">':'<div id="img-preview-el"></div>')+
     '<input type="hidden" id="f-img-url" value="'+(a.imageUrl||'')+'">'
   );
+  } catch(e) { console.error('assetForm error:',e); return '<div>خطأ في تحميل النموذج: '+e.message+'</div>'; }
 }
 
 function updateSubTypeOptions(selected) {
@@ -1214,9 +1342,7 @@ async function saveAsset() {
     closeModal(); await window.reloadData(); populateTypeFilters();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
-</script>
 
-<script>
 /* ────────── INVENTORY ────────── */
 function renderInventory() {
   const assets = getAssets();
@@ -1435,9 +1561,7 @@ async function deleteCustomer(id) {
     showToast('تم حذف العميل','success'); await window.reloadData();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
-</script>
 
-<script>
 /* ────────── HANDOVER ────────── */
 function openNewHandover() { if (!can('handover')) return; openHandoverModal(null); }
 function openHandoverFromAsset(id) { if (!can('handover')) return; openHandoverModal(id); }
@@ -1825,9 +1949,7 @@ function renderDisposes() {
     '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+d.assetName+'</td><td style="text-align:center;font-weight:700;color:var(--red)">'+d.qty+'</td><td style="font-size:12px">'+d.reason+'</td><td>'+d.approved+'</td><td style="font-size:12px">'+d.date+'</td></tr>'
   ).join('');
 }
-</script>
 
-<script>
 /* ────────── ASSET TYPES & SUB TYPES ────────── */
 function renderTypesList() {
   const el = document.getElementById('types-list');
@@ -1989,8 +2111,17 @@ const PERM_LABELS={view:'عرض',add:'إضافة',edit:'تعديل',handover:'ت
 
 function renderUsers() {
   if (!document.getElementById('users-body')) return;
+  const users = getUsers();
+  if (!users.length && !window._dataReady) {
+    document.getElementById('users-body').innerHTML = '<tr><td colspan="5" class="empty-row"><i class="ti ti-loader"></i> جارٍ تحميل البيانات...</td></tr>';
+    return;
+  }
+  if (!users.length) {
+    document.getElementById('users-body').innerHTML = '<tr><td colspan="5" class="empty-row">لا يوجد مستخدمون</td></tr>';
+    return;
+  }
   const isAdmin = can('users');
-  document.getElementById('users-body').innerHTML = getUsers().map(u=>
+  document.getElementById('users-body').innerHTML = users.map(u=>
     '<tr>'+
     '<td style="font-weight:600"><i class="ti ti-user-circle" style="margin-left:5px;color:var(--text3)"></i>'+u.name+'</td>'+
     '<td><code class="tag">'+u.username+'</code></td>'+
@@ -2211,7 +2342,9 @@ function showToast(msg, type='') {
 }
 </script>
 
+<!-- Firebase Initialization Call (after all functions defined) -->
 <script>
+
 /* ────────── PRINT HANDOVER FORM ────────── */
 function printHandoverForm(hid) {
   const h=getHandovers().find(x=>x._id===hid);
@@ -2377,8 +2510,96 @@ function printReport(pageId) {
   '</body></html>');
   win.document.close();
 }
+
+
+/* ── Export all functions to window for Firebase module compatibility ── */
+if(typeof doLogin!=='undefined')window.doLogin=doLogin;
+if(typeof doLogout!=='undefined')window.doLogout=doLogout;
+if(typeof createAdminUser!=='undefined')window.createAdminUser=createAdminUser;
+if(typeof can!=='undefined')window.can=can;
+if(typeof showPage!=='undefined')window.showPage=showPage;
+if(typeof renderAll!=='undefined')window.renderAll=renderAll;
+if(typeof populateTypeFilters!=='undefined')window.populateTypeFilters=populateTypeFilters;
+if(typeof applyCompanySettings!=='undefined')window.applyCompanySettings=applyCompanySettings;
+if(typeof showToast!=='undefined')window.showToast=showToast;
+if(typeof closeModal!=='undefined')window.closeModal=closeModal;
+if(typeof statusBadge!=='undefined')window.statusBadge=statusBadge;
+if(typeof renderStats!=='undefined')window.renderStats=renderStats;
+if(typeof renderRecent!=='undefined')window.renderRecent=renderRecent;
+if(typeof renderAssets!=='undefined')window.renderAssets=renderAssets;
+if(typeof filterAssets!=='undefined')window.filterAssets=filterAssets;
+if(typeof renderInventory!=='undefined')window.renderInventory=renderInventory;
+if(typeof renderHandovers!=='undefined')window.renderHandovers=renderHandovers;
+if(typeof filterHandovers!=='undefined')window.filterHandovers=filterHandovers;
+if(typeof renderMaintenances!=='undefined')window.renderMaintenances=renderMaintenances;
+if(typeof renderDisposes!=='undefined')window.renderDisposes=renderDisposes;
+if(typeof renderReports!=='undefined')window.renderReports=renderReports;
+if(typeof renderUsers!=='undefined')window.renderUsers=renderUsers;
+if(typeof renderTypesList!=='undefined')window.renderTypesList=renderTypesList;
+if(typeof renderSubTypes!=='undefined')window.renderSubTypes=renderSubTypes;
+if(typeof renderCustody!=='undefined')window.renderCustody=renderCustody;
+if(typeof filterCustody!=='undefined')window.filterCustody=filterCustody;
+if(typeof renderCustomers!=='undefined')window.renderCustomers=renderCustomers;
+if(typeof filterCustomers!=='undefined')window.filterCustomers=filterCustomers;
+if(typeof renderReturns!=='undefined')window.renderReturns=renderReturns;
+if(typeof openAddAsset!=='undefined')window.openAddAsset=openAddAsset;
+if(typeof openEdit!=='undefined')window.openEdit=openEdit;
+if(typeof openAddCustomer!=='undefined')window.openAddCustomer=openAddCustomer;
+if(typeof openEditCustomer!=='undefined')window.openEditCustomer=openEditCustomer;
+if(typeof viewCustomerDetails!=='undefined')window.viewCustomerDetails=viewCustomerDetails;
+if(typeof openNewHandover!=='undefined')window.openNewHandover=openNewHandover;
+if(typeof openHandoverFromAsset!=='undefined')window.openHandoverFromAsset=openHandoverFromAsset;
+if(typeof openNewReturn!=='undefined')window.openNewReturn=openNewReturn;
+if(typeof openReturnFromHandover!=='undefined')window.openReturnFromHandover=openReturnFromHandover;
+if(typeof openNewMaintenance!=='undefined')window.openNewMaintenance=openNewMaintenance;
+if(typeof openMaintenanceFromAsset!=='undefined')window.openMaintenanceFromAsset=openMaintenanceFromAsset;
+if(typeof openNewDispose!=='undefined')window.openNewDispose=openNewDispose;
+if(typeof openDisposeFromAsset!=='undefined')window.openDisposeFromAsset=openDisposeFromAsset;
+if(typeof openAddUser!=='undefined')window.openAddUser=openAddUser;
+if(typeof openEditUser!=='undefined')window.openEditUser=openEditUser;
+if(typeof openChangePassword!=='undefined')window.openChangePassword=openChangePassword;
+if(typeof saveSettings!=='undefined')window.saveSettings=saveSettings;
+if(typeof previewSettingsLogo!=='undefined')window.previewSettingsLogo=previewSettingsLogo;
+if(typeof addAssetType!=='undefined')window.addAssetType=addAssetType;
+if(typeof deleteType!=='undefined')window.deleteType=deleteType;
+if(typeof addSubType!=='undefined')window.addSubType=addSubType;
+if(typeof deleteSubType!=='undefined')window.deleteSubType=deleteSubType;
+if(typeof addAttribute!=='undefined')window.addAttribute=addAttribute;
+if(typeof deleteAttribute!=='undefined')window.deleteAttribute=deleteAttribute;
+if(typeof switchTypesTab!=='undefined')window.switchTypesTab=switchTypesTab;
+if(typeof switchAttrsTab!=='undefined')window.switchAttrsTab=switchAttrsTab;
+if(typeof printReport!=='undefined')window.printReport=printReport;
+if(typeof printHandoverForm!=='undefined')window.printHandoverForm=printHandoverForm;
+if(typeof printCustodyForm!=='undefined')window.printCustodyForm=printCustodyForm;
+if(typeof updateSubTypeOptions!=='undefined')window.updateSubTypeOptions=updateSubTypeOptions;
+if(typeof onHandoverAssetChange!=='undefined')window.onHandoverAssetChange=onHandoverAssetChange;
+if(typeof onHandoverCustomerSelect!=='undefined')window.onHandoverCustomerSelect=onHandoverCustomerSelect;
+if(typeof onReturnHandoverChange!=='undefined')window.onReturnHandoverChange=onReturnHandoverChange;
+if(typeof selectReturnReason!=='undefined')window.selectReturnReason=selectReturnReason;
+if(typeof onReturnHandoverChange!=='undefined')window.onReturnHandoverChange=onReturnHandoverChange;
+if(typeof returnFromMaintenance!=='undefined')window.returnFromMaintenance=returnFromMaintenance;
+if(typeof returnFromClient!=='undefined')window.returnFromClient=returnFromClient;
+if(typeof approveCustody!=='undefined')window.approveCustody=approveCustody;
+if(typeof deleteCustody!=='undefined')window.deleteCustody=deleteCustody;
+if(typeof openNewCustody!=='undefined')window.openNewCustody=openNewCustody;
+if(typeof onCustodyAssetChange!=='undefined')window.onCustodyAssetChange=onCustodyAssetChange;
+if(typeof deleteUser!=='undefined')window.deleteUser=deleteUser;
+if(typeof setPresetPerms!=='undefined')window.setPresetPerms=setPresetPerms;
+if(typeof deleteCustomer!=='undefined')window.deleteCustomer=deleteCustomer;
+if(typeof saveEditCustomer!=='undefined')window.saveEditCustomer=saveEditCustomer;
+if(typeof viewAssetImage!=='undefined')window.viewAssetImage=viewAssetImage;
+if(typeof previewAssetImage!=='undefined')window.previewAssetImage=previewAssetImage;
+if(typeof onCustodyAssetChange!=='undefined')window.onCustodyAssetChange=onCustodyAssetChange;
+if(typeof filterCustody!=='undefined')window.filterCustody=filterCustody;
+
+// NOW start firebase after all functions are defined
+// Store the promise so login can wait for it
+window._firebasePromise = window._firebaseInit().catch(e => {
+  console.error("Firebase init failed:", e);
+  const hint = document.getElementById('login-hint');
+  if (hint) hint.innerHTML = '<span style="color:#C62828">⚠️ خطأ Firebase: ' + e.message + '</span>';
+});
+
 </script>
-
-
 </body>
 </html>
