@@ -2775,6 +2775,8 @@ function printAssetHistory() {
   const a = getAssets().find(x=>x._id===_currentHistoryAssetId);
   if (!a) return;
   const cn = window._settings?.companyName||'نظام إدارة الأصول';
+  const logoUrl = window._settings?.logoUrl||'';
+  const logoHTML = logoUrl?'<img src="'+logoUrl+'" style="height:56px;max-width:110px;object-fit:contain;border-radius:6px" alt="logo">':'';
   const now = new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
 
   const handovers = getHandovers().filter(h=>h.assetId===_currentHistoryAssetId);
@@ -2809,7 +2811,7 @@ function printAssetHistory() {
   '.ft{margin-top:20px;padding-top:10px;border-top:1px solid #C8DBF0;font-size:11px;color:#7090B0;text-align:center}'+
   '@media print{body{margin:10px}button{display:none!important}}</style></head><body>'+
   '<div class="hdr">'+
-    '<div><h1>'+cn+'</h1><div style="font-size:14px;color:#5B7AAA">سجل تاريخ الأصل</div></div>'+
+    '<div style="display:flex;align-items:center;gap:14px">'+logoHTML+'<div><h1>'+cn+'</h1><div style="font-size:14px;color:#5B7AAA">سجل تاريخ الأصل</div></div></div>'+
     '<div style="font-size:12px;color:#5B7AAA;line-height:1.8;text-align:left"><div>تاريخ الطباعة: '+now+'</div><div>أُعد بواسطة: '+(currentUser?.name||'')+'</div></div>'+
   '</div>'+
   '<div style="background:#DBEAFE;padding:12px;border-radius:6px;margin-bottom:14px">'+
@@ -3072,12 +3074,15 @@ function printDeptCustodyForm(id) {
   const c=(window.deptCustodyRequests||[]).find(x=>x._id===id);
   if (!c) return;
   const cn=window._settings?.companyName||'شركة ثمار القمة المحدودة';
+  const logoUrl=window._settings?.logoUrl||'';
+  const logoHTML=logoUrl?'<img src="'+logoUrl+'" style="height:60px;max-width:120px;object-fit:contain;border-radius:6px" alt="logo">':'';
   const reqColor=c.requestStatus==='معتمد'?'#2E7D32':c.requestStatus==='مرفوض'?'#C62828':'#B45309';
   const win=window.open('','_blank');
   win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>عهدة إدارة - '+c.seqNum+'</title>'+
   '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">'+
   '<style>body{font-family:\'Cairo\',Arial,sans-serif;font-size:13px;direction:rtl;padding:24px;color:#0E1D3A}'+
-  '.hdr{border-bottom:3px solid #1C3F8A;padding-bottom:12px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start}'+
+  '.hdr{border-bottom:3px solid #1C3F8A;padding-bottom:12px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center}'+
+  '.hdr-left{display:flex;align-items:center;gap:14px}'+
   '.ttl{font-size:20px;font-weight:700;color:#1C3F8A}.sub{font-size:13px;color:#5B7AAA;margin-top:2px}'+
   'table{width:100%;border-collapse:collapse;margin-bottom:14px}'+
   'td{border:1px solid #C8DBF0;padding:9px 12px}.lbl{background:#F0F6FF;font-weight:700;color:#1C3F8A;width:30%}'+
@@ -3088,7 +3093,7 @@ function printDeptCustodyForm(id) {
   '.badge-purple{background:#EDE7F6;color:#5B2D8E}'+
   '@media print{.noprint{display:none}}</style></head><body>'+
   '<div class="hdr">'+
-    '<div><div class="ttl">'+cn+'</div><div class="sub">نموذج طلب عهدة إدارة</div></div>'+
+    '<div class="hdr-left">'+logoHTML+'<div><div class="ttl">'+cn+'</div><div class="sub">نموذج طلب عهدة إدارة</div></div></div>'+
     '<div style="font-size:12px;color:#5B7AAA;line-height:2;text-align:left">'+
       '<div>الرقم: <strong style="color:#1C3F8A">'+c.seqNum+'</strong></div>'+
       '<div>التاريخ: '+c.date+'</div>'+
@@ -3158,22 +3163,31 @@ function showToast(msg, type='') {
 <!-- Firebase Initialization Call (after all functions defined) -->
 <script>
 
+/* ────────── PRINT LOGO HELPER ────────── */
+function getPrintLogoHTML() {
+  const logoUrl = window._settings?.logoUrl || '';
+  if (!logoUrl) return '';
+  return '<img src="'+logoUrl+'" style="height:60px;max-width:120px;object-fit:contain;border-radius:6px;" alt="logo">';
+}
 /* ────────── PRINT HANDOVER FORM ────────── */
 function printHandoverForm(hid) {
   const h=getHandovers().find(x=>x._id===hid);
   if (!h) return;
   const cn=window._settings?.companyName||'شركة ثمار القمة المحدودة';
+  const logoUrl=window._settings?.logoUrl||'';
+  const logoHTML=logoUrl?'<img src="'+logoUrl+'" style="height:56px;max-width:110px;object-fit:contain;border-radius:6px" alt="logo">':'';
   const win=window.open('','_blank');
   win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>نموذج تسليم</title>'+
   '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">'+
   '<style>body{font-family:\'Cairo\',Arial,sans-serif;font-size:13px;direction:rtl;padding:24px;color:#0E1D3A}'+
   '.hdr{border-bottom:3px solid #1C3F8A;padding-bottom:12px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center}'+
+  '.hdr-left{display:flex;align-items:center;gap:12px}'+
   '.ttl{font-size:18px;font-weight:700;color:#1C3F8A}table{width:100%;border-collapse:collapse}'+
   'td{border:1px solid #C8DBF0;padding:8px 12px}.lbl{background:#F0F6FF;font-weight:700;color:#1C3F8A;width:35%}'+
   '.sign{display:flex;gap:20px;margin-top:24px}.sbox{flex:1;border:1.5px solid #C8DBF0;border-radius:8px;padding:14px;min-height:100px}'+
   '.stitle{font-weight:700;color:#1C3F8A;margin-bottom:8px}.sline{border-top:2px dashed #B0CCE8;margin-top:30px;padding-top:5px;font-size:11px;color:#7090B0;text-align:center}'+
   '@media print{.noprint{display:none}}</style></head><body>'+
-  '<div class="hdr"><div><div class="ttl">'+cn+'</div><div style="font-size:13px;color:#5B7AAA">نموذج تسليم أصل</div></div>'+
+  '<div class="hdr"><div class="hdr-left">'+logoHTML+'<div><div class="ttl">'+cn+'</div><div style="font-size:13px;color:#5B7AAA">نموذج تسليم أصل</div></div></div>'+
   '<div style="font-size:12px;color:#5B7AAA;line-height:1.8"><div>رقم: HO-'+Date.now().toString().slice(-6)+'</div><div>التاريخ: '+h.date+'</div></div></div>'+
   '<div style="text-align:center;font-size:16px;font-weight:700;color:#1C3F8A;background:#DBEAFE;padding:10px;border-radius:6px;margin-bottom:16px">📋 وثيقة تسليم أصل</div>'+
   '<table style="margin-bottom:16px">'+
@@ -3199,18 +3213,21 @@ function printCustodyForm(id) {
   const c=(window.custodyRequests||[]).find(x=>x._id===id);
   if (!c) return;
   const cn=window._settings?.companyName||'شركة ثمار القمة المحدودة';
+  const logoUrl=window._settings?.logoUrl||'';
+  const logoHTML=logoUrl?'<img src="'+logoUrl+'" style="height:56px;max-width:110px;object-fit:contain;border-radius:6px" alt="logo">':'';
   const reqColor=c.requestStatus==='معتمد'?'#2E7D32':c.requestStatus==='مرفوض'?'#C62828':'#B45309';
   const win=window.open('','_blank');
   win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>طلب عهدة</title>'+
   '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">'+
   '<style>body{font-family:\'Cairo\',Arial,sans-serif;font-size:13px;direction:rtl;padding:24px;color:#0E1D3A}'+
-  '.hdr{border-bottom:3px solid #1C3F8A;padding-bottom:12px;margin-bottom:18px;display:flex;justify-content:space-between}'+
+  '.hdr{border-bottom:3px solid #1C3F8A;padding-bottom:12px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center}'+
+  '.hdr-left{display:flex;align-items:center;gap:12px}'+
   'table{width:100%;border-collapse:collapse}td{border:1px solid #C8DBF0;padding:8px 12px}.lbl{background:#F0F6FF;font-weight:700;color:#1C3F8A;width:30%}'+
   '.sign{display:flex;gap:20px;margin-top:24px}.sbox{flex:1;border:1.5px solid #C8DBF0;border-radius:8px;padding:14px;min-height:100px}'+
   '.stitle{font-weight:700;color:#1C3F8A;margin-bottom:8px}.sline{border-top:2px dashed #B0CCE8;margin-top:30px;padding-top:5px;font-size:11px;color:#7090B0;text-align:center}'+
   '.notes{border:1px solid #C8DBF0;border-radius:6px;padding:12px;margin:14px 0;min-height:60px;background:#F8FBFF}'+
   '@media print{.noprint{display:none}}</style></head><body>'+
-  '<div class="hdr"><div><div style="font-size:18px;font-weight:700;color:#1C3F8A">'+cn+'</div><div style="color:#5B7AAA">طلب عهدة أصل</div></div>'+
+  '<div class="hdr"><div class="hdr-left">'+logoHTML+'<div><div style="font-size:18px;font-weight:700;color:#1C3F8A">'+cn+'</div><div style="color:#5B7AAA">طلب عهدة أصل</div></div></div>'+
   '<div style="font-size:12px;color:#5B7AAA;line-height:1.8"><div>رقم: '+(c.custodyNumber||'CUS-'+c._id.slice(-6))+'</div><div>التاريخ: '+(c.date||'-')+'</div><div>الحالة: <strong style="color:'+reqColor+'">'+c.requestStatus+'</strong></div></div></div>'+
   '<div style="text-align:center;font-size:16px;font-weight:700;color:#1C3F8A;background:#DBEAFE;padding:10px;border-radius:6px;margin-bottom:16px">📋 نموذج طلب عهدة</div>'+
   '<table style="margin-bottom:14px">'+
@@ -3241,6 +3258,8 @@ function printCustodyForm(id) {
 function printReport(pageId) {
   const now=new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
   const cn=window._settings?.companyName||'شركة ثمار القمة المحدودة';
+  const logoUrl=window._settings?.logoUrl||'';
+  const logoHTML=logoUrl?'<img src="'+logoUrl+'" style="height:56px;max-width:110px;object-fit:contain;border-radius:6px" alt="logo">':'';
   const user=currentUser?.name||'';
   const hs='background:#1C3F8A;color:#fff;padding:8px 10px;text-align:right;font-weight:700';
   const ts='padding:7px 10px;border-bottom:1px solid #C8DBF0;vertical-align:middle';
@@ -3324,7 +3343,7 @@ function printReport(pageId) {
   'tr:nth-child(even) td{background:#F8FBFF}'+
   '.ft{margin-top:20px;padding-top:10px;border-top:1px solid #C8DBF0;font-size:11px;color:#7090B0;text-align:center}'+
   '@media print{body{margin:10px}button{display:none!important}}</style></head><body>'+
-  '<div class="hdr"><div><h1>'+cn+'</h1><h2>'+title+'</h2></div><div class="hi"><div>تاريخ الطباعة: '+now+'</div><div>أُعد بواسطة: '+user+'</div></div></div>'+
+  '<div class="hdr"><div style="display:flex;align-items:center;gap:14px">'+logoHTML+'<div><h1>'+cn+'</h1><h2>'+title+'</h2></div></div><div class="hi"><div>تاريخ الطباعة: '+now+'</div><div>أُعد بواسطة: '+user+'</div></div></div>'+
   content+
   '<div class="ft">'+cn+' | نظام إدارة الأصول | '+now+'</div>'+
   '<div style="text-align:center;margin-top:16px"><button onclick="window.print()" style="padding:10px 28px;background:#1C3F8A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:\'Cairo\',sans-serif;font-size:14px;font-weight:600">🖨️ طباعة</button></div>'+
