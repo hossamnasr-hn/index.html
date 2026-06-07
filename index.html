@@ -799,9 +799,9 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db,"users"));
   const existingUsers = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   
-  const NEW_PERMS = ["custody","settings"];
+  const NEW_PERMS = ["custody","dept_custody","settings"];
   if (usersSnap.empty || existingUsers.length === 0) {
-    await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","settings"] });
+    await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","dept_custody","settings"] });
     console.log("Admin user created");
   } else {
     for (const d of usersSnap.docs) {
@@ -1088,8 +1088,8 @@ async function doLogin() {
     if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
     // Auto-grant custody & settings to any user who has 'users' permission (backward compat)
-    if (found.perms.includes('users') && (!found.perms.includes('custody') || !found.perms.includes('settings'))) {
-      const upgraded = [...new Set([...found.perms, 'custody', 'settings'])];
+    if (found.perms.includes('users') && (!found.perms.includes('custody') || !found.perms.includes('dept_custody') || !found.perms.includes('settings'))) {
+      const upgraded = [...new Set([...found.perms, 'custody', 'dept_custody', 'settings'])];
       found.perms = upgraded;
       // Also persist to Firebase silently
       try {
@@ -1145,7 +1145,7 @@ async function createAdminUser() {
             username: "admin",
             password: "admin123",
             role: data.role || "مدير",
-            perms: data.perms || ["view","add","edit","handover","dispose","maintenance","users","return","customers"]
+            perms: data.perms || ["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","dept_custody","settings"]
           });
         }
       }
@@ -1156,7 +1156,7 @@ async function createAdminUser() {
         username: "admin",
         password: "admin123",
         role: "مدير",
-        perms: ["view","add","edit","handover","dispose","maintenance","users","return","customers"]
+        perms: ["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","dept_custody","settings"]
       };
       await add(col(window.db, "users"), adminData);
     }
