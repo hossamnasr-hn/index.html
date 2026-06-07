@@ -682,7 +682,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
             </div>
           </div>
           <table>
-            <thead><tr><th>الرقم</th><th>التاريخ</th><th>الإدارة</th><th>الطالب</th><th>الصنف / الوصف</th><th>الكمية</th><th>الغرض</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <thead><tr><th>الرقم</th><th>التاريخ</th><th>الإدارة</th><th>الطالب</th><th>الصنف / الوصف</th><th>الكمية</th><th>الغرض</th><th>المبلغ الإجمالي</th><th>الحالة</th><th>إجراءات</th></tr></thead>
             <tbody id="dept-custody-body"></tbody>
           </table>
         </div>
@@ -801,7 +801,7 @@ async function initDefaultData() {
   
   const NEW_PERMS = ["custody","dept_custody","settings"];
   if (usersSnap.empty || existingUsers.length === 0) {
-    await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","dept_custody","settings"] });
+    await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"] });
     console.log("Admin user created");
   } else {
     for (const d of usersSnap.docs) {
@@ -1089,7 +1089,7 @@ async function doLogin() {
     document.getElementById('header-role').textContent = found.role;
     // Auto-grant custody & settings to any user who has 'users' permission (backward compat)
     if (found.perms.includes('users') && (!found.perms.includes('custody') || !found.perms.includes('dept_custody') || !found.perms.includes('settings'))) {
-      const upgraded = [...new Set([...found.perms, 'custody', 'dept_custody', 'settings'])];
+      const upgraded = [...new Set([...found.perms, 'custody', 'custody_add', 'custody_edit', 'custody_approve', 'custody_print', 'dept_custody', 'dept_custody_add', 'dept_custody_edit', 'dept_custody_approve', 'dept_custody_print', 'settings'])];
       found.perms = upgraded;
       // Also persist to Firebase silently
       try {
@@ -1145,7 +1145,7 @@ async function createAdminUser() {
             username: "admin",
             password: "admin123",
             role: data.role || "مدير",
-            perms: data.perms || ["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","dept_custody","settings"]
+            perms: data.perms || ["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"]
           });
         }
       }
@@ -1156,7 +1156,7 @@ async function createAdminUser() {
         username: "admin",
         password: "admin123",
         role: "مدير",
-        perms: ["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","dept_custody","settings"]
+        perms: ["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"]
       };
       await add(col(window.db, "users"), adminData);
     }
@@ -2796,15 +2796,15 @@ function renderCustody() {
       '<td>'+sb+'</td>'+
       '<td style="white-space:nowrap">'+
         (can('custody_print')||can('custody')?'<button class="btn-action info" onclick="printCustodyForm(\''+c._id+'\')"><i class="ti ti-printer"></i></button>':'')+
-        (can('custody_approve')||can('edit')?'<button class="btn-action success" onclick="approveCustody(\''+c._id+'\',\'معتمد\')"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveCustody(\''+c._id+'\',\'مرفوض\')"><i class="ti ti-x"></i></button>':'')+
-        (can('custody_edit')||can('edit')?'<button class="btn-action danger" onclick="deleteCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>':'')+
+        (can('custody_approve')?'<button class="btn-action success" onclick="approveCustody(\''+c._id+'\',\'معتمد\')"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveCustody(\''+c._id+'\',\'مرفوض\')"><i class="ti ti-x"></i></button>':'')+
+        (can('custody_edit')?'<button class="btn-action danger" onclick="deleteCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>':'')+
       '</td></tr>';
   }).join('');
 }
 function filterCustody() { renderCustody(); }
 
 function openNewCustody() {
-  if (!can('custody_add')&&!can('edit')) { showToast('ليس لديك صلاحية إضافة طلب عهدة','error'); return; }
+  if (!can('custody_add')) { showToast('ليس لديك صلاحية إضافة طلب عهدة','error'); return; }
   const assets=getAssets();
   const opts=assets.map(a=>'<option value="'+a._id+'" data-barcode="'+(a.barcode||a.code||a._id)+'" data-status="'+(a.status||'متاح')+'" data-name="'+a.name+'">'+a.name+' ['+(a.barcode||a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' ('+( a.status||'متاح')+')</option>').join('');
   const today=new Date().toISOString().split('T')[0];
@@ -2885,7 +2885,7 @@ function renderDeptCustody() {
   if (typeof filterDeptCustody==='function') filterDeptCustody(); else _renderDeptCustodyRows(getDeptCustodyRequests());
   // show/hide add button based on permission
   const addBtn = document.getElementById('dept-custody-add-btn');
-  if (addBtn) addBtn.style.display = (can('dept_custody_add')||can('edit')) ? '' : 'none';
+  if (addBtn) addBtn.style.display = can('dept_custody_add') ? '' : 'none';
 }
 function filterDeptCustody() {
   const q=(document.getElementById('dept-custody-search')?.value||'').toLowerCase();
@@ -2901,7 +2901,7 @@ function filterDeptCustody() {
 }
 function _renderDeptCustodyRows(list) {
   const tbody=document.getElementById('dept-custody-body'); if (!tbody) return;
-  if (!list.length) { tbody.innerHTML='<tr><td colspan="9" class="empty-row">لا توجد طلبات عهدة إدارات</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="10" class="empty-row">لا توجد طلبات عهدة إدارات</td></tr>'; return; }
   tbody.innerHTML=list.map((c,i)=>{
     const sb=c.requestStatus==='معتمد'?'<span class="custody-badge-approved">معتمد</span>':c.requestStatus==='مرفوض'?'<span class="custody-badge-rejected">مرفوض</span>':'<span class="custody-badge-pending">قيد المراجعة</span>';
     return '<tr>'+
@@ -2912,17 +2912,18 @@ function _renderDeptCustodyRows(list) {
       '<td style="font-size:12px;max-width:180px">'+(c.itemDesc||'-')+'</td>'+
       '<td style="text-align:center;font-weight:700">'+(c.qty||'-')+'</td>'+
       '<td style="font-size:12px;max-width:140px">'+(c.purpose||'-')+'</td>'+
+      '<td style="font-weight:700;color:var(--green);white-space:nowrap">'+(c.financialTotal>0?Number(c.financialTotal||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+' ريال':'-')+'</td>'+
       '<td>'+sb+'</td>'+
       '<td style="white-space:nowrap">'+
         (can('dept_custody_print')||can('dept_custody')?'<button class="btn-action info" onclick="printDeptCustodyForm(\''+c._id+'\')"><i class="ti ti-printer"></i></button>':'')+
-        (can('dept_custody_approve')||can('edit')?'<button class="btn-action success" onclick="approveDeptCustody(\''+c._id+'\',\'معتمد\')" title="اعتماد"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveDeptCustody(\''+c._id+'\',\'مرفوض\')" title="رفض"><i class="ti ti-x"></i></button>':'')+
-        (can('dept_custody_edit')||can('edit')?'<button class="btn-action danger" onclick="deleteDeptCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>':'')+
+        (can('dept_custody_approve')?'<button class="btn-action success" onclick="approveDeptCustody(\''+c._id+'\',\'معتمد\')" title="اعتماد"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveDeptCustody(\''+c._id+'\',\'مرفوض\')" title="رفض"><i class="ti ti-x"></i></button>':'')+
+        (can('dept_custody_edit')?'<button class="btn-action danger" onclick="deleteDeptCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>':'')+
       '</td></tr>';
   }).join('');
 }
 
 function openNewDeptCustody() {
-  if (!can('dept_custody_add')&&!can('edit')) { showToast('ليس لديك صلاحية إضافة طلب عهدة إدارات','error'); return; }
+  if (!can('dept_custody_add')) { showToast('ليس لديك صلاحية إضافة طلب عهدة إدارات','error'); return; }
   const today=new Date().toISOString().split('T')[0];
   document.getElementById('modal-title').innerHTML='<i class="ti ti-building"></i> طلب عهدة إدارة جديد';
   document.getElementById('modal-body').innerHTML=
