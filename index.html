@@ -644,7 +644,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
             </div>
           </div>
           <table>
-            <thead><tr><th>#</th><th>التاريخ</th><th>طالب العهدة</th><th>الأصل</th><th>الحالة</th><th>الغرض</th><th>حالة الطلب</th><th>إجراءات</th></tr></thead>
+            <thead><tr><th>#</th><th>التاريخ</th><th>طالب العهدة</th><th>الأصل</th><th>الحالة</th><th>الغرض</th><th>المبلغ الإجمالي</th><th>حالة الطلب</th><th>إجراءات</th></tr></thead>
             <tbody id="custody-body"></tbody>
           </table>
         </div>
@@ -922,10 +922,11 @@ try {
         if (nameEl) nameEl.textContent = fresh.name;
         document.getElementById('header-role').textContent = fresh.role;
         if (!fresh.perms.includes('users')) document.getElementById('nav-users').style.display='none';
+        const _hasCustAcc = fresh.perms.some(p=>p==='custody'||p.startsWith('custody_'));
         const custodyNav = document.getElementById('nav-custody');
-        if (custodyNav) custodyNav.style.display = fresh.perms.includes('custody') ? '' : 'none';
+        if (custodyNav) custodyNav.style.display = _hasCustAcc ? '' : 'none';
         const deptCustodyNav = document.getElementById('nav-dept-custody');
-        if (deptCustodyNav) deptCustodyNav.style.display = fresh.perms.includes('custody') ? '' : 'none';
+        if (deptCustodyNav) deptCustodyNav.style.display = _hasCustAcc ? '' : 'none';
         const settingsNav = document.getElementById('nav-settings');
         if (settingsNav) settingsNav.style.display = fresh.perms.includes('settings') ? '' : 'none';
         populateTypeFilters();
@@ -1095,10 +1096,11 @@ async function doLogin() {
       } catch(e) { console.warn('perm upgrade:', e); }
     }
     if (!found.perms.includes('users')) document.getElementById('nav-users').style.display='none';
+    const hasCustodyAccess = found.perms.some(p=>p==='custody'||p.startsWith('custody_'));
     const custodyNav = document.getElementById('nav-custody');
-    if (custodyNav) custodyNav.style.display = found.perms.includes('custody') ? '' : 'none';
+    if (custodyNav) custodyNav.style.display = hasCustodyAccess ? '' : 'none';
     const deptCustodyNav = document.getElementById('nav-dept-custody');
-    if (deptCustodyNav) deptCustodyNav.style.display = found.perms.includes('custody') ? '' : 'none';
+    if (deptCustodyNav) deptCustodyNav.style.display = hasCustodyAccess ? '' : 'none';
     const settingsNav = document.getElementById('nav-settings');
     if (settingsNav) settingsNav.style.display = found.perms.includes('settings') ? '' : 'none';
     const addBtn = document.getElementById('add-asset-btn');
@@ -1848,7 +1850,9 @@ function openHandoverModal(preAssetId) {
       '<div class="field"><label>المسؤول</label><input id="h-resp" value="'+currentUser.name+'"></div>'+
       '<div class="field"><label>تاريخ التسليم</label><input id="h-date" type="date" value="'+today+'"></div>'+
     '</div>'+
-    '<div class="form-row full" style="margin-bottom:0"><div class="field"><label>ملاحظات</label><textarea id="h-notes" rows="2"></textarea></div></div>';
+    '<div class="form-row full" style="margin-bottom:0"><div class="field"><label>ملاحظات</label><textarea id="h-notes" rows="2"></textarea></div></div>'+
+    '<div class="form-section">الإجراءات والشروط</div>'+
+    '<div class="form-row full" style="margin-bottom:0"><div class="field"><label>إجراءات خاصة / شروط التسليم</label><textarea id="h-actions" rows="2" placeholder="مثال: يُسلَّم بحالة ممتازة، يُعاد خلال 30 يوماً..."></textarea></div></div>';
   document.getElementById('modal-save-btn').className='btn-save success-btn';
   document.getElementById('modal-save-btn').textContent='تأكيد التسليم';
   document.getElementById('modal-save-btn').onclick=saveHandover;
@@ -1904,6 +1908,7 @@ async function saveHandover() {
       responsible:document.getElementById('h-resp').value,
       date:document.getElementById('h-date').value,
       notes:document.getElementById('h-notes').value,
+      actions:document.getElementById('h-actions')?.value||'',
       status:'مُسلَّم'
     });
     showToast('تم تسجيل التسليم','success');
@@ -1972,7 +1977,9 @@ function openReturnModal(hid) {
     '<div class="form-row" style="margin-bottom:12px"><div class="field"><label>الحالة بعد الاسترداد</label>'+
       '<select id="ret-condition"><option value="متاح">متاح</option><option value="صيانة">يحتاج صيانة</option><option value="تالف">تالف</option></select>'+
     '</div></div>'+
-    '<div class="form-row full" style="margin-bottom:0"><div class="field"><label>ملاحظات</label><textarea id="ret-notes" rows="2" placeholder="تفاصيل إضافية..."></textarea></div></div>';
+    '<div class="form-row full" style="margin-bottom:0"><div class="field"><label>ملاحظات</label><textarea id="ret-notes" rows="2" placeholder="تفاصيل إضافية..."></textarea></div></div>'+
+    '<div class="form-section">الإجراءات</div>'+
+    '<div class="form-row full" style="margin-bottom:0"><div class="field"><label>إجراءات ما بعد الاسترداد</label><textarea id="ret-actions" rows="2" placeholder="مثال: إرسال للصيانة فور الاسترداد، تحديث السجل..."></textarea></div></div>';
   document.getElementById('modal-save-btn').className='btn-save';
   document.getElementById('modal-save-btn').style.background='var(--teal)';
   document.getElementById('modal-save-btn').textContent='تأكيد الاسترداد';
@@ -2033,6 +2040,7 @@ async function saveReturn() {
       clientName:h.clientName, clientId:h.clientId||'',
       qty, reason, conditionAfterReturn:condition,
       notes:document.getElementById('ret-notes').value,
+      actions:document.getElementById('ret-actions')?.value||'',
       recordedBy:currentUser.name,
       date:document.getElementById('ret-date').value,
       createdAt:new Date().toISOString()
@@ -2104,7 +2112,9 @@ function openMaintenanceModal(preAssetId) {
     '<div class="form-row" style="margin-bottom:0">'+
       '<div class="field"><label>تاريخ التحويل</label><input id="m-date" type="date" value="'+today+'"></div>'+
       '<div class="field"><label>ملاحظات</label><input id="m-notes"></div>'+
-    '</div>';
+    '</div>'+
+    '<div class="form-section">الإجراءات المطلوبة</div>'+
+    '<div class="form-row full" style="margin-bottom:0"><div class="field"><label>الإجراءات والتعليمات للصيانة</label><textarea id="m-actions" rows="2" placeholder="مثال: استبدال القطعة X، مراجعة التبريد..."></textarea></div></div>';
   document.getElementById('modal-save-btn').className='btn-save amber-btn';
   document.getElementById('modal-save-btn').textContent='تأكيد التحويل';
   document.getElementById('modal-save-btn').onclick=saveMaintenance;
@@ -2126,7 +2136,7 @@ async function saveMaintenance() {
     await waitForFirebase();
     const {collection:col, doc:docRef, addDoc:add, updateDoc:upd} = window.fsApi;
     await upd(docRef(window.db,"assets",a._id),{availableQty:a.availableQty-qty,maintenanceQty:a.maintenanceQty+qty,status:a.availableQty-qty===0?'صيانة':a.status});
-    await add(col(window.db,"maintenances"),{assetId,assetName:a.name,qty,vendor,fault,date:document.getElementById('m-date').value,notes:document.getElementById('m-notes').value,status:'قيد الصيانة'});
+    await add(col(window.db,"maintenances"),{assetId,assetName:a.name,qty,vendor,fault,date:document.getElementById('m-date').value,notes:document.getElementById('m-notes').value,actions:document.getElementById('m-actions')?.value||'',status:'قيد الصيانة'});
     showToast('تم التحويل','success');
     closeModal(); await window.reloadData();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
@@ -2137,7 +2147,7 @@ function renderMaintenances() {
   const list = getMaintenances();
   if (!list.length) { document.getElementById('maintenance-body').innerHTML='<tr><td colspan="8" class="empty-row">لا توجد أصول في الصيانة</td></tr>'; return; }
   document.getElementById('maintenance-body').innerHTML = list.map((m,i)=>
-    '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+m.assetName+(m.autoCreated?'<div style="font-size:10px;color:var(--teal)"><i class="ti ti-link"></i> مرتبط باسترداد</div>':'')+'</td><td style="text-align:center;font-weight:700">'+m.qty+'</td><td>'+m.vendor+'</td><td style="font-size:12px;color:var(--text2)">'+m.fault+'</td><td style="font-size:12px">'+m.date+'</td><td>'+statusBadge(m.status,m.assetId)+'</td>'+
+    '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+m.assetName+(m.autoCreated?'<div style="font-size:10px;color:var(--teal)"><i class="ti ti-link"></i> مرتبط باسترداد</div>':'')+'</td><td style="text-align:center;font-weight:700">'+m.qty+'</td><td>'+m.vendor+'</td><td style="font-size:12px;color:var(--text2)">'+m.fault+(m.actions?'<div style="color:var(--purple);margin-top:2px"><i class="ti ti-clipboard"></i> '+m.actions+'</div>':'')+'</td><td style="font-size:12px">'+m.date+'</td><td>'+statusBadge(m.status,m.assetId)+'</td>'+
     '<td>'+(m.status==='قيد الصيانة'?'<button class="btn-action success" onclick="returnFromMaintenance(\''+m._id+'\')"><i class="ti ti-corner-up-left"></i> إعادة</button>':'')+'</td></tr>'
   ).join('');
 }
@@ -2176,7 +2186,9 @@ function openDisposeModal(preAssetId) {
     '<div class="form-row" style="margin-bottom:0">'+
       '<div class="field"><label>المعتمد من</label><input id="d-approved" value="'+currentUser.name+'" readonly style="opacity:.7"></div>'+
       '<div class="field"><label>التاريخ</label><input id="d-date" type="date" value="'+today+'"></div>'+
-    '</div>';
+    '</div>'+
+    '<div class="form-section">الإجراءات</div>'+
+    '<div class="form-row full" style="margin-bottom:0"><div class="field"><label>إجراءات الإتلاف والتوثيق</label><textarea id="d-actions" rows="2" placeholder="مثال: التخلص البيئي الآمن، توثيق الصور..."></textarea></div></div>';
   document.getElementById('modal-save-btn').className='btn-save danger-btn';
   document.getElementById('modal-save-btn').textContent='تأكيد الإتلاف';
   document.getElementById('modal-save-btn').onclick=saveDispose;
@@ -2201,7 +2213,7 @@ async function saveDispose() {
     const newTotal=a.totalQty-qty, newDisposed=(a.disposedQty||0)+qty;
     const newStatus=newTotal===0?'متلف':newAvail===0?'تالف':'متاح';
     await upd(docRef(window.db,"assets",a._id),{totalQty:newTotal,availableQty:newAvail,damagedQty:newDamaged,disposedQty:newDisposed,status:newStatus});
-    await add(col(window.db,"disposes"),{assetId,assetName:a.name,qty,reason,approved:document.getElementById('d-approved').value,date:document.getElementById('d-date').value});
+    await add(col(window.db,"disposes"),{assetId,assetName:a.name,qty,reason,approved:document.getElementById('d-approved').value,date:document.getElementById('d-date').value,actions:document.getElementById('d-actions')?.value||''});
     showToast('تم تسجيل الإتلاف','success');
     closeModal(); await window.reloadData();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
@@ -2212,7 +2224,7 @@ function renderDisposes() {
   const list = getDisposes();
   if (!list.length) { document.getElementById('dispose-body').innerHTML='<tr><td colspan="6" class="empty-row">لا توجد أصول متلفة</td></tr>'; return; }
   document.getElementById('dispose-body').innerHTML = list.map((d,i)=>
-    '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+d.assetName+(d.autoCreated?'<div style="font-size:10px;color:var(--teal)"><i class="ti ti-link"></i> مرتبط باسترداد</div>':'')+'</td><td style="text-align:center;font-weight:700;color:var(--red)">'+d.qty+'</td><td style="font-size:12px">'+d.reason+'</td><td>'+d.approved+'</td><td style="font-size:12px">'+d.date+'</td></tr>'
+    '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+d.assetName+(d.autoCreated?'<div style="font-size:10px;color:var(--teal)"><i class="ti ti-link"></i> مرتبط باسترداد</div>':'')+'</td><td style="text-align:center;font-weight:700;color:var(--red)">'+d.qty+'</td><td style="font-size:12px">'+d.reason+(d.actions?'<div style="color:var(--purple);font-size:11px;margin-top:2px"><i class="ti ti-clipboard"></i> '+d.actions+'</div>':'')+'</td><td>'+d.approved+'</td><td style="font-size:12px">'+d.date+'</td></tr>'
   ).join('');
 }
 
@@ -2369,12 +2381,17 @@ function renderReports() {
 
 /* ────────── USERS ────────── */
 const ALL_PERMS=[
-  {key:'view',label:'عرض'},{key:'add',label:'إضافة أصول'},{key:'edit',label:'تعديل أصول'},
-  {key:'handover',label:'تسليم'},{key:'maintenance',label:'صيانة'},{key:'dispose',label:'إتلاف'},
-  {key:'users',label:'مستخدمون'},{key:'return',label:'استرداد'},{key:'customers',label:'العملاء'},
-  {key:'custody',label:'طلبات العهدة'},{key:'settings',label:'الإعدادات'},
+  {key:'view',label:'عرض الأصول'},{key:'add',label:'إضافة أصول'},{key:'edit',label:'تعديل أصول'},
+  {key:'handover',label:'تسليم أصل'},{key:'maintenance',label:'صيانة'},{key:'dispose',label:'إتلاف'},
+  {key:'users',label:'إدارة المستخدمين'},{key:'return',label:'استرداد أصل'},{key:'customers',label:'العملاء'},
+  {key:'settings',label:'الإعدادات'},
+  {key:'custody',label:'عهدة — اطلاع فقط'},
+  {key:'custody_add',label:'عهدة — إضافة'},
+  {key:'custody_edit',label:'عهدة — تعديل'},
+  {key:'custody_approve',label:'عهدة — موافقة / رفض'},
+  {key:'custody_print',label:'عهدة — طباعة'},
 ];
-const PERM_LABELS={view:'عرض',add:'إضافة',edit:'تعديل',handover:'تسليم',maintenance:'صيانة',dispose:'إتلاف',users:'مستخدمون',return:'استرداد',customers:'العملاء',custody:'طلبات العهدة',settings:'الإعدادات'};
+const PERM_LABELS={view:'عرض',add:'إضافة',edit:'تعديل',handover:'تسليم',maintenance:'صيانة',dispose:'إتلاف',users:'مستخدمون',return:'استرداد',customers:'العملاء',settings:'الإعدادات',custody:'عهدة-اطلاع',custody_add:'عهدة-إضافة',custody_edit:'عهدة-تعديل',custody_approve:'عهدة-موافقة',custody_print:'عهدة-طباعة'};
 
 function renderUsers() {
   if (!document.getElementById('users-body')) return;
@@ -2428,11 +2445,19 @@ function userFormHTML(u) {
     '</div>'+
     '<div class="form-section">الصلاحيات</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">'+
-    ALL_PERMS.map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:var(--bg);cursor:pointer;border:1px solid var(--border)">'+
+    ALL_PERMS.filter(p=>!p.key.startsWith('custody_')).map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:var(--bg);cursor:pointer;border:1px solid var(--border)">'+
       '<input type="checkbox" name="perm" value="'+p.key+'" '+(u&&(u.perms||[]).includes(p.key)?'checked':'')+' style="width:15px;height:15px;accent-color:var(--blue)">'+
       '<span style="font-size:13px">'+p.label+'</span></label>'
     ).join('')+
     '</div>'+
+    '<div style="background:var(--purple-bg);border:1px solid #C0A0E0;border-radius:var(--radius);padding:12px;margin-bottom:10px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--purple);margin-bottom:8px"><i class="ti ti-file-invoice"></i> صلاحيات العهدة</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+
+    ALL_PERMS.filter(p=>p.key==='custody'||p.key.startsWith('custody_')).map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:rgba(255,255,255,.6);cursor:pointer;border:1px solid #C0A0E0">'+
+      '<input type="checkbox" name="perm" value="'+p.key+'" '+(u&&(u.perms||[]).includes(p.key)?'checked':'')+' style="width:15px;height:15px;accent-color:var(--purple)">'+
+      '<span style="font-size:13px;color:var(--purple)">'+p.label+'</span></label>'
+    ).join('')+
+    '</div></div>'+
     '<div style="display:flex;gap:6px">'+
     '<button type="button" onclick="setPresetPerms(\'admin\')" style="padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:11px;cursor:pointer;font-family:var(--font);background:var(--blue-bg);color:var(--blue)">كل الصلاحيات</button>'+
     '<button type="button" onclick="setPresetPerms(\'manager\')" style="padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:11px;cursor:pointer;font-family:var(--font);background:var(--amber-bg);color:var(--amber)">مشرف</button>'+
@@ -2440,8 +2465,12 @@ function userFormHTML(u) {
     '</div>';
 }
 function setPresetPerms(p) {
-  const pre={admin:['view','add','edit','handover','dispose','maintenance','users','return','customers','custody','settings'],manager:['view','add','edit','handover','dispose','maintenance','return','customers','custody'],viewer:['view']};
-  document.querySelectorAll('input[name="perm"]').forEach(c=>c.checked=pre[p].includes(c.value));
+  const pre={
+    admin:['view','add','edit','handover','dispose','maintenance','users','return','customers','custody','custody_add','custody_edit','custody_approve','custody_print','settings'],
+    manager:['view','add','edit','handover','dispose','maintenance','return','customers','custody','custody_add','custody_approve','custody_print'],
+    viewer:['view','custody','custody_print']
+  };
+  document.querySelectorAll('input[name="perm"]').forEach(c=>c.checked=pre[p]?.includes(c.value));
 }
 function getFormUser() {
   const name=document.getElementById('u-name').value.trim();
@@ -2488,7 +2517,64 @@ async function deleteUser(id) {
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
 
-/* ────────── ASSET HISTORY ────────── */
+/* ────────── FINANCIAL ITEMS HELPER ────────── */
+function financialItemsHTML(items) {
+  // items = [{desc:'',amount:0}, ...]
+  const rows = (items && items.length ? items : [{desc:'',amount:''},{desc:'',amount:''}]);
+  return '<div class="form-section" style="margin-top:14px">بنود مالية (ريال سعودي)</div>'+
+    '<div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:10px">'+
+    '<div style="display:grid;grid-template-columns:1fr 120px 32px;gap:6px;align-items:center;margin-bottom:6px">'+
+      '<span style="font-size:11px;font-weight:700;color:var(--text2)">وصف البند</span>'+
+      '<span style="font-size:11px;font-weight:700;color:var(--text2)">المبلغ (ريال)</span>'+
+      '<span></span>'+
+    '</div>'+
+    '<div id="fi-rows">'+
+      rows.map((r,i)=>financialItemRow(i,r.desc||'',r.amount||'')).join('')+
+    '</div>'+
+    '<button type="button" onclick="addFinancialItemRow()" style="margin-top:6px;padding:4px 12px;border:1px dashed var(--border2);border-radius:var(--radius);background:transparent;font-family:var(--font);font-size:12px;cursor:pointer;color:var(--blue)"><i class="ti ti-plus"></i> إضافة بند</button>'+
+    '<div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:10px;padding-top:8px;border-top:2px solid var(--border)">'+
+      '<span style="font-size:13px;font-weight:700;color:var(--text2)">الإجمالي:</span>'+
+      '<span id="fi-total" style="font-size:16px;font-weight:700;color:var(--green)">0.00 ريال</span>'+
+    '</div>'+
+    '</div>';
+}
+function financialItemRow(i, desc, amount) {
+  return '<div class="fi-row" style="display:grid;grid-template-columns:1fr 120px 32px;gap:6px;align-items:center;margin-bottom:5px" id="fi-row-'+i+'">'+
+    '<input type="text" class="fi-desc" placeholder="وصف البند..." value="'+desc+'" style="padding:6px 9px;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font);font-size:12px;width:100%;background:var(--card)">'+
+    '<input type="number" class="fi-amount" placeholder="0.00" value="'+amount+'" min="0" step="0.01" oninput="updateFinancialTotal()" style="padding:6px 9px;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font);font-size:12px;width:100%;background:var(--card);text-align:left;direction:ltr">'+
+    '<button type="button" onclick="removeFinancialRow(this)" style="padding:4px 6px;border:1px solid #F0A0A0;border-radius:var(--radius);background:transparent;color:var(--red);cursor:pointer;font-size:13px" title="حذف">×</button>'+
+  '</div>';
+}
+function addFinancialItemRow() {
+  const container = document.getElementById('fi-rows');
+  if (!container) return;
+  const i = container.querySelectorAll('.fi-row').length;
+  const div = document.createElement('div');
+  div.innerHTML = financialItemRow(i,'','');
+  container.appendChild(div.firstChild);
+}
+function removeFinancialRow(btn) {
+  const row = btn.closest('.fi-row');
+  if (document.querySelectorAll('.fi-row').length <= 1) return;
+  row.remove();
+  updateFinancialTotal();
+}
+function updateFinancialTotal() {
+  const amounts = [...document.querySelectorAll('.fi-amount')].map(i=>parseFloat(i.value)||0);
+  const total = amounts.reduce((s,v)=>s+v,0);
+  const el = document.getElementById('fi-total');
+  if (el) el.textContent = total.toLocaleString('ar-SA',{minimumFractionDigits:2,maximumFractionDigits:2})+' ريال';
+}
+function getFinancialItems() {
+  const rows = document.querySelectorAll('.fi-row');
+  const items = [];
+  rows.forEach(row=>{
+    const desc = row.querySelector('.fi-desc')?.value?.trim()||'';
+    const amount = parseFloat(row.querySelector('.fi-amount')?.value)||0;
+    if (desc||amount) items.push({desc,amount});
+  });
+  return items;
+}
 function populateHistoryAssetSelect() {
   const sel = document.getElementById('history-asset-select');
   if (!sel) return;
@@ -2649,7 +2735,7 @@ function renderCustody() {
     const mst=!statusF||c.requestStatus===statusF;
     return ms&&mst;
   });
-  if (!filtered.length) { tbody.innerHTML='<tr><td colspan="8" class="empty-row">لا توجد طلبات عهدة</td></tr>'; return; }
+  if (!filtered.length) { tbody.innerHTML='<tr><td colspan="9" class="empty-row">لا توجد طلبات عهدة</td></tr>'; return; }
   tbody.innerHTML=filtered.map((c,i)=>{
     const sb=c.requestStatus==='معتمد'?'<span class="custody-badge-approved">معتمد</span>':c.requestStatus==='مرفوض'?'<span class="custody-badge-rejected">مرفوض</span>':'<span class="custody-badge-pending">قيد المراجعة</span>';
     const custNum = c.custodyNumber || ('CUS-'+c._id.slice(-6));
@@ -2660,17 +2746,19 @@ function renderCustody() {
       '<td><div style="font-weight:600">'+(c.assetName||'-')+'</div><code class="tag">'+(c.barcode||'-')+'</code></td>'+
       '<td>'+statusBadge(c.assetStatus||'متاح',c.assetId)+'</td>'+
       '<td style="font-size:12px;max-width:160px">'+(c.purpose||'-')+'</td>'+
+      '<td style="font-weight:700;color:var(--green);white-space:nowrap">'+(c.financialTotal>0?Number(c.financialTotal||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+' ريال':'-')+'</td>'+
       '<td>'+sb+'</td>'+
       '<td style="white-space:nowrap">'+
-        '<button class="btn-action info" onclick="printCustodyForm(\''+c._id+'\')"><i class="ti ti-printer"></i></button>'+
-        (can('edit')?'<button class="btn-action success" onclick="approveCustody(\''+c._id+'\',\'معتمد\')"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveCustody(\''+c._id+'\',\'مرفوض\')"><i class="ti ti-x"></i></button>':'')+
-        '<button class="btn-action danger" onclick="deleteCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>'+
+        (can('custody_print')||can('custody')?'<button class="btn-action info" onclick="printCustodyForm(\''+c._id+'\')"><i class="ti ti-printer"></i></button>':'')+
+        (can('custody_approve')||can('edit')?'<button class="btn-action success" onclick="approveCustody(\''+c._id+'\',\'معتمد\')"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveCustody(\''+c._id+'\',\'مرفوض\')"><i class="ti ti-x"></i></button>':'')+
+        (can('custody_edit')||can('edit')?'<button class="btn-action danger" onclick="deleteCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>':'')+
       '</td></tr>';
   }).join('');
 }
 function filterCustody() { renderCustody(); }
 
 function openNewCustody() {
+  if (!can('custody_add')&&!can('edit')) { showToast('ليس لديك صلاحية إضافة طلب عهدة','error'); return; }
   const assets=getAssets();
   const opts=assets.map(a=>'<option value="'+a._id+'" data-barcode="'+(a.barcode||a.code||a._id)+'" data-status="'+(a.status||'متاح')+'" data-name="'+a.name+'">'+a.name+' ['+(a.barcode||a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' ('+( a.status||'متاح')+')</option>').join('');
   const today=new Date().toISOString().split('T')[0];
@@ -2688,8 +2776,9 @@ function openNewCustody() {
       '<div class="field"><label>حالة الأصل</label><input type="text" id="cus-status" readonly style="background:var(--bg2)"></div>'+
     '</div>'+
     '<div class="field" style="margin-bottom:12px"><label>الغرض *</label><textarea id="cus-purpose" placeholder="الغرض من طلب العهدة..."></textarea></div>'+
-    '<div class="field"><label>ملاحظات</label><textarea id="cus-notes"></textarea></div>'+
-    '<div class="alert alert-info"><i class="ti ti-info-circle"></i> سيُنشأ نموذج للطباعة بعد الحفظ</div>';
+    financialItemsHTML([])+
+    '<div class="field" style="margin-top:10px"><label>ملاحظات</label><textarea id="cus-notes"></textarea></div>'+
+    '<div class="alert alert-info" style="margin-top:10px"><i class="ti ti-info-circle"></i> سيُنشأ نموذج للطباعة بعد الحفظ</div>';
   document.getElementById('modal-save-btn').textContent='حفظ الطلب';
   document.getElementById('modal-save-btn').onclick=saveCustodyRequest;
   document.getElementById('modal-box').className='modal wide';
@@ -2710,7 +2799,9 @@ async function saveCustodyRequest() {
   const sel=document.getElementById('cus-asset');
   const opt=sel.options[sel.selectedIndex];
   const custodyNum='CUS-'+Date.now().toString().slice(-6);
-  const rec={date,requesterName,assetId,assetName:opt.dataset.name||opt.text,barcode:document.getElementById('cus-barcode').value,assetStatus:document.getElementById('cus-status').value,purpose,notes:document.getElementById('cus-notes').value,requestStatus:'قيد المراجعة',createdBy:currentUser?.name||'',createdAt:new Date().toISOString(),custodyNumber:custodyNum};
+  const financialItems = getFinancialItems();
+  const financialTotal = financialItems.reduce((s,i)=>s+(i.amount||0),0);
+  const rec={date,requesterName,assetId,assetName:opt.dataset.name||opt.text,barcode:document.getElementById('cus-barcode').value,assetStatus:document.getElementById('cus-status').value,purpose,notes:document.getElementById('cus-notes').value,financialItems,financialTotal,requestStatus:'قيد المراجعة',createdBy:currentUser?.name||'',createdAt:new Date().toISOString(),custodyNumber:custodyNum};
   try {
     await waitForFirebase();
     const docRef=await window.fsApi.addDoc(window.fsApi.collection(window.db,"custodyRequests"),rec);
@@ -2804,7 +2895,8 @@ function openNewDeptCustody() {
       '<div class="field"><label>الكمية</label><input type="number" id="dc-qty" min="1" value="1"></div>'+
     '</div>'+
     '<div class="field" style="margin-bottom:12px"><label>الغرض من العهدة *</label><textarea id="dc-purpose" placeholder="وصف الغرض من الطلب..."></textarea></div>'+
-    '<div class="form-row" style="margin-bottom:12px">'+
+    financialItemsHTML([])+
+    '<div class="form-row" style="margin-bottom:12px;margin-top:10px">'+
       '<div class="field"><label>المدة المتوقعة</label><input type="text" id="dc-duration" placeholder="مثال: شهر، 3 أشهر..."></div>'+
       '<div class="field"><label>الشخص المسؤول عن الاعتماد</label><input type="text" id="dc-approver" placeholder="اسم المسؤول"></div>'+
     '</div>'+
@@ -2827,7 +2919,9 @@ async function saveDeptCustodyRequest() {
   const deptCode={'الإدارة المالية':'FIN','المبيعات':'SAL','الخدمات المساندة':'SUP','الموارد البشرية':'HR','تقنية المعلومات':'IT','المشتريات':'PUR','العمليات':'OPS','أخرى':'OTH'};
   const prefix=deptCode[dept]||'GEN';
   const seqNum=prefix+'-'+String(existing.length+1).padStart(4,'0');
-  const rec={date,dept,requesterName,position:document.getElementById('dc-position').value.trim(),itemDesc,qty:document.getElementById('dc-qty').value,purpose,duration:document.getElementById('dc-duration').value.trim(),approver:document.getElementById('dc-approver').value.trim(),notes:document.getElementById('dc-notes').value,requestStatus:'قيد المراجعة',seqNum,createdBy:currentUser?.name||'',createdAt:new Date().toISOString()};
+  const financialItems = getFinancialItems();
+  const financialTotal = financialItems.reduce((s,i)=>s+(i.amount||0),0);
+  const rec={date,dept,requesterName,position:document.getElementById('dc-position').value.trim(),itemDesc,qty:document.getElementById('dc-qty').value,purpose,duration:document.getElementById('dc-duration').value.trim(),approver:document.getElementById('dc-approver').value.trim(),notes:document.getElementById('dc-notes').value,financialItems,financialTotal,requestStatus:'قيد المراجعة',seqNum,createdBy:currentUser?.name||'',createdAt:new Date().toISOString()};
   try {
     await waitForFirebase();
     const docRef=await window.fsApi.addDoc(window.fsApi.collection(window.db,"deptCustodyRequests"),rec);
@@ -2897,6 +2991,13 @@ function printDeptCustodyForm(id) {
   '</table>'+
   '<div class="notes-box"><strong style="color:#3A5070">📌 الغرض من العهدة:</strong><br><div style="margin-top:6px">'+c.purpose+'</div></div>'+
   (c.notes?'<div class="notes-box"><strong style="color:#3A5070">🗒️ ملاحظات:</strong><br><div style="margin-top:6px">'+c.notes+'</div></div>':'')+
+  ((c.financialItems&&c.financialItems.length)?
+    '<div style="margin:14px 0"><strong style="color:#3A5070;font-size:13px">💰 البنود المالية (ريال سعودي)</strong>'+
+    '<table style="margin-top:8px;width:100%;border-collapse:collapse;font-size:12px">'+
+      '<thead><tr><th style="background:#1C3F8A;color:#fff;padding:6px 10px;text-align:right">وصف البند</th><th style="background:#1C3F8A;color:#fff;padding:6px 10px;text-align:left;width:120px">المبلغ (ريال)</th></tr></thead>'+
+      '<tbody>'+c.financialItems.map(fi=>'<tr><td style="border:1px solid #C8DBF0;padding:6px 10px">'+fi.desc+'</td><td style="border:1px solid #C8DBF0;padding:6px 10px;text-align:left;direction:ltr">'+Number(fi.amount||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+'</td></tr>').join('')+
+      '<tr><td style="border:1px solid #C8DBF0;padding:8px 10px;font-weight:700;background:#F0F6FF">الإجمالي</td><td style="border:1px solid #C8DBF0;padding:8px 10px;font-weight:700;color:#2E7D32;font-size:14px;text-align:left;direction:ltr;background:#F0F6FF">'+Number(c.financialTotal||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+' ريال</td></tr>'+
+    '</tbody></table></div>':'')+
   '<div class="sign">'+
     '<div class="sbox">'+
       '<div class="stitle">توقيع الطالب</div>'+
@@ -2967,6 +3068,7 @@ function printHandoverForm(hid) {
     '<tr><td class="lbl">رقم التواصل</td><td>'+(h.phone1||'-')+(h.phone2?' / '+h.phone2:'')+'</td><td class="lbl">العنوان</td><td style="font-size:12px">'+(h.clientAddress||'-')+'</td></tr>'+
     '<tr><td class="lbl">المسؤول</td><td>'+h.responsible+'</td><td class="lbl">تاريخ التسليم</td><td>'+h.date+'</td></tr>'+
     (h.notes?'<tr><td class="lbl">ملاحظات</td><td colspan="3">'+h.notes+'</td></tr>':'')+
+    (h.actions?'<tr><td class="lbl">الإجراءات / الشروط</td><td colspan="3" style="color:#B45309;font-weight:600">'+h.actions+'</td></tr>':'')+
   '</table>'+
   '<div class="sign">'+
     '<div class="sbox"><div class="stitle">توقيع المُسلِّم</div><div style="font-size:12px;color:#5B7AAA">الاسم: '+h.responsible+'</div><div class="sline">التوقيع / الختم</div></div>'+
@@ -3004,6 +3106,13 @@ function printCustodyForm(id) {
   '</table>'+
   '<div class="notes"><strong style="color:#3A5070">📌 الغرض من العهدة:</strong><br><div style="margin-top:6px">'+(c.purpose||'-')+'</div></div>'+
   (c.notes?'<div class="notes"><strong style="color:#3A5070">🗒️ ملاحظات:</strong><br><div style="margin-top:6px">'+c.notes+'</div></div>':'')+
+  ((c.financialItems&&c.financialItems.length)?
+    '<div style="margin:14px 0"><strong style="color:#3A5070;font-size:13px">💰 البنود المالية (ريال سعودي)</strong>'+
+    '<table style="margin-top:8px;width:100%;border-collapse:collapse;font-size:12px">'+
+      '<thead><tr><th style="background:#1C3F8A;color:#fff;padding:6px 10px;text-align:right">وصف البند</th><th style="background:#1C3F8A;color:#fff;padding:6px 10px;text-align:left;width:120px">المبلغ (ريال)</th></tr></thead>'+
+      '<tbody>'+c.financialItems.map(fi=>'<tr><td style="border:1px solid #C8DBF0;padding:6px 10px">'+fi.desc+'</td><td style="border:1px solid #C8DBF0;padding:6px 10px;text-align:left;direction:ltr">'+Number(fi.amount||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+'</td></tr>').join('')+
+      '<tr><td style="border:1px solid #C8DBF0;padding:8px 10px;font-weight:700;background:#F0F6FF;text-align:right">الإجمالي</td><td style="border:1px solid #C8DBF0;padding:8px 10px;font-weight:700;color:#2E7D32;font-size:14px;text-align:left;direction:ltr;background:#F0F6FF">'+Number(c.financialTotal||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+' ريال</td></tr>'+
+    '</tbody></table></div>':'')+
   '<div class="sign">'+
     '<div class="sbox"><div class="stitle">توقيع الطالب</div><div style="font-size:12px;color:#5B7AAA">الاسم: '+(c.requesterName||'')+'</div><div class="sline">التوقيع</div></div>'+
     '<div class="sbox"><div class="stitle">اعتماد المسؤول</div><div style="font-size:12px;color:#5B7AAA">الاسم: ____________________________</div><div class="sline">التوقيع / الختم</div></div>'+
@@ -3147,6 +3256,9 @@ if(typeof populateHistoryAssetSelect!=='undefined')window.populateHistoryAssetSe
 if(typeof searchAssetHistory!=='undefined')window.searchAssetHistory=searchAssetHistory;
 if(typeof loadAssetHistoryById!=='undefined')window.loadAssetHistoryById=loadAssetHistoryById;
 if(typeof printAssetHistory!=='undefined')window.printAssetHistory=printAssetHistory;
+if(typeof addFinancialItemRow!=='undefined')window.addFinancialItemRow=addFinancialItemRow;
+if(typeof removeFinancialRow!=='undefined')window.removeFinancialRow=removeFinancialRow;
+if(typeof updateFinancialTotal!=='undefined')window.updateFinancialTotal=updateFinancialTotal;
 if(typeof renderCustomers!=='undefined')window.renderCustomers=renderCustomers;
 if(typeof filterCustomers!=='undefined')window.filterCustomers=filterCustomers;
 if(typeof renderReturns!=='undefined')window.renderReturns=renderReturns;
