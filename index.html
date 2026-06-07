@@ -324,23 +324,23 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
   <div id="main">
     <div id="sidebar">
       <div class="nav-section">الرئيسية</div>
-      <div class="nav-item active" onclick="showPage('dashboard',this)" data-page="dashboard"><i class="ti ti-dashboard"></i> لوحة التحكم</div>
-      <div class="nav-item" onclick="showPage('assets',this)" data-page="assets"><i class="ti ti-package"></i> سجل الأصول</div>
-      <div class="nav-item" onclick="showPage('inventory',this)" data-page="inventory"><i class="ti ti-layout-grid"></i> رصيد المخزون</div>
-      <div class="nav-section">العمليات</div>
-      <div class="nav-item" onclick="showPage('customers',this)" data-page="customers"><i class="ti ti-users"></i> العملاء</div>
-      <div class="nav-item" onclick="showPage('handover',this)" data-page="handover"><i class="ti ti-transfer"></i> تسليم أصل</div>
-      <div class="nav-item" onclick="showPage('returns',this)" data-page="returns"><i class="ti ti-corner-up-left"></i> استرداد أصل</div>
-      <div class="nav-item" onclick="showPage('maintenance',this)" data-page="maintenance"><i class="ti ti-tool"></i> الصيانة</div>
-      <div class="nav-item" onclick="showPage('dispose',this)" data-page="dispose"><i class="ti ti-trash"></i> الإتلاف</div>
+      <div class="nav-item active" id="nav-dashboard" onclick="showPage('dashboard',this)" data-page="dashboard"><i class="ti ti-dashboard"></i> لوحة التحكم</div>
+      <div class="nav-item" id="nav-assets" style="display:none" onclick="showPage('assets',this)" data-page="assets"><i class="ti ti-package"></i> سجل الأصول</div>
+      <div class="nav-item" id="nav-inventory" style="display:none" onclick="showPage('inventory',this)" data-page="inventory"><i class="ti ti-layout-grid"></i> رصيد المخزون</div>
+      <div class="nav-section" id="nav-section-ops" style="display:none">العمليات</div>
+      <div class="nav-item" id="nav-customers" style="display:none" onclick="showPage('customers',this)" data-page="customers"><i class="ti ti-users"></i> العملاء</div>
+      <div class="nav-item" id="nav-handover" style="display:none" onclick="showPage('handover',this)" data-page="handover"><i class="ti ti-transfer"></i> تسليم أصل</div>
+      <div class="nav-item" id="nav-returns" style="display:none" onclick="showPage('returns',this)" data-page="returns"><i class="ti ti-corner-up-left"></i> استرداد أصل</div>
+      <div class="nav-item" id="nav-maintenance" style="display:none" onclick="showPage('maintenance',this)" data-page="maintenance"><i class="ti ti-tool"></i> الصيانة</div>
+      <div class="nav-item" id="nav-dispose" style="display:none" onclick="showPage('dispose',this)" data-page="dispose"><i class="ti ti-trash"></i> الإتلاف</div>
       <div class="nav-item" id="nav-custody" style="display:none" onclick="showPage('custody',this)" data-page="custody"><i class="ti ti-file-invoice"></i> طلبات العهدة</div>
       <div class="nav-item" id="nav-dept-custody" style="display:none" onclick="showPage('dept-custody',this)" data-page="dept-custody"><i class="ti ti-building"></i> عهدة الإدارات</div>
-      <div class="nav-section">الإدارة</div>
-      <div class="nav-item" onclick="showPage('types',this)" data-page="types"><i class="ti ti-tags"></i> أنواع الأصول</div>
-      <div class="nav-item" onclick="showPage('reports',this)" data-page="reports"><i class="ti ti-chart-bar"></i> التقارير</div>
-      <div class="nav-item" onclick="showPage('asset-history',this)" data-page="asset-history"><i class="ti ti-history"></i> سجل الأصل</div>
-      <div class="nav-item" id="nav-users" onclick="showPage('users',this)" data-page="users"><i class="ti ti-user-shield"></i> المستخدمون</div>
-      <div class="nav-item" id="nav-settings" onclick="showPage('settings',this)" data-page="settings"><i class="ti ti-settings"></i> الإعدادات</div>
+      <div class="nav-section" id="nav-section-admin" style="display:none">الإدارة</div>
+      <div class="nav-item" id="nav-types" style="display:none" onclick="showPage('types',this)" data-page="types"><i class="ti ti-tags"></i> أنواع الأصول</div>
+      <div class="nav-item" id="nav-reports" style="display:none" onclick="showPage('reports',this)" data-page="reports"><i class="ti ti-chart-bar"></i> التقارير</div>
+      <div class="nav-item" id="nav-asset-history" style="display:none" onclick="showPage('asset-history',this)" data-page="asset-history"><i class="ti ti-history"></i> سجل الأصل</div>
+      <div class="nav-item" id="nav-users" style="display:none" onclick="showPage('users',this)" data-page="users"><i class="ti ti-user-shield"></i> المستخدمون</div>
+      <div class="nav-item" id="nav-settings" style="display:none" onclick="showPage('settings',this)" data-page="settings"><i class="ti ti-settings"></i> الإعدادات</div>
     </div>
     <div id="content">
 
@@ -799,23 +799,26 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db,"users"));
   const existingUsers = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   
-  const NEW_PERMS = ["custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"];
+  const ADMIN_FULL_PERMS = ["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"];
   if (usersSnap.empty || existingUsers.length === 0) {
-    await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"] });
+    await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms: ADMIN_FULL_PERMS });
     console.log("Admin user created");
   } else {
     for (const d of usersSnap.docs) {
       const data = d.data();
       const updates = {};
+      // إضافة حقل username إذا كان غائباً (مستخدمون قدامى)
       if (!data.username) {
         updates.username = data.name==="مدير النظام"?"admin": data.name.replace(/\s+/g,"_").toLowerCase();
         updates.password = data.password||"admin123";
       }
       const currentPerms = data.perms || [];
-      // Add missing new perms to any user who has 'users' permission (admins) OR who already has some custody perms
-      const missingPerms = NEW_PERMS.filter(p => !currentPerms.includes(p));
-      if (missingPerms.length > 0 && (currentPerms.includes("users") || currentPerms.some(p=>p.startsWith("custody")||p.startsWith("dept_custody")))) {
-        updates.perms = [...new Set([...currentPerms, ...missingPerms])];
+      // ترقية الصلاحيات فقط للمديرين (يملكون 'users') وليس للمستخدمين العاديين
+      if (currentPerms.includes("users")) {
+        const missingAdminPerms = ADMIN_FULL_PERMS.filter(p => !currentPerms.includes(p));
+        if (missingAdminPerms.length > 0) {
+          updates.perms = [...new Set([...currentPerms, ...missingAdminPerms])];
+        }
       }
       if (Object.keys(updates).length > 0) {
         await updateDoc(doc(db,"users",d.id), updates);
@@ -922,7 +925,6 @@ try {
         const nameEl = document.getElementById('header-name');
         if (nameEl) nameEl.textContent = fresh.name;
         document.getElementById('header-role').textContent = fresh.role;
-        if (!fresh.perms.includes('users')) document.getElementById('nav-users').style.display='none';
         const ALL_CUSTODY_PERMS_SR = ['custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
         if (fresh.perms.includes('users') && ALL_CUSTODY_PERMS_SR.some(p=>!fresh.perms.includes(p))) {
           const upgraded = [...new Set([...fresh.perms, ...ALL_CUSTODY_PERMS_SR])];
@@ -930,14 +932,9 @@ try {
           currentUser = fresh;
           try { await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",fresh._id),{perms:upgraded}); } catch(e){}
         }
-        const _hasCustAcc = fresh.perms.some(p=>p==='custody'||p.startsWith('custody_'));
-        const _hasDeptCustAcc = fresh.perms.some(p=>p==='dept_custody'||p.startsWith('dept_custody_'));
-        const custodyNav = document.getElementById('nav-custody');
-        if (custodyNav) custodyNav.style.display = _hasCustAcc ? '' : 'none';
-        const deptCustodyNav = document.getElementById('nav-dept-custody');
-        if (deptCustodyNav) deptCustodyNav.style.display = _hasDeptCustAcc ? '' : 'none';
-        const settingsNav = document.getElementById('nav-settings');
-        if (settingsNav) settingsNav.style.display = fresh.perms.includes('settings') ? '' : 'none';
+        applyNavPermissions(fresh.perms);
+        const addBtnSR = document.getElementById('add-asset-btn');
+        if (addBtnSR) addBtnSR.style.display = fresh.perms.includes('add') ? '' : 'none';
         populateTypeFilters();
         renderAll();
         console.log("✅ Session restored for:", fresh.name);
@@ -1095,27 +1092,18 @@ async function doLogin() {
     const nameEl = document.getElementById('header-name');
     if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
-    // Auto-grant custody & settings to any user who has 'users' permission (backward compat)
-    const ALL_CUSTODY_PERMS = ['custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
-    if (found.perms.includes('users') && ALL_CUSTODY_PERMS.some(p=>!found.perms.includes(p))) {
-      const upgraded = [...new Set([...found.perms, ...ALL_CUSTODY_PERMS])];
+    // ترقية تلقائية للمديرين فقط (من يملكون صلاحية 'users') — لا نُغيِّر صلاحيات المستخدمين العاديين
+    const ADMIN_ALL_PERMS = ['view','add','edit','handover','dispose','maintenance','users','return','customers','custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
+    if (found.perms.includes('users') && ADMIN_ALL_PERMS.some(p=>!found.perms.includes(p))) {
+      const upgraded = [...new Set([...found.perms, ...ADMIN_ALL_PERMS])];
       found.perms = upgraded;
-      // Also persist to Firebase silently
       try {
         await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",found._id), {perms: upgraded});
       } catch(e) { console.warn('perm upgrade:', e); }
     }
-    if (!found.perms.includes('users')) document.getElementById('nav-users').style.display='none';
-    const hasCustodyAccess = found.perms.some(p=>p==='custody'||p.startsWith('custody_'));
-    const hasDeptCustodyAccess = found.perms.some(p=>p==='dept_custody'||p.startsWith('dept_custody_'));
-    const custodyNav = document.getElementById('nav-custody');
-    if (custodyNav) custodyNav.style.display = hasCustodyAccess ? '' : 'none';
-    const deptCustodyNav = document.getElementById('nav-dept-custody');
-    if (deptCustodyNav) deptCustodyNav.style.display = hasDeptCustodyAccess ? '' : 'none';
-    const settingsNav = document.getElementById('nav-settings');
-    if (settingsNav) settingsNav.style.display = found.perms.includes('settings') ? '' : 'none';
+    applyNavPermissions(found.perms);
     const addBtn = document.getElementById('add-asset-btn');
-    if (addBtn) addBtn.style.display = '';
+    if (addBtn) addBtn.style.display = found.perms.includes('add') ? '' : 'none';
     populateTypeFilters();
     renderAll();
   } catch(e) {
@@ -1129,8 +1117,16 @@ async function doLogin() {
 function doLogout() {
   currentUser = null;
   try { localStorage.removeItem('_assetSession'); } catch(e) {}
+  resetNav();
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('app-shell').classList.add('hidden');
+  // إعادة ضبط لوحة التحكم كصفحة افتراضية
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const dash = document.getElementById('page-dashboard');
+  if (dash) dash.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const navDash = document.getElementById('nav-dashboard');
+  if (navDash) navDash.classList.add('active');
 }
 
 async function createAdminUser() {
@@ -1194,6 +1190,44 @@ async function createAdminUser() {
 
 function can(p) { return currentUser && currentUser.perms && currentUser.perms.includes(p); }
 
+/* ────────── APPLY NAV PERMISSIONS ────────── */
+function applyNavPermissions(perms) {
+  const p = perms || [];
+  const show = (id, cond) => { const el=document.getElementById(id); if(el) el.style.display=cond?'':'none'; };
+
+  // لوحة التحكم — دائماً ظاهرة
+  show('nav-assets',          p.includes('view'));
+  show('nav-inventory',       p.includes('view'));
+
+  // قسم العمليات — يظهر إذا كان هناك أي صلاحية عمليات
+  const hasOps = p.some(x=>['customers','handover','return','maintenance','dispose','custody','dept_custody'].includes(x)||x.startsWith('custody_')||x.startsWith('dept_custody_'));
+  show('nav-section-ops', hasOps);
+  show('nav-customers',   p.includes('customers'));
+  show('nav-handover',    p.includes('handover'));
+  show('nav-returns',     p.includes('return'));
+  show('nav-maintenance', p.includes('maintenance'));
+  show('nav-dispose',     p.includes('dispose'));
+  show('nav-custody',     p.some(x=>x==='custody'||x.startsWith('custody_')));
+  show('nav-dept-custody',p.some(x=>x==='dept_custody'||x.startsWith('dept_custody_')));
+
+  // قسم الإدارة
+  const hasAdmin = p.some(x=>['users','settings','view'].includes(x));
+  show('nav-section-admin', hasAdmin);
+  show('nav-types',         p.includes('add')||p.includes('edit'));
+  show('nav-reports',       p.includes('view'));
+  show('nav-asset-history', p.includes('view'));
+  show('nav-users',         p.includes('users'));
+  show('nav-settings',      p.includes('settings'));
+}
+
+function resetNav() {
+  // يُخفي كل عناصر القائمة عند تسجيل الخروج
+  ['nav-assets','nav-inventory','nav-section-ops','nav-customers','nav-handover',
+   'nav-returns','nav-maintenance','nav-dispose','nav-custody','nav-dept-custody',
+   'nav-section-admin','nav-types','nav-reports','nav-asset-history','nav-users','nav-settings'
+  ].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+}
+
 /* ────────── CHANGE PASSWORD ────────── */
 function openChangePassword() {
   document.getElementById('modal-title').innerHTML = '<i class="ti ti-key"></i> تغيير كلمة المرور';
@@ -1220,7 +1254,27 @@ async function saveChangePassword() {
 }
 
 /* ────────── NAVIGATION ────────── */
+// خريطة الصفحات والصلاحيات المطلوبة للوصول إليها
+const PAGE_PERMS = {
+  'assets': 'view', 'inventory': 'view', 'customers': 'customers',
+  'handover': 'handover', 'returns': 'return', 'maintenance': 'maintenance',
+  'dispose': 'dispose', 'custody': 'custody', 'dept-custody': 'dept_custody',
+  'types': 'add', 'reports': 'view', 'asset-history': 'view',
+  'users': 'users', 'settings': 'settings', 'dashboard': null
+};
+
 function showPage(id, el) {
+  // التحقق من الصلاحية المطلوبة للصفحة
+  const requiredPerm = PAGE_PERMS[id];
+  if (requiredPerm) {
+    if (requiredPerm === 'custody' && !currentUser?.perms?.some(p=>p==='custody'||p.startsWith('custody_'))) {
+      showToast('ليس لديك صلاحية الوصول لهذه الصفحة','error'); return;
+    } else if (requiredPerm === 'dept_custody' && !currentUser?.perms?.some(p=>p==='dept_custody'||p.startsWith('dept_custody_'))) {
+      showToast('ليس لديك صلاحية الوصول لهذه الصفحة','error'); return;
+    } else if (requiredPerm !== 'custody' && requiredPerm !== 'dept_custody' && !can(requiredPerm)) {
+      showToast('ليس لديك صلاحية الوصول لهذه الصفحة','error'); return;
+    }
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
