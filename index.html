@@ -458,7 +458,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
             </div>
           </div>
           <table>
-            <thead><tr><th>#</th><th>الأصل</th><th>النوع الفرعي</th><th>العدد</th><th>العميل</th><th>الجوال</th><th>العنوان</th><th>المسؤول</th><th>تاريخ التسليم</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <thead><tr><th>#</th><th>الأصل</th><th>النوع الفرعي</th><th>العدد</th><th>العميل</th><th>الجوال</th><th>العنوان</th><th>المسؤول</th><th>تاريخ التسليم</th><th>الحالة</th><th>الإجراءات / الشروط</th><th>إجراءات</th></tr></thead>
             <tbody id="handover-body"></tbody>
           </table>
         </div>
@@ -476,7 +476,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
         <div class="table-card">
           <div class="table-toolbar"><span style="font-size:13px;font-weight:700">عمليات استرداد الأصول من العملاء</span></div>
           <table>
-            <thead><tr><th>#</th><th>الأصل</th><th>العدد</th><th>العميل</th><th>سبب الاسترداد</th><th>الحالة بعد الاسترداد</th><th>المسجِّل</th><th>التاريخ</th></tr></thead>
+            <thead><tr><th>#</th><th>الأصل</th><th>العدد</th><th>العميل</th><th>سبب الاسترداد</th><th>الحالة بعد الاسترداد</th><th>الإجراءات</th><th>المسجِّل</th><th>التاريخ</th></tr></thead>
             <tbody id="returns-body"></tbody>
           </table>
         </div>
@@ -493,7 +493,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
         </div>
         <div class="table-card">
           <table>
-            <thead><tr><th>#</th><th>الأصل</th><th>العدد</th><th>جهة الصيانة</th><th>وصف العطل</th><th>تاريخ التحويل</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <thead><tr><th>#</th><th>الأصل</th><th>العدد</th><th>جهة الصيانة</th><th>وصف العطل</th><th>الإجراءات المطلوبة</th><th>تاريخ التحويل</th><th>الحالة</th><th>إجراءات</th></tr></thead>
             <tbody id="maintenance-body"></tbody>
           </table>
         </div>
@@ -510,7 +510,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
         </div>
         <div class="table-card">
           <table>
-            <thead><tr><th>#</th><th>الأصل</th><th>الكمية المتلفة</th><th>سبب الإتلاف</th><th>المعتمد من</th><th>التاريخ</th></tr></thead>
+            <thead><tr><th>#</th><th>الأصل</th><th>الكمية المتلفة</th><th>سبب الإتلاف</th><th>الإجراءات</th><th>المعتمد من</th><th>التاريخ</th></tr></thead>
             <tbody id="dispose-body"></tbody>
           </table>
         </div>
@@ -655,7 +655,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
         <div class="page-title">
           <span><i class="ti ti-building"></i> عهدة الإدارات</span>
           <div style="display:flex;gap:8px">
-            <button class="add-btn" onclick="openNewDeptCustody()"><i class="ti ti-plus"></i> طلب عهدة جديد</button>
+            <button class="add-btn" id="dept-custody-add-btn" onclick="openNewDeptCustody()"><i class="ti ti-plus"></i> طلب عهدة جديد</button>
           </div>
         </div>
         <div class="table-card">
@@ -923,10 +923,11 @@ try {
         document.getElementById('header-role').textContent = fresh.role;
         if (!fresh.perms.includes('users')) document.getElementById('nav-users').style.display='none';
         const _hasCustAcc = fresh.perms.some(p=>p==='custody'||p.startsWith('custody_'));
+        const _hasDeptCustAcc = fresh.perms.some(p=>p==='dept_custody'||p.startsWith('dept_custody_'));
         const custodyNav = document.getElementById('nav-custody');
         if (custodyNav) custodyNav.style.display = _hasCustAcc ? '' : 'none';
         const deptCustodyNav = document.getElementById('nav-dept-custody');
-        if (deptCustodyNav) deptCustodyNav.style.display = _hasCustAcc ? '' : 'none';
+        if (deptCustodyNav) deptCustodyNav.style.display = _hasDeptCustAcc ? '' : 'none';
         const settingsNav = document.getElementById('nav-settings');
         if (settingsNav) settingsNav.style.display = fresh.perms.includes('settings') ? '' : 'none';
         populateTypeFilters();
@@ -1097,10 +1098,11 @@ async function doLogin() {
     }
     if (!found.perms.includes('users')) document.getElementById('nav-users').style.display='none';
     const hasCustodyAccess = found.perms.some(p=>p==='custody'||p.startsWith('custody_'));
+    const hasDeptCustodyAccess = found.perms.some(p=>p==='dept_custody'||p.startsWith('dept_custody_'));
     const custodyNav = document.getElementById('nav-custody');
     if (custodyNav) custodyNav.style.display = hasCustodyAccess ? '' : 'none';
     const deptCustodyNav = document.getElementById('nav-dept-custody');
-    if (deptCustodyNav) deptCustodyNav.style.display = hasCustodyAccess ? '' : 'none';
+    if (deptCustodyNav) deptCustodyNav.style.display = hasDeptCustodyAccess ? '' : 'none';
     const settingsNav = document.getElementById('nav-settings');
     if (settingsNav) settingsNav.style.display = found.perms.includes('settings') ? '' : 'none';
     const addBtn = document.getElementById('add-asset-btn');
@@ -1327,6 +1329,7 @@ function renderAssetRows(list) {
     '<td>'+statusBadge(a.status,a._id)+'</td>'+
     '<td style="white-space:nowrap">'+
       (can('edit')?'<button class="btn-action" onclick="openEdit(\''+a._id+'\')" title="تعديل"><i class="ti ti-edit"></i></button>':'')+
+      '<button class="btn-action" onclick="printAssetBarcode({_id:\''+a._id+'\',name:\''+a.name.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\',code:\''+a.code+'\',type:\''+a.type+'\',subType:\''+a.subType+'\'})" title="طباعة الباركود" style="color:var(--blue);border-color:var(--blue-light)"><i class="ti ti-barcode"></i></button>'+
       (can('handover')&&a.availableQty>0?'<button class="btn-action success" onclick="openHandoverFromAsset(\''+a._id+'\')" title="تسليم"><i class="ti ti-transfer"></i></button>':'')+
       (can('maintenance')&&a.availableQty>0?'<button class="btn-action purple" onclick="openMaintenanceFromAsset(\''+a._id+'\')" title="صيانة"><i class="ti ti-tool"></i></button>':'')+
       (can('dispose')&&a.totalQty>0?'<button class="btn-action danger" onclick="openDisposeFromAsset(\''+a._id+'\')" title="إتلاف"><i class="ti ti-trash"></i></button>':'')+
@@ -1927,7 +1930,7 @@ function filterHandovers() {
 function renderHandovers() { filterHandovers(); }
 
 function renderHandoverRows(list) {
-  if (!list.length) { document.getElementById('handover-body').innerHTML='<tr><td colspan="11" class="empty-row">لا توجد عمليات تسليم</td></tr>'; return; }
+  if (!list.length) { document.getElementById('handover-body').innerHTML='<tr><td colspan="12" class="empty-row">لا توجد عمليات تسليم</td></tr>'; return; }
   document.getElementById('handover-body').innerHTML = list.map((h,i)=>
     '<tr>'+
     '<td style="color:var(--text3)">'+(i+1)+'</td>'+
@@ -1940,6 +1943,7 @@ function renderHandoverRows(list) {
     '<td>'+h.responsible+'</td>'+
     '<td style="font-size:12px">'+h.date+'</td>'+
     '<td>'+statusBadge(h.status,h.assetId)+'</td>'+
+    '<td style="max-width:180px">'+(h.actions?'<div style="display:flex;align-items:flex-start;gap:5px;font-size:12px;color:var(--amber);padding:4px 6px;background:var(--amber-bg);border-radius:var(--radius);border:1px solid #F0D080"><i class="ti ti-clipboard-list" style="flex-shrink:0;margin-top:1px"></i><span>'+h.actions+'</span></div>':'<span style="color:var(--text3);font-size:11px">—</span>')+'</td>'+
     '<td style="white-space:nowrap">'+
       (h.status!=='مُرتجع'&&can('return')?'<button class="btn-action teal" onclick="openReturnFromHandover(\''+h._id+'\')" title="استرداد"><i class="ti ti-corner-up-left"></i> استرداد</button>':'')+
       '<button class="btn-action info" onclick="printHandoverForm(\''+h._id+'\')" title="طباعة"><i class="ti ti-printer"></i></button>'+
@@ -2078,7 +2082,7 @@ function renderReturns() {
   const tbody = document.getElementById('returns-body');
   if (!tbody) return;
   const list = getReturns();
-  if (!list.length) { tbody.innerHTML='<tr><td colspan="8" class="empty-row">لا توجد عمليات استرداد مسجلة</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="9" class="empty-row">لا توجد عمليات استرداد مسجلة</td></tr>'; return; }
   tbody.innerHTML = list.map((r,i)=>
     '<tr>'+
     '<td style="color:var(--text3)">'+(i+1)+'</td>'+
@@ -2087,6 +2091,7 @@ function renderReturns() {
     '<td>'+r.clientName+'</td>'+
     '<td><span class="badge '+(r.reason==='صيانة'?'badge-amber':r.reason==='تالفة'?'badge-red':'badge-gray')+'">'+r.reason+'</span></td>'+
     '<td><span class="badge '+(r.conditionAfterReturn==='متاح'?'badge-green':r.conditionAfterReturn==='صيانة'?'badge-amber':'badge-red')+'">'+r.conditionAfterReturn+'</span></td>'+
+    '<td style="max-width:180px">'+(r.actions?'<div style="display:flex;align-items:flex-start;gap:5px;font-size:12px;color:var(--teal);padding:4px 6px;background:var(--teal-bg);border-radius:var(--radius);border:1px solid #80CCC0"><i class="ti ti-clipboard-list" style="flex-shrink:0;margin-top:1px"></i><span>'+r.actions+'</span></div>':'<span style="color:var(--text3);font-size:11px">—</span>')+'</td>'+
     '<td>'+(r.recordedBy||'-')+'</td>'+
     '<td style="font-size:12px">'+(r.date||'-')+'</td></tr>'
   ).join('');
@@ -2145,10 +2150,19 @@ async function saveMaintenance() {
 function renderMaintenances() {
   if (!document.getElementById('maintenance-body')) return;
   const list = getMaintenances();
-  if (!list.length) { document.getElementById('maintenance-body').innerHTML='<tr><td colspan="8" class="empty-row">لا توجد أصول في الصيانة</td></tr>'; return; }
+  if (!list.length) { document.getElementById('maintenance-body').innerHTML='<tr><td colspan="9" class="empty-row">لا توجد أصول في الصيانة</td></tr>'; return; }
   document.getElementById('maintenance-body').innerHTML = list.map((m,i)=>
-    '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+m.assetName+(m.autoCreated?'<div style="font-size:10px;color:var(--teal)"><i class="ti ti-link"></i> مرتبط باسترداد</div>':'')+'</td><td style="text-align:center;font-weight:700">'+m.qty+'</td><td>'+m.vendor+'</td><td style="font-size:12px;color:var(--text2)">'+m.fault+(m.actions?'<div style="color:var(--purple);margin-top:2px"><i class="ti ti-clipboard"></i> '+m.actions+'</div>':'')+'</td><td style="font-size:12px">'+m.date+'</td><td>'+statusBadge(m.status,m.assetId)+'</td>'+
-    '<td>'+(m.status==='قيد الصيانة'?'<button class="btn-action success" onclick="returnFromMaintenance(\''+m._id+'\')"><i class="ti ti-corner-up-left"></i> إعادة</button>':'')+'</td></tr>'
+    '<tr>'+
+    '<td style="color:var(--text3)">'+(i+1)+'</td>'+
+    '<td style="font-weight:600">'+m.assetName+(m.autoCreated?'<div style="font-size:10px;color:var(--teal)"><i class="ti ti-link"></i> مرتبط باسترداد</div>':'')+'</td>'+
+    '<td style="text-align:center;font-weight:700">'+m.qty+'</td>'+
+    '<td>'+m.vendor+'</td>'+
+    '<td style="font-size:12px;color:var(--text2)">'+m.fault+'</td>'+
+    '<td style="max-width:190px">'+(m.actions?'<div style="display:flex;align-items:flex-start;gap:5px;font-size:12px;color:var(--purple);padding:4px 6px;background:var(--purple-bg);border-radius:var(--radius);border:1px solid #C0A0E0"><i class="ti ti-clipboard-check" style="flex-shrink:0;margin-top:1px"></i><span>'+m.actions+'</span></div>':'<span style="color:var(--text3);font-size:11px">—</span>')+'</td>'+
+    '<td style="font-size:12px">'+m.date+'</td>'+
+    '<td>'+statusBadge(m.status,m.assetId)+'</td>'+
+    '<td>'+(m.status==='قيد الصيانة'?'<button class="btn-action success" onclick="returnFromMaintenance(\''+m._id+'\')"><i class="ti ti-corner-up-left"></i> إعادة</button>':'')+'</td>'+
+    '</tr>'
   ).join('');
 }
 
@@ -2222,9 +2236,17 @@ async function saveDispose() {
 function renderDisposes() {
   if (!document.getElementById('dispose-body')) return;
   const list = getDisposes();
-  if (!list.length) { document.getElementById('dispose-body').innerHTML='<tr><td colspan="6" class="empty-row">لا توجد أصول متلفة</td></tr>'; return; }
+  if (!list.length) { document.getElementById('dispose-body').innerHTML='<tr><td colspan="7" class="empty-row">لا توجد أصول متلفة</td></tr>'; return; }
   document.getElementById('dispose-body').innerHTML = list.map((d,i)=>
-    '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+d.assetName+(d.autoCreated?'<div style="font-size:10px;color:var(--teal)"><i class="ti ti-link"></i> مرتبط باسترداد</div>':'')+'</td><td style="text-align:center;font-weight:700;color:var(--red)">'+d.qty+'</td><td style="font-size:12px">'+d.reason+(d.actions?'<div style="color:var(--purple);font-size:11px;margin-top:2px"><i class="ti ti-clipboard"></i> '+d.actions+'</div>':'')+'</td><td>'+d.approved+'</td><td style="font-size:12px">'+d.date+'</td></tr>'
+    '<tr>'+
+    '<td style="color:var(--text3)">'+(i+1)+'</td>'+
+    '<td style="font-weight:600">'+d.assetName+(d.autoCreated?'<div style="font-size:10px;color:var(--teal)"><i class="ti ti-link"></i> مرتبط باسترداد</div>':'')+'</td>'+
+    '<td style="text-align:center;font-weight:700;color:var(--red)">'+d.qty+'</td>'+
+    '<td style="font-size:12px">'+d.reason+'</td>'+
+    '<td style="max-width:190px">'+(d.actions?'<div style="display:flex;align-items:flex-start;gap:5px;font-size:12px;color:var(--red);padding:4px 6px;background:var(--red-bg);border-radius:var(--radius);border:1px solid #F0A0A0"><i class="ti ti-clipboard-list" style="flex-shrink:0;margin-top:1px"></i><span>'+d.actions+'</span></div>':'<span style="color:var(--text3);font-size:11px">—</span>')+'</td>'+
+    '<td>'+d.approved+'</td>'+
+    '<td style="font-size:12px">'+d.date+'</td>'+
+    '</tr>'
   ).join('');
 }
 
@@ -2385,13 +2407,25 @@ const ALL_PERMS=[
   {key:'handover',label:'تسليم أصل'},{key:'maintenance',label:'صيانة'},{key:'dispose',label:'إتلاف'},
   {key:'users',label:'إدارة المستخدمين'},{key:'return',label:'استرداد أصل'},{key:'customers',label:'العملاء'},
   {key:'settings',label:'الإعدادات'},
-  {key:'custody',label:'عهدة — اطلاع فقط'},
-  {key:'custody_add',label:'عهدة — إضافة'},
-  {key:'custody_edit',label:'عهدة — تعديل'},
-  {key:'custody_approve',label:'عهدة — موافقة / رفض'},
-  {key:'custody_print',label:'عهدة — طباعة'},
+  // عهدة الأصول
+  {key:'custody',label:'عهدة الأصول — اطلاع فقط'},
+  {key:'custody_add',label:'عهدة الأصول — إضافة'},
+  {key:'custody_edit',label:'عهدة الأصول — تعديل / حذف'},
+  {key:'custody_approve',label:'عهدة الأصول — موافقة / رفض'},
+  {key:'custody_print',label:'عهدة الأصول — طباعة'},
+  // عهدة الإدارات
+  {key:'dept_custody',label:'عهدة الإدارات — اطلاع فقط'},
+  {key:'dept_custody_add',label:'عهدة الإدارات — إضافة'},
+  {key:'dept_custody_edit',label:'عهدة الإدارات — تعديل / حذف'},
+  {key:'dept_custody_approve',label:'عهدة الإدارات — موافقة / رفض'},
+  {key:'dept_custody_print',label:'عهدة الإدارات — طباعة'},
 ];
-const PERM_LABELS={view:'عرض',add:'إضافة',edit:'تعديل',handover:'تسليم',maintenance:'صيانة',dispose:'إتلاف',users:'مستخدمون',return:'استرداد',customers:'العملاء',settings:'الإعدادات',custody:'عهدة-اطلاع',custody_add:'عهدة-إضافة',custody_edit:'عهدة-تعديل',custody_approve:'عهدة-موافقة',custody_print:'عهدة-طباعة'};
+const PERM_LABELS={
+  view:'عرض',add:'إضافة',edit:'تعديل',handover:'تسليم',maintenance:'صيانة',dispose:'إتلاف',
+  users:'مستخدمون',return:'استرداد',customers:'العملاء',settings:'الإعدادات',
+  custody:'عهدة أصول-اطلاع',custody_add:'عهدة أصول-إضافة',custody_edit:'عهدة أصول-تعديل',custody_approve:'عهدة أصول-موافقة',custody_print:'عهدة أصول-طباعة',
+  dept_custody:'عهدة إدارات-اطلاع',dept_custody_add:'عهدة إدارات-إضافة',dept_custody_edit:'عهدة إدارات-تعديل',dept_custody_approve:'عهدة إدارات-موافقة',dept_custody_print:'عهدة إدارات-طباعة',
+};
 
 function renderUsers() {
   if (!document.getElementById('users-body')) return;
@@ -2445,17 +2479,25 @@ function userFormHTML(u) {
     '</div>'+
     '<div class="form-section">الصلاحيات</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">'+
-    ALL_PERMS.filter(p=>!p.key.startsWith('custody_')).map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:var(--bg);cursor:pointer;border:1px solid var(--border)">'+
+    ALL_PERMS.filter(p=>!p.key.startsWith('custody')&&!p.key.startsWith('dept_custody')).map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:var(--bg);cursor:pointer;border:1px solid var(--border)">'+
       '<input type="checkbox" name="perm" value="'+p.key+'" '+(u&&(u.perms||[]).includes(p.key)?'checked':'')+' style="width:15px;height:15px;accent-color:var(--blue)">'+
       '<span style="font-size:13px">'+p.label+'</span></label>'
     ).join('')+
     '</div>'+
-    '<div style="background:var(--purple-bg);border:1px solid #C0A0E0;border-radius:var(--radius);padding:12px;margin-bottom:10px">'+
-    '<div style="font-size:12px;font-weight:700;color:var(--purple);margin-bottom:8px"><i class="ti ti-file-invoice"></i> صلاحيات العهدة</div>'+
+    '<div style="background:var(--purple-bg);border:1px solid #C0A0E0;border-radius:var(--radius);padding:12px;margin-bottom:8px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--purple);margin-bottom:8px"><i class="ti ti-file-invoice"></i> صلاحيات عهدة الأصول</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+
     ALL_PERMS.filter(p=>p.key==='custody'||p.key.startsWith('custody_')).map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:rgba(255,255,255,.6);cursor:pointer;border:1px solid #C0A0E0">'+
       '<input type="checkbox" name="perm" value="'+p.key+'" '+(u&&(u.perms||[]).includes(p.key)?'checked':'')+' style="width:15px;height:15px;accent-color:var(--purple)">'+
-      '<span style="font-size:13px;color:var(--purple)">'+p.label+'</span></label>'
+      '<span style="font-size:13px;color:var(--purple)">'+p.label.replace('عهدة الأصول — ','')+'</span></label>'
+    ).join('')+
+    '</div></div>'+
+    '<div style="background:var(--teal-bg);border:1px solid #80CCC0;border-radius:var(--radius);padding:12px;margin-bottom:10px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--teal);margin-bottom:8px"><i class="ti ti-building"></i> صلاحيات عهدة الإدارات</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+
+    ALL_PERMS.filter(p=>p.key.startsWith('dept_custody')).map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:rgba(255,255,255,.6);cursor:pointer;border:1px solid #80CCC0">'+
+      '<input type="checkbox" name="perm" value="'+p.key+'" '+(u&&(u.perms||[]).includes(p.key)?'checked':'')+' style="width:15px;height:15px;accent-color:var(--teal)">'+
+      '<span style="font-size:13px;color:var(--teal)">'+p.label.replace('عهدة الإدارات — ','')+'</span></label>'
     ).join('')+
     '</div></div>'+
     '<div style="display:flex;gap:6px">'+
@@ -2466,11 +2508,15 @@ function userFormHTML(u) {
 }
 function setPresetPerms(p) {
   const pre={
-    admin:['view','add','edit','handover','dispose','maintenance','users','return','customers','custody','custody_add','custody_edit','custody_approve','custody_print','settings'],
-    manager:['view','add','edit','handover','dispose','maintenance','return','customers','custody','custody_add','custody_approve','custody_print'],
-    viewer:['view','custody','custody_print']
+    admin:['view','add','edit','handover','dispose','maintenance','users','return','customers','settings',
+           'custody','custody_add','custody_edit','custody_approve','custody_print',
+           'dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print'],
+    manager:['view','add','edit','handover','dispose','maintenance','return','customers',
+             'custody','custody_add','custody_approve','custody_print',
+             'dept_custody','dept_custody_add','dept_custody_approve','dept_custody_print'],
+    viewer:['view','custody','custody_print','dept_custody','dept_custody_print']
   };
-  document.querySelectorAll('input[name="perm"]').forEach(c=>c.checked=pre[p]?.includes(c.value));
+  document.querySelectorAll('input[name="perm"]').forEach(c=>c.checked=(pre[p]||[]).includes(c.value));
 }
 function getFormUser() {
   const name=document.getElementById('u-name').value.trim();
@@ -2837,6 +2883,9 @@ function getDeptCustodyRequests() { return window.deptCustodyRequests||[]; }
 
 function renderDeptCustody() {
   if (typeof filterDeptCustody==='function') filterDeptCustody(); else _renderDeptCustodyRows(getDeptCustodyRequests());
+  // show/hide add button based on permission
+  const addBtn = document.getElementById('dept-custody-add-btn');
+  if (addBtn) addBtn.style.display = (can('dept_custody_add')||can('edit')) ? '' : 'none';
 }
 function filterDeptCustody() {
   const q=(document.getElementById('dept-custody-search')?.value||'').toLowerCase();
@@ -2865,14 +2914,15 @@ function _renderDeptCustodyRows(list) {
       '<td style="font-size:12px;max-width:140px">'+(c.purpose||'-')+'</td>'+
       '<td>'+sb+'</td>'+
       '<td style="white-space:nowrap">'+
-        '<button class="btn-action info" onclick="printDeptCustodyForm(\''+c._id+'\')"><i class="ti ti-printer"></i></button>'+
-        (can('edit')?'<button class="btn-action success" onclick="approveDeptCustody(\''+c._id+'\',\'معتمد\')"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveDeptCustody(\''+c._id+'\',\'مرفوض\')"><i class="ti ti-x"></i></button>':'')+
-        '<button class="btn-action danger" onclick="deleteDeptCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>'+
+        (can('dept_custody_print')||can('dept_custody')?'<button class="btn-action info" onclick="printDeptCustodyForm(\''+c._id+'\')"><i class="ti ti-printer"></i></button>':'')+
+        (can('dept_custody_approve')||can('edit')?'<button class="btn-action success" onclick="approveDeptCustody(\''+c._id+'\',\'معتمد\')" title="اعتماد"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveDeptCustody(\''+c._id+'\',\'مرفوض\')" title="رفض"><i class="ti ti-x"></i></button>':'')+
+        (can('dept_custody_edit')||can('edit')?'<button class="btn-action danger" onclick="deleteDeptCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>':'')+
       '</td></tr>';
   }).join('');
 }
 
 function openNewDeptCustody() {
+  if (!can('dept_custody_add')&&!can('edit')) { showToast('ليس لديك صلاحية إضافة طلب عهدة إدارات','error'); return; }
   const today=new Date().toISOString().split('T')[0];
   document.getElementById('modal-title').innerHTML='<i class="ti ti-building"></i> طلب عهدة إدارة جديد';
   document.getElementById('modal-body').innerHTML=
@@ -3165,20 +3215,20 @@ function printReport(pageId) {
     content='<table border="0" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="'+hs+'">النوع</th><th style="'+hs+'">النوع الفرعي</th><th style="'+hs+'">الإجمالي</th><th style="'+hs+'">متاح</th><th style="'+hs+'">عند عميل</th><th style="'+hs+'">صيانة</th><th style="'+hs+'">تالف</th><th style="'+hs+'">نسبة الإتاحة</th></tr></thead><tbody>'+rows+'</tbody></table>';
   } else if (pageId==='handover') {
     title='تقرير عمليات التسليم';
-    content=tbl(['#','الأصل','النوع الفرعي','العدد','العميل','السجل التجاري','الجوال','العنوان','المسؤول','التاريخ','الحالة'],
-      getHandovers().map((h,i)=>'<tr><td style="'+ts+';text-align:center">'+(i+1)+'</td><td style="'+ts+'">'+h.assetName+'</td><td style="'+ts+'">'+(h.assetSubType||'-')+'</td><td style="'+ts+';text-align:center">'+h.qty+'</td><td style="'+ts+'">'+h.clientName+'</td><td style="'+ts+'">'+(h.crNumber||'-')+'</td><td style="'+ts+'">'+(h.phone1||'-')+'</td><td style="'+ts+'">'+(h.clientAddress||'-')+'</td><td style="'+ts+'">'+h.responsible+'</td><td style="'+ts+'">'+h.date+'</td><td style="'+ts+'">'+h.status+'</td></tr>').join(''));
+    content=tbl(['#','الأصل','النوع الفرعي','العدد','العميل','السجل التجاري','الجوال','العنوان','المسؤول','التاريخ','الحالة','الإجراءات / الشروط'],
+      getHandovers().map((h,i)=>'<tr><td style="'+ts+';text-align:center">'+(i+1)+'</td><td style="'+ts+'">'+h.assetName+'</td><td style="'+ts+'">'+(h.assetSubType||'-')+'</td><td style="'+ts+';text-align:center">'+h.qty+'</td><td style="'+ts+'">'+h.clientName+'</td><td style="'+ts+'">'+(h.crNumber||'-')+'</td><td style="'+ts+'">'+(h.phone1||'-')+'</td><td style="'+ts+'">'+(h.clientAddress||'-')+'</td><td style="'+ts+'">'+h.responsible+'</td><td style="'+ts+'">'+h.date+'</td><td style="'+ts+'">'+h.status+'</td><td style="'+ts+';color:#B45309">'+(h.actions||'—')+'</td></tr>').join(''));
   } else if (pageId==='returns') {
     title='تقرير عمليات الاسترداد';
-    content=tbl(['#','الأصل','العدد','العميل','سبب الاسترداد','الحالة بعد الاسترداد','المسجِّل','التاريخ'],
-      getReturns().map((r,i)=>'<tr><td style="'+ts+';text-align:center">'+(i+1)+'</td><td style="'+ts+'">'+r.assetName+'</td><td style="'+ts+';text-align:center">'+r.qty+'</td><td style="'+ts+'">'+r.clientName+'</td><td style="'+ts+'">'+(r.reason||'-')+'</td><td style="'+ts+'">'+(r.conditionAfterReturn||'-')+'</td><td style="'+ts+'">'+(r.recordedBy||'-')+'</td><td style="'+ts+'">'+(r.date||'-')+'</td></tr>').join(''));
+    content=tbl(['#','الأصل','العدد','العميل','سبب الاسترداد','الحالة بعد الاسترداد','الإجراءات','المسجِّل','التاريخ'],
+      getReturns().map((r,i)=>'<tr><td style="'+ts+';text-align:center">'+(i+1)+'</td><td style="'+ts+'">'+r.assetName+'</td><td style="'+ts+';text-align:center">'+r.qty+'</td><td style="'+ts+'">'+r.clientName+'</td><td style="'+ts+'">'+(r.reason||'-')+'</td><td style="'+ts+'">'+(r.conditionAfterReturn||'-')+'</td><td style="'+ts+';color:#0D7377">'+(r.actions||'—')+'</td><td style="'+ts+'">'+(r.recordedBy||'-')+'</td><td style="'+ts+'">'+(r.date||'-')+'</td></tr>').join(''));
   } else if (pageId==='maintenance') {
     title='تقرير الصيانة';
-    content=tbl(['#','الأصل','العدد','جهة الصيانة','وصف العطل','التاريخ','الحالة'],
-      getMaintenances().map((m,i)=>'<tr><td style="'+ts+';text-align:center">'+(i+1)+'</td><td style="'+ts+'">'+m.assetName+'</td><td style="'+ts+';text-align:center">'+m.qty+'</td><td style="'+ts+'">'+m.vendor+'</td><td style="'+ts+'">'+m.fault+'</td><td style="'+ts+'">'+m.date+'</td><td style="'+ts+'">'+m.status+'</td></tr>').join(''));
+    content=tbl(['#','الأصل','العدد','جهة الصيانة','وصف العطل','الإجراءات المطلوبة','التاريخ','الحالة'],
+      getMaintenances().map((m,i)=>'<tr><td style="'+ts+';text-align:center">'+(i+1)+'</td><td style="'+ts+'">'+m.assetName+'</td><td style="'+ts+';text-align:center">'+m.qty+'</td><td style="'+ts+'">'+m.vendor+'</td><td style="'+ts+'">'+m.fault+'</td><td style="'+ts+';color:#5B2D8E">'+(m.actions||'—')+'</td><td style="'+ts+'">'+m.date+'</td><td style="'+ts+'">'+m.status+'</td></tr>').join(''));
   } else if (pageId==='dispose') {
     title='تقرير الإتلاف';
-    content=tbl(['#','الأصل','الكمية','السبب','المعتمد من','التاريخ'],
-      getDisposes().map((d,i)=>'<tr><td style="'+ts+';text-align:center">'+(i+1)+'</td><td style="'+ts+'">'+d.assetName+'</td><td style="'+ts+';text-align:center;color:#C62828;font-weight:bold">'+d.qty+'</td><td style="'+ts+'">'+d.reason+'</td><td style="'+ts+'">'+d.approved+'</td><td style="'+ts+'">'+d.date+'</td></tr>').join(''));
+    content=tbl(['#','الأصل','الكمية','السبب','الإجراءات','المعتمد من','التاريخ'],
+      getDisposes().map((d,i)=>'<tr><td style="'+ts+';text-align:center">'+(i+1)+'</td><td style="'+ts+'">'+d.assetName+'</td><td style="'+ts+';text-align:center;color:#C62828;font-weight:bold">'+d.qty+'</td><td style="'+ts+'">'+d.reason+'</td><td style="'+ts+';color:#C62828">'+(d.actions||'—')+'</td><td style="'+ts+'">'+d.approved+'</td><td style="'+ts+'">'+d.date+'</td></tr>').join(''));
   } else if (pageId==='customers') {
     title='تقرير العملاء';
     content=tbl(['#','الاسم','السجل التجاري','الجوال','العنوان','المدينة','الأصول الحالية','تاريخ الإضافة'],
