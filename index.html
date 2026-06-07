@@ -334,9 +334,11 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="nav-item" onclick="showPage('maintenance',this)" data-page="maintenance"><i class="ti ti-tool"></i> الصيانة</div>
       <div class="nav-item" onclick="showPage('dispose',this)" data-page="dispose"><i class="ti ti-trash"></i> الإتلاف</div>
       <div class="nav-item" id="nav-custody" onclick="showPage('custody',this)" data-page="custody"><i class="ti ti-file-invoice"></i> طلبات العهدة</div>
+      <div class="nav-item" id="nav-dept-custody" onclick="showPage('dept-custody',this)" data-page="dept-custody"><i class="ti ti-building"></i> عهدة الإدارات</div>
       <div class="nav-section">الإدارة</div>
       <div class="nav-item" onclick="showPage('types',this)" data-page="types"><i class="ti ti-tags"></i> أنواع الأصول</div>
       <div class="nav-item" onclick="showPage('reports',this)" data-page="reports"><i class="ti ti-chart-bar"></i> التقارير</div>
+      <div class="nav-item" onclick="showPage('asset-history',this)" data-page="asset-history"><i class="ti ti-history"></i> سجل الأصل</div>
       <div class="nav-item" id="nav-users" onclick="showPage('users',this)" data-page="users"><i class="ti ti-user-shield"></i> المستخدمون</div>
       <div class="nav-item" id="nav-settings" onclick="showPage('settings',this)" data-page="settings"><i class="ti ti-settings"></i> الإعدادات</div>
     </div>
@@ -594,6 +596,33 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
         </div>
       </div>
 
+      <!-- Asset History -->
+      <div class="page" id="page-asset-history">
+        <div class="page-title">
+          <span><i class="ti ti-history"></i> سجل تاريخ الأصل</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="report-page-btn" onclick="printAssetHistory()"><i class="ti ti-printer"></i> طباعة السجل</button>
+          </div>
+        </div>
+        <div class="table-card" style="padding:20px;margin-bottom:16px">
+          <div style="font-size:14px;font-weight:700;margin-bottom:14px;color:var(--blue)">البحث عن أصل بالباركود أو الاسم</div>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+            <div class="field" style="margin:0;flex:1;min-width:200px">
+              <label>الباركود / كود الأصل</label>
+              <input type="text" id="history-barcode" placeholder="مثال: FR-123456" oninput="searchAssetHistory()">
+            </div>
+            <div class="field" style="margin:0;flex:2;min-width:200px">
+              <label>اسم الأصل</label>
+              <select id="history-asset-select" onchange="loadAssetHistoryById(this.value)">
+                <option value="">-- اختر من القائمة --</option>
+              </select>
+            </div>
+            <button class="add-btn" style="height:38px" onclick="searchAssetHistory()"><i class="ti ti-search"></i> بحث</button>
+          </div>
+        </div>
+        <div id="asset-history-result"></div>
+      </div>
+
       <!-- Custody -->
       <div class="page" id="page-custody">
         <div class="page-title">
@@ -617,6 +646,44 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
           <table>
             <thead><tr><th>#</th><th>التاريخ</th><th>طالب العهدة</th><th>الأصل</th><th>الحالة</th><th>الغرض</th><th>حالة الطلب</th><th>إجراءات</th></tr></thead>
             <tbody id="custody-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Dept Custody -->
+      <div class="page" id="page-dept-custody">
+        <div class="page-title">
+          <span><i class="ti ti-building"></i> عهدة الإدارات</span>
+          <div style="display:flex;gap:8px">
+            <button class="add-btn" onclick="openNewDeptCustody()"><i class="ti ti-plus"></i> طلب عهدة جديد</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar">
+            <div class="toolbar-left">
+              <div class="search-box"><i class="ti ti-search" style="font-size:14px;color:var(--text3)"></i><input type="text" id="dept-custody-search" placeholder="بحث..." oninput="filterDeptCustody()"></div>
+              <select class="filter-select" id="dept-custody-filter-dept" onchange="filterDeptCustody()">
+                <option value="">جميع الإدارات</option>
+                <option value="الإدارة المالية">الإدارة المالية</option>
+                <option value="المبيعات">المبيعات</option>
+                <option value="الخدمات المساندة">الخدمات المساندة</option>
+                <option value="الموارد البشرية">الموارد البشرية</option>
+                <option value="تقنية المعلومات">تقنية المعلومات</option>
+                <option value="المشتريات">المشتريات</option>
+                <option value="العمليات">العمليات</option>
+                <option value="أخرى">أخرى</option>
+              </select>
+              <select class="filter-select" id="dept-custody-filter-status" onchange="filterDeptCustody()">
+                <option value="">جميع الحالات</option>
+                <option value="قيد المراجعة">قيد المراجعة</option>
+                <option value="معتمد">معتمد</option>
+                <option value="مرفوض">مرفوض</option>
+              </select>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>الرقم</th><th>التاريخ</th><th>الإدارة</th><th>الطالب</th><th>الصنف / الوصف</th><th>الكمية</th><th>الغرض</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <tbody id="dept-custody-body"></tbody>
           </table>
         </div>
       </div>
@@ -790,7 +857,7 @@ async function initDefaultData() {
 }
 
 async function loadAllData() {
-  const [usersSnap,typesSnap,subTypesSnap,attrSnap,assetsSnap,handoversSnap,maintsSnap,disposesSnap,custodySnap,customersSnap,returnsSnap,settingsSnap] = await Promise.all([
+  const [usersSnap,typesSnap,subTypesSnap,attrSnap,assetsSnap,handoversSnap,maintsSnap,disposesSnap,custodySnap,customersSnap,returnsSnap,settingsSnap,deptCustodySnap] = await Promise.all([
     getDocs(collection(db,"users")),
     getDocs(collection(db,"assetTypes")),
     getDocs(collection(db,"assetSubTypes")),
@@ -803,6 +870,7 @@ async function loadAllData() {
     getDocs(collection(db,"customers")),
     getDocs(collection(db,"returns")),
     getDocs(collection(db,"settings")),
+    getDocs(collection(db,"deptCustodyRequests")),
   ]);
   window.users = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   console.log('✅ Users loaded from Firebase:', window.users.length, window.users.map(u=>u.username));
@@ -816,6 +884,7 @@ async function loadAllData() {
   window.custodyRequests = custodySnap.docs.map(d=>({...d.data(),_id:d.id}));
   window.customers = customersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   window.returns = returnsSnap.docs.map(d=>({...d.data(),_id:d.id}));
+  window.deptCustodyRequests = deptCustodySnap.docs.map(d=>({...d.data(),_id:d.id}));
   // Load settings
   if (!settingsSnap.empty) {
     const s = settingsSnap.docs[0].data();
@@ -837,6 +906,37 @@ try {
   await loadAllData();
   window._dataReady = true;
   console.log("✅ All data loaded. Users:", window.users?.length);
+
+  // Auto-restore session from localStorage
+  try {
+    const saved = localStorage.getItem('_assetSession');
+    if (saved) {
+      const sess = JSON.parse(saved);
+      const fresh = (window.users||[]).find(u=>u._id===sess._id);
+      if (fresh) {
+        currentUser = fresh;
+        document.getElementById('login-screen').style.display='none';
+        document.getElementById('app-shell').classList.remove('hidden');
+        document.getElementById('header-avatar').textContent = fresh.name.split(' ').map(w=>w[0]).join('').slice(0,2);
+        const nameEl = document.getElementById('header-name');
+        if (nameEl) nameEl.textContent = fresh.name;
+        document.getElementById('header-role').textContent = fresh.role;
+        if (!fresh.perms.includes('users')) document.getElementById('nav-users').style.display='none';
+        const custodyNav = document.getElementById('nav-custody');
+        if (custodyNav) custodyNav.style.display = fresh.perms.includes('custody') ? '' : 'none';
+        const deptCustodyNav = document.getElementById('nav-dept-custody');
+        if (deptCustodyNav) deptCustodyNav.style.display = fresh.perms.includes('custody') ? '' : 'none';
+        const settingsNav = document.getElementById('nav-settings');
+        if (settingsNav) settingsNav.style.display = fresh.perms.includes('settings') ? '' : 'none';
+        populateTypeFilters();
+        renderAll();
+        console.log("✅ Session restored for:", fresh.name);
+      } else {
+        localStorage.removeItem('_assetSession');
+      }
+    }
+  } catch(e) { console.warn('Session restore:', e); }
+
   // Update login hint to show ready
   const hint = document.getElementById('login-hint');
   if (hint && hint.textContent.includes('جارٍ')) {
@@ -976,6 +1076,8 @@ async function doLogin() {
     }
 
     currentUser = found;
+    // Save session to localStorage for auto-login on refresh
+    try { localStorage.setItem('_assetSession', JSON.stringify({_id:found._id, username:found.username, name:found.name, role:found.role, perms:found.perms})); } catch(e) {}
     document.getElementById('login-error').style.display='none';
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app-shell').classList.remove('hidden');
@@ -995,6 +1097,8 @@ async function doLogin() {
     if (!found.perms.includes('users')) document.getElementById('nav-users').style.display='none';
     const custodyNav = document.getElementById('nav-custody');
     if (custodyNav) custodyNav.style.display = found.perms.includes('custody') ? '' : 'none';
+    const deptCustodyNav = document.getElementById('nav-dept-custody');
+    if (deptCustodyNav) deptCustodyNav.style.display = found.perms.includes('custody') ? '' : 'none';
     const settingsNav = document.getElementById('nav-settings');
     if (settingsNav) settingsNav.style.display = found.perms.includes('settings') ? '' : 'none';
     const addBtn = document.getElementById('add-asset-btn');
@@ -1011,6 +1115,7 @@ async function doLogin() {
 
 function doLogout() {
   currentUser = null;
+  try { localStorage.removeItem('_assetSession'); } catch(e) {}
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('app-shell').classList.add('hidden');
 }
@@ -1125,6 +1230,8 @@ function renderAll() {
   try { renderCustody(); } catch(e) { console.warn('renderCustody:', e.message); }
   try { renderCustomers(); } catch(e) { console.warn('renderCustomers:', e.message); }
   try { renderReturns(); } catch(e) { console.warn('renderReturns:', e.message); }
+  try { populateHistoryAssetSelect(); } catch(e) { console.warn('populateHistoryAssetSelect:', e.message); }
+  try { renderDeptCustody(); } catch(e) { console.warn('renderDeptCustody:', e.message); }
 }
 
 /* ────────── STATUS BADGE ────────── */
@@ -1207,7 +1314,7 @@ function renderAssetRows(list) {
     '<tr>'+
     '<td>'+(a.imageUrl?'<img src="'+a.imageUrl+'" class="asset-img" onclick="viewAssetImage(\''+a._id+'\')">':'<div class="asset-img-placeholder"><i class="ti ti-photo"></i></div>')+'</td>'+
     '<td><code class="tag">'+a.code+'</code></td>'+
-    '<td style="font-weight:600">'+a.name+(a.manufacturer?'<div style="font-size:10px;color:var(--text3)">'+a.manufacturer+'</div>':'')+'</td>'+
+    '<td style="font-weight:600">'+a.name+(a.manufacturer?'<div style="font-size:10px;color:var(--text3)">'+a.manufacturer+'</div>':'')+'<div style="font-size:10px;color:var(--text3);margin-top:2px"><i class="ti ti-barcode" style="font-size:9px"></i> '+a.code+'</div></td>'+
     '<td><span class="badge badge-blue">'+a.type+'</span></td>'+
     '<td>'+(a.subType?'<span class="badge badge-gray">'+a.subType+'</span>':'-')+(a.capacity?'<div style="font-size:10px;color:var(--text3)">'+a.capacity+'</div>':'')+'</td>'+
     '<td style="font-weight:700;text-align:center">'+a.totalQty+'</td>'+
@@ -1710,8 +1817,8 @@ function openHandoverModal(preAssetId) {
   const availAssets = getAssets().filter(a=>a.availableQty>0);
   if (!availAssets.length) { showToast('لا توجد أصول متاحة','error'); return; }
   const assetOpts = availAssets.map(a=>
-    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+' data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'">'+
-    a.name+(a.subType?' ('+a.subType+')':'')+' - متاح: '+a.availableQty+'</option>'
+    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+' data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-code="'+(a.code||'')+'">'+
+    a.name+' ['+(a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' - متاح: '+a.availableQty+'</option>'
   ).join('');
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('modal-title').innerHTML = '<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم أصل لعميل';
@@ -1757,8 +1864,9 @@ function onHandoverAssetChange() {
   const det = document.getElementById('h-asset-details');
   if (det && opt.value) {
     const subs = [opt.dataset.subtype, opt.dataset.mfg].filter(Boolean);
-    det.innerHTML = subs.map(s=>'<span class="badge badge-gray" style="margin:2px">'+s+'</span>').join('');
-    det.style.display = subs.length ? 'block' : 'none';
+    const code = opt.dataset.code||'';
+    det.innerHTML = (code?'<span class="badge badge-blue" style="margin:2px"><i class="ti ti-barcode"></i> '+code+'</span>':'') + subs.map(s=>'<span class="badge badge-gray" style="margin:2px">'+s+'</span>').join('');
+    det.style.display = (subs.length||code) ? 'block' : 'none';
   }
 }
 
@@ -1787,7 +1895,7 @@ async function saveHandover() {
     const newAvail=a.availableQty-qty, newClient=a.clientQty+qty;
     await upd(docRef(window.db,"assets",a._id),{availableQty:newAvail,clientQty:newClient,status:newAvail===0&&newClient>0?'عند عميل':a.status});
     await add(col(window.db,"handovers"),{
-      assetId, assetName:a.name, assetType:a.type, assetSubType:a.subType||'',
+      assetId, assetName:a.name, assetCode:a.code||'', assetType:a.type, assetSubType:a.subType||'',
       qty, clientName, clientId:customerId,
       clientAddress:document.getElementById('h-address').value,
       crNumber:document.getElementById('h-cr').value,
@@ -1841,7 +1949,7 @@ function openReturnFromHandover(hid) { openReturnModal(hid); }
 function openReturnModal(hid) {
   const activeHandovers = getHandovers().filter(h=>h.status==='مُسلَّم');
   if (!activeHandovers.length) { showToast('لا توجد أصول مسلَّمة','error'); return; }
-  const hopts = activeHandovers.map(h=>'<option value="'+h._id+'" '+(h._id===hid?'selected':'')+'>'+h.assetName+' - '+h.clientName+' ('+h.qty+' وحدة)</option>').join('');
+  const hopts = activeHandovers.map(h=>'<option value="'+h._id+'" '+(h._id===hid?'selected':'')+'>'+h.assetName+' ['+(h.assetCode||'')+']'+' - '+h.clientName+' ('+h.qty+' وحدة)</option>').join('');
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('modal-title').innerHTML = '<i class="ti ti-corner-up-left" style="color:var(--teal)"></i> استرداد أصل من عميل';
   document.getElementById('modal-body').innerHTML =
@@ -1930,6 +2038,30 @@ async function saveReturn() {
       createdAt:new Date().toISOString()
     });
     showToast('تم تسجيل الاسترداد','success');
+    // Auto-create maintenance or dispose request based on return reason
+    if (condition === 'صيانة' || reason === 'صيانة') {
+      await add(col(window.db,"maintenances"),{
+        assetId:a._id, assetName:a.name, qty,
+        vendor:'بانتظار التحديد',
+        fault:'تم إنشاؤه تلقائياً من طلب الاسترداد - '+reason,
+        date:document.getElementById('ret-date').value,
+        notes:'مرتبط باسترداد من العميل: '+(h.clientName||'')+'. '+( document.getElementById('ret-notes').value||''),
+        status:'قيد الصيانة',
+        returnId:hid,
+        autoCreated:true
+      });
+      showToast('تم إنشاء طلب صيانة تلقائي مرتبط بالاسترداد','success');
+    } else if (condition === 'تالف' || reason === 'تالفة') {
+      await add(col(window.db,"disposes"),{
+        assetId:a._id, assetName:a.name, qty,
+        reason:'تالف - مسترد من العميل: '+(h.clientName||'')+'. '+reason,
+        approved:currentUser.name,
+        date:document.getElementById('ret-date').value,
+        returnId:hid,
+        autoCreated:true
+      });
+      showToast('تم إنشاء طلب إتلاف تلقائي مرتبط بالاسترداد','success');
+    }
     closeModal(); await window.reloadData();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
@@ -1959,7 +2091,7 @@ function openMaintenanceFromAsset(id) { if (!can('maintenance')) return; openMai
 function openMaintenanceModal(preAssetId) {
   const availAssets = getAssets().filter(a=>a.availableQty>0);
   if (!availAssets.length) { showToast('لا توجد أصول متاحة','error'); return; }
-  const assetOpts = availAssets.map(a=>'<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+'>'+a.name+(a.subType?' ('+a.subType+')':'')+'  متاح: '+a.availableQty+'</option>').join('');
+  const assetOpts = availAssets.map(a=>'<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+'>'+a.name+' ['+(a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+'  متاح: '+a.availableQty+'</option>').join('');
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('modal-title').innerHTML = '<i class="ti ti-tool" style="color:var(--amber)"></i> تحويل لصيانة';
   document.getElementById('modal-body').innerHTML =
@@ -2005,7 +2137,7 @@ function renderMaintenances() {
   const list = getMaintenances();
   if (!list.length) { document.getElementById('maintenance-body').innerHTML='<tr><td colspan="8" class="empty-row">لا توجد أصول في الصيانة</td></tr>'; return; }
   document.getElementById('maintenance-body').innerHTML = list.map((m,i)=>
-    '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+m.assetName+'</td><td style="text-align:center;font-weight:700">'+m.qty+'</td><td>'+m.vendor+'</td><td style="font-size:12px;color:var(--text2)">'+m.fault+'</td><td style="font-size:12px">'+m.date+'</td><td>'+statusBadge(m.status,m.assetId)+'</td>'+
+    '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+m.assetName+(m.autoCreated?'<div style="font-size:10px;color:var(--teal)"><i class="ti ti-link"></i> مرتبط باسترداد</div>':'')+'</td><td style="text-align:center;font-weight:700">'+m.qty+'</td><td>'+m.vendor+'</td><td style="font-size:12px;color:var(--text2)">'+m.fault+'</td><td style="font-size:12px">'+m.date+'</td><td>'+statusBadge(m.status,m.assetId)+'</td>'+
     '<td>'+(m.status==='قيد الصيانة'?'<button class="btn-action success" onclick="returnFromMaintenance(\''+m._id+'\')"><i class="ti ti-corner-up-left"></i> إعادة</button>':'')+'</td></tr>'
   ).join('');
 }
@@ -2031,7 +2163,7 @@ function openDisposeFromAsset(id) { if (!can('dispose')) return; openDisposeModa
 function openDisposeModal(preAssetId) {
   const valid = getAssets().filter(a=>a.totalQty>0);
   if (!valid.length) { showToast('لا توجد أصول','error'); return; }
-  const opts = valid.map(a=>'<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+'>'+a.name+' (متاح: '+a.availableQty+'، تالف: '+a.damagedQty+')</option>').join('');
+  const opts = valid.map(a=>'<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+'>'+a.name+' ['+(a.code||'')+']'+' (متاح: '+a.availableQty+'، تالف: '+a.damagedQty+')</option>').join('');
   const today=new Date().toISOString().split('T')[0];
   document.getElementById('modal-title').innerHTML = '<i class="ti ti-trash" style="color:var(--red)"></i> إتلاف أصل';
   document.getElementById('modal-body').innerHTML =
@@ -2080,7 +2212,7 @@ function renderDisposes() {
   const list = getDisposes();
   if (!list.length) { document.getElementById('dispose-body').innerHTML='<tr><td colspan="6" class="empty-row">لا توجد أصول متلفة</td></tr>'; return; }
   document.getElementById('dispose-body').innerHTML = list.map((d,i)=>
-    '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+d.assetName+'</td><td style="text-align:center;font-weight:700;color:var(--red)">'+d.qty+'</td><td style="font-size:12px">'+d.reason+'</td><td>'+d.approved+'</td><td style="font-size:12px">'+d.date+'</td></tr>'
+    '<tr><td style="color:var(--text3)">'+(i+1)+'</td><td style="font-weight:600">'+d.assetName+(d.autoCreated?'<div style="font-size:10px;color:var(--teal)"><i class="ti ti-link"></i> مرتبط باسترداد</div>':'')+'</td><td style="text-align:center;font-weight:700;color:var(--red)">'+d.qty+'</td><td style="font-size:12px">'+d.reason+'</td><td>'+d.approved+'</td><td style="font-size:12px">'+d.date+'</td></tr>'
   ).join('');
 }
 
@@ -2356,6 +2488,156 @@ async function deleteUser(id) {
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
 
+/* ────────── ASSET HISTORY ────────── */
+function populateHistoryAssetSelect() {
+  const sel = document.getElementById('history-asset-select');
+  if (!sel) return;
+  const assets = getAssets();
+  sel.innerHTML = '<option value="">-- اختر من القائمة --</option>' +
+    assets.map(a=>'<option value="'+a._id+'">'+a.name+' ['+a.code+']</option>').join('');
+}
+
+function searchAssetHistory() {
+  const barcode = (document.getElementById('history-barcode')?.value||'').trim().toLowerCase();
+  if (!barcode) { populateHistoryAssetSelect(); return; }
+  const assets = getAssets();
+  const found = assets.find(a=>(a.code||'').toLowerCase()===barcode||(a.barcode||'').toLowerCase()===barcode);
+  if (found) { loadAssetHistoryById(found._id); }
+  else {
+    // fuzzy: search by name too
+    const fuzzy = assets.filter(a=>(a.code||'').toLowerCase().includes(barcode)||(a.name||'').toLowerCase().includes(barcode));
+    if (fuzzy.length===1) { loadAssetHistoryById(fuzzy[0]._id); }
+    else if (fuzzy.length>1) {
+      const sel=document.getElementById('history-asset-select');
+      if(sel){sel.innerHTML='<option value="">-- اختر من النتائج --</option>'+fuzzy.map(a=>'<option value="'+a._id+'">'+a.name+' ['+a.code+']</option>').join('');sel.size=Math.min(fuzzy.length+1,8);}
+      document.getElementById('asset-history-result').innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> وُجد '+fuzzy.length+' نتائج، اختر من القائمة أعلاه</div>';
+    } else {
+      document.getElementById('asset-history-result').innerHTML='<div class="alert alert-warning"><i class="ti ti-alert-circle"></i> لم يُوجد أصل بهذا الباركود أو الاسم</div>';
+    }
+  }
+}
+
+let _currentHistoryAssetId = null;
+function loadAssetHistoryById(assetId) {
+  if (!assetId) return;
+  _currentHistoryAssetId = assetId;
+  const a = getAssets().find(x=>x._id===assetId);
+  if (!a) return;
+  const handovers = getHandovers().filter(h=>h.assetId===assetId);
+  const returns = getReturns().filter(r=>r.assetId===assetId);
+  const maintenances = getMaintenances().filter(m=>m.assetId===assetId);
+  const disposes = getDisposes().filter(d=>d.assetId===assetId);
+  const custody = (window.custodyRequests||[]).filter(c=>c.assetId===assetId);
+
+  // Build unified timeline
+  let events = [];
+  events.push({type:'إضافة',icon:'ti-plus',color:'var(--green)',date:a.date||'',desc:'تمت إضافة الأصل إلى المخزون',qty:a.totalQty,ref:''});
+  handovers.forEach(h=>events.push({type:'تسليم',icon:'ti-transfer',color:'var(--blue)',date:h.date||'',desc:'تسليم إلى: '+h.clientName+' | الكمية: '+h.qty,qty:h.qty,ref:h._id}));
+  returns.forEach(r=>events.push({type:'استرداد',icon:'ti-corner-up-left',color:'var(--teal)',date:r.date||'',desc:'استرداد من: '+r.clientName+' | السبب: '+r.reason+' | الحالة: '+r.conditionAfterReturn,qty:r.qty,ref:r._id}));
+  maintenances.forEach(m=>events.push({type:'صيانة',icon:'ti-tool',color:'var(--amber)',date:m.date||'',desc:'تحويل لصيانة: '+m.vendor+' | '+m.fault+' | الحالة: '+m.status+(m.autoCreated?' (تلقائي)':''),qty:m.qty,ref:m._id}));
+  disposes.forEach(d=>events.push({type:'إتلاف',icon:'ti-trash',color:'var(--red)',date:d.date||'',desc:'الإتلاف: '+d.reason+' | المعتمد: '+d.approved+(d.autoCreated?' (تلقائي)':''),qty:d.qty,ref:d._id}));
+  custody.forEach(c=>events.push({type:'عهدة',icon:'ti-file-invoice',color:'var(--purple)',date:c.date||'',desc:'طلب عهدة: '+c.requesterName+' | الغرض: '+c.purpose+' | الحالة: '+c.requestStatus,qty:'-',ref:c._id}));
+  events.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+
+  const typeColors={'إضافة':'badge-green','تسليم':'badge-blue','استرداد':'badge-teal','صيانة':'badge-amber','إتلاف':'badge-red','عهدة':'badge-purple'};
+  const html =
+    '<div class="table-card" style="margin-bottom:16px;padding:18px" id="asset-history-panel">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'+
+      '<div>'+
+        '<div style="font-size:16px;font-weight:700;color:var(--blue)">'+a.name+'</div>'+
+        '<div style="margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">'+
+          '<code class="tag" style="font-size:13px"><i class="ti ti-barcode"></i> '+a.code+'</code>'+
+          '<span class="badge badge-blue">'+a.type+'</span>'+
+          (a.subType?'<span class="badge badge-gray">'+a.subType+'</span>':'')+
+          statusBadge(a.status,a._id)+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:6px">'+
+        '<button class="report-page-btn" onclick="printAssetHistory()"><i class="ti ti-printer"></i> طباعة</button>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:16px">'+
+      ['الإجمالي|'+a.totalQty+'|var(--blue)','متاح|'+a.availableQty+'|var(--green)','عند عميل|'+a.clientQty+'|#2655A8','صيانة|'+a.maintenanceQty+'|var(--amber)','تالف|'+a.damagedQty+'|var(--red)','عمليات|'+events.length+'|var(--purple)'].map(s=>{const[k,v,c]=s.split('|');return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;text-align:center"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">'+k+'</div><div style="font-size:20px;font-weight:700;color:'+c+'">'+v+'</div></div>'}).join('')+
+    '</div>'+
+    '<div style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:10px;border-bottom:2px solid var(--blue-bg);padding-bottom:6px"><i class="ti ti-timeline"></i> جميع العمليات ('+events.length+')</div>'+
+    '<table><thead><tr><th>#</th><th>التاريخ</th><th>نوع العملية</th><th>التفاصيل</th><th>الكمية</th></tr></thead><tbody>'+
+    (events.length?events.map((e,i)=>
+      '<tr>'+
+      '<td style="color:var(--text3)">'+(i+1)+'</td>'+
+      '<td style="font-size:12px;white-space:nowrap">'+(e.date||'-')+'</td>'+
+      '<td><span class="badge '+(typeColors[e.type]||'badge-gray')+'"><i class="ti '+e.icon+'"></i> '+e.type+'</span></td>'+
+      '<td style="font-size:12px;color:var(--text2)">'+e.desc+'</td>'+
+      '<td style="text-align:center;font-weight:700">'+e.qty+'</td>'+
+      '</tr>'
+    ).join(''):'<tr><td colspan="5" class="empty-row">لا توجد عمليات مسجلة</td></tr>')+
+    '</tbody></table></div>';
+
+  document.getElementById('asset-history-result').innerHTML = html;
+}
+
+function printAssetHistory() {
+  if (!_currentHistoryAssetId) { showToast('اختر أصلاً أولاً','error'); return; }
+  const a = getAssets().find(x=>x._id===_currentHistoryAssetId);
+  if (!a) return;
+  const cn = window._settings?.companyName||'نظام إدارة الأصول';
+  const now = new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
+
+  const handovers = getHandovers().filter(h=>h.assetId===_currentHistoryAssetId);
+  const returns = getReturns().filter(r=>r.assetId===_currentHistoryAssetId);
+  const maintenances = getMaintenances().filter(m=>m.assetId===_currentHistoryAssetId);
+  const disposes = getDisposes().filter(d=>d.assetId===_currentHistoryAssetId);
+  const custody = (window.custodyRequests||[]).filter(c=>c.assetId===_currentHistoryAssetId);
+
+  let events = [];
+  events.push({type:'إضافة',date:a.date||'',desc:'تمت إضافة الأصل إلى المخزون',qty:a.totalQty});
+  handovers.forEach(h=>events.push({type:'تسليم',date:h.date||'',desc:'تسليم إلى: '+h.clientName+' | الكمية: '+h.qty,qty:h.qty}));
+  returns.forEach(r=>events.push({type:'استرداد',date:r.date||'',desc:'استرداد من: '+r.clientName+' | السبب: '+r.reason+' | الحالة: '+r.conditionAfterReturn,qty:r.qty}));
+  maintenances.forEach(m=>events.push({type:'صيانة',date:m.date||'',desc:'تحويل لصيانة: '+m.vendor+' | '+m.fault+' | الحالة: '+m.status+(m.autoCreated?' (تلقائي)':''),qty:m.qty}));
+  disposes.forEach(d=>events.push({type:'إتلاف',date:d.date||'',desc:'الإتلاف: '+d.reason+' | المعتمد: '+d.approved+(d.autoCreated?' (تلقائي)':''),qty:d.qty}));
+  custody.forEach(c=>events.push({type:'عهدة',date:c.date||'',desc:'طلب عهدة: '+c.requesterName+' | الغرض: '+c.purpose+' | الحالة: '+c.requestStatus,qty:'-'}));
+  events.sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:0);
+
+  const hs='background:#1C3F8A;color:#fff;padding:8px 10px;text-align:right;font-weight:700';
+  const ts='padding:7px 10px;border-bottom:1px solid #C8DBF0;vertical-align:middle;font-size:12px';
+  const win=window.open('','_blank');
+  win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>سجل الأصل - '+a.name+'</title>'+
+  '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">'+
+  '<style>body{font-family:\'Cairo\',Arial,sans-serif;font-size:13px;color:#0E1D3A;margin:24px;direction:rtl}'+
+  '.hdr{border-bottom:3px solid #1C3F8A;padding-bottom:12px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}'+
+  'h1{font-size:20px;color:#1C3F8A;margin:0}'+
+  '.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}'+
+  '.info-box{border:1px solid #C8DBF0;border-radius:6px;padding:10px;text-align:center}'+
+  '.info-label{font-size:11px;color:#7090B0;margin-bottom:4px}'+
+  '.info-val{font-size:20px;font-weight:700;color:#1C3F8A}'+
+  'table{width:100%;border-collapse:collapse}th{'+hs+'}'+
+  'td{'+ts+'}tr:nth-child(even) td{background:#F8FBFF}'+
+  '.ft{margin-top:20px;padding-top:10px;border-top:1px solid #C8DBF0;font-size:11px;color:#7090B0;text-align:center}'+
+  '@media print{body{margin:10px}button{display:none!important}}</style></head><body>'+
+  '<div class="hdr">'+
+    '<div><h1>'+cn+'</h1><div style="font-size:14px;color:#5B7AAA">سجل تاريخ الأصل</div></div>'+
+    '<div style="font-size:12px;color:#5B7AAA;line-height:1.8;text-align:left"><div>تاريخ الطباعة: '+now+'</div><div>أُعد بواسطة: '+(currentUser?.name||'')+'</div></div>'+
+  '</div>'+
+  '<div style="background:#DBEAFE;padding:12px;border-radius:6px;margin-bottom:14px">'+
+    '<div style="font-size:16px;font-weight:700;color:#1C3F8A">'+a.name+'</div>'+
+    '<div style="margin-top:4px;font-size:12px;color:#3A5070">الباركود: <strong>'+a.code+'</strong> | النوع: '+a.type+(a.subType?' | الفرعي: '+a.subType:'')+'</div>'+
+  '</div>'+
+  '<div class="info-grid">'+
+    '<div class="info-box"><div class="info-label">الإجمالي</div><div class="info-val">'+a.totalQty+'</div></div>'+
+    '<div class="info-box"><div class="info-label">متاح</div><div class="info-val" style="color:#2E7D32">'+a.availableQty+'</div></div>'+
+    '<div class="info-box"><div class="info-label">عند عميل</div><div class="info-val" style="color:#1C3F8A">'+a.clientQty+'</div></div>'+
+    '<div class="info-box"><div class="info-label">صيانة</div><div class="info-val" style="color:#B45309">'+a.maintenanceQty+'</div></div>'+
+    '<div class="info-box"><div class="info-label">تالف</div><div class="info-val" style="color:#C62828">'+a.damagedQty+'</div></div>'+
+    '<div class="info-box"><div class="info-label">عمليات</div><div class="info-val" style="color:#5B2D8E">'+events.length+'</div></div>'+
+  '</div>'+
+  '<table><thead><tr><th>#</th><th>التاريخ</th><th>نوع العملية</th><th>التفاصيل</th><th>الكمية</th></tr></thead><tbody>'+
+  events.map((e,i)=>'<tr><td style="'+ts+';text-align:center">'+(i+1)+'</td><td style="'+ts+'">'+e.date+'</td><td style="'+ts+';font-weight:700">'+e.type+'</td><td style="'+ts+'">'+e.desc+'</td><td style="'+ts+';text-align:center;font-weight:700">'+e.qty+'</td></tr>').join('')+
+  '</tbody></table>'+
+  '<div class="ft">'+cn+' | سجل تاريخ الأصل | '+now+'</div>'+
+  '<div style="text-align:center;margin-top:16px"><button onclick="window.print()" style="padding:10px 28px;background:#1C3F8A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:\'Cairo\',sans-serif;font-size:14px;font-weight:600">🖨️ طباعة</button></div>'+
+  '</body></html>');
+  win.document.close();
+}
+
 /* ────────── CUSTODY ────────── */
 function renderCustody() {
   const tbody=document.getElementById('custody-body'); if (!tbody) return;
@@ -2390,7 +2672,7 @@ function filterCustody() { renderCustody(); }
 
 function openNewCustody() {
   const assets=getAssets();
-  const opts=assets.map(a=>'<option value="'+a._id+'" data-barcode="'+(a.barcode||a.code||a._id)+'" data-status="'+(a.status||'متاح')+'" data-name="'+a.name+'">'+a.name+(a.subType?' ('+a.subType+')':'')+' ('+( a.status||'متاح')+')</option>').join('');
+  const opts=assets.map(a=>'<option value="'+a._id+'" data-barcode="'+(a.barcode||a.code||a._id)+'" data-status="'+(a.status||'متاح')+'" data-name="'+a.name+'">'+a.name+' ['+(a.barcode||a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' ('+( a.status||'متاح')+')</option>').join('');
   const today=new Date().toISOString().split('T')[0];
   document.getElementById('modal-title').innerHTML='<i class="ti ti-file-invoice"></i> طلب عهدة جديد';
   document.getElementById('modal-body').innerHTML=
@@ -2457,6 +2739,182 @@ async function deleteCustody(id) {
     window.custodyRequests=(window.custodyRequests||[]).filter(c=>c._id!==id);
     renderCustody(); showToast('تم الحذف','success');
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+/* ────────── DEPT CUSTODY (عهدة الإدارات) ────────── */
+function getDeptCustodyRequests() { return window.deptCustodyRequests||[]; }
+
+function renderDeptCustody() {
+  if (typeof filterDeptCustody==='function') filterDeptCustody(); else _renderDeptCustodyRows(getDeptCustodyRequests());
+}
+function filterDeptCustody() {
+  const q=(document.getElementById('dept-custody-search')?.value||'').toLowerCase();
+  const dept=document.getElementById('dept-custody-filter-dept')?.value||'';
+  const status=document.getElementById('dept-custody-filter-status')?.value||'';
+  const list=getDeptCustodyRequests().filter(c=>{
+    const mq=!q||(c.requesterName||'').toLowerCase().includes(q)||(c.dept||'').toLowerCase().includes(q)||(c.itemDesc||'').toLowerCase().includes(q)||(c.seqNum||'').toLowerCase().includes(q);
+    const md=!dept||c.dept===dept;
+    const ms=!status||c.requestStatus===status;
+    return mq&&md&&ms;
+  });
+  _renderDeptCustodyRows(list);
+}
+function _renderDeptCustodyRows(list) {
+  const tbody=document.getElementById('dept-custody-body'); if (!tbody) return;
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="9" class="empty-row">لا توجد طلبات عهدة إدارات</td></tr>'; return; }
+  tbody.innerHTML=list.map((c,i)=>{
+    const sb=c.requestStatus==='معتمد'?'<span class="custody-badge-approved">معتمد</span>':c.requestStatus==='مرفوض'?'<span class="custody-badge-rejected">مرفوض</span>':'<span class="custody-badge-pending">قيد المراجعة</span>';
+    return '<tr>'+
+      '<td style="text-align:center"><code class="tag">'+c.seqNum+'</code></td>'+
+      '<td style="font-size:12px">'+(c.date||'-')+'</td>'+
+      '<td><span class="badge badge-purple">'+(c.dept||'-')+'</span></td>'+
+      '<td style="font-weight:600">'+(c.requesterName||'-')+'</td>'+
+      '<td style="font-size:12px;max-width:180px">'+(c.itemDesc||'-')+'</td>'+
+      '<td style="text-align:center;font-weight:700">'+(c.qty||'-')+'</td>'+
+      '<td style="font-size:12px;max-width:140px">'+(c.purpose||'-')+'</td>'+
+      '<td>'+sb+'</td>'+
+      '<td style="white-space:nowrap">'+
+        '<button class="btn-action info" onclick="printDeptCustodyForm(\''+c._id+'\')"><i class="ti ti-printer"></i></button>'+
+        (can('edit')?'<button class="btn-action success" onclick="approveDeptCustody(\''+c._id+'\',\'معتمد\')"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveDeptCustody(\''+c._id+'\',\'مرفوض\')"><i class="ti ti-x"></i></button>':'')+
+        '<button class="btn-action danger" onclick="deleteDeptCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>'+
+      '</td></tr>';
+  }).join('');
+}
+
+function openNewDeptCustody() {
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-building"></i> طلب عهدة إدارة جديد';
+  document.getElementById('modal-body').innerHTML=
+    '<div class="alert alert-info"><i class="ti ti-info-circle"></i> هذا الطلب غير مرتبط بأصول المخزون — مخصص للإدارات</div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>الإدارة *</label>'+
+        '<select id="dc-dept">'+
+          '<option value="">-- اختر الإدارة --</option>'+
+          ['الإدارة المالية','المبيعات','الخدمات المساندة','الموارد البشرية','تقنية المعلومات','المشتريات','العمليات','أخرى'].map(d=>'<option value="'+d+'">'+d+'</option>').join('')+
+        '</select>'+
+      '</div>'+
+      '<div class="field"><label>التاريخ *</label><input type="date" id="dc-date" value="'+today+'"></div>'+
+    '</div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>اسم الطالب *</label><input type="text" id="dc-requester" placeholder="الاسم الكامل" value="'+currentUser.name+'"></div>'+
+      '<div class="field"><label>المنصب / الوظيفة</label><input type="text" id="dc-position" placeholder="المنصب الوظيفي"></div>'+
+    '</div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>الصنف / الوصف *</label><input type="text" id="dc-item" placeholder="مثال: لابتوب، طابعة، أثاث..."></div>'+
+      '<div class="field"><label>الكمية</label><input type="number" id="dc-qty" min="1" value="1"></div>'+
+    '</div>'+
+    '<div class="field" style="margin-bottom:12px"><label>الغرض من العهدة *</label><textarea id="dc-purpose" placeholder="وصف الغرض من الطلب..."></textarea></div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>المدة المتوقعة</label><input type="text" id="dc-duration" placeholder="مثال: شهر، 3 أشهر..."></div>'+
+      '<div class="field"><label>الشخص المسؤول عن الاعتماد</label><input type="text" id="dc-approver" placeholder="اسم المسؤول"></div>'+
+    '</div>'+
+    '<div class="field"><label>ملاحظات</label><textarea id="dc-notes"></textarea></div>';
+  document.getElementById('modal-save-btn').textContent='حفظ الطلب';
+  document.getElementById('modal-save-btn').onclick=saveDeptCustodyRequest;
+  document.getElementById('modal-box').className='modal wide';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+async function saveDeptCustodyRequest() {
+  const dept=document.getElementById('dc-dept').value;
+  const requesterName=document.getElementById('dc-requester').value.trim();
+  const itemDesc=document.getElementById('dc-item').value.trim();
+  const purpose=document.getElementById('dc-purpose').value.trim();
+  const date=document.getElementById('dc-date').value;
+  if (!dept||!requesterName||!itemDesc||!purpose) { showToast('يرجى ملء الحقول الإلزامية','error'); return; }
+  // Generate sequential number per dept
+  const existing=(window.deptCustodyRequests||[]).filter(c=>c.dept===dept);
+  const deptCode={'الإدارة المالية':'FIN','المبيعات':'SAL','الخدمات المساندة':'SUP','الموارد البشرية':'HR','تقنية المعلومات':'IT','المشتريات':'PUR','العمليات':'OPS','أخرى':'OTH'};
+  const prefix=deptCode[dept]||'GEN';
+  const seqNum=prefix+'-'+String(existing.length+1).padStart(4,'0');
+  const rec={date,dept,requesterName,position:document.getElementById('dc-position').value.trim(),itemDesc,qty:document.getElementById('dc-qty').value,purpose,duration:document.getElementById('dc-duration').value.trim(),approver:document.getElementById('dc-approver').value.trim(),notes:document.getElementById('dc-notes').value,requestStatus:'قيد المراجعة',seqNum,createdBy:currentUser?.name||'',createdAt:new Date().toISOString()};
+  try {
+    await waitForFirebase();
+    const docRef=await window.fsApi.addDoc(window.fsApi.collection(window.db,"deptCustodyRequests"),rec);
+    rec._id=docRef.id;
+    window.deptCustodyRequests=window.deptCustodyRequests||[];
+    window.deptCustodyRequests.push(rec);
+    closeModal(); renderDeptCustody();
+    showToast('تم حفظ الطلب - الرقم: '+seqNum,'success');
+    setTimeout(()=>printDeptCustodyForm(rec._id),400);
+  } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+async function approveDeptCustody(id,status) {
+  try {
+    await waitForFirebase();
+    await window.fsApi.updateDoc(window.fsApi.doc(window.db,"deptCustodyRequests",id),{requestStatus:status});
+    const idx=(window.deptCustodyRequests||[]).findIndex(c=>c._id===id);
+    if (idx>=0) window.deptCustodyRequests[idx].requestStatus=status;
+    renderDeptCustody(); showToast('تم تحديث الحالة','success');
+  } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+async function deleteDeptCustody(id) {
+  if (!confirm('حذف هذا الطلب؟')) return;
+  try {
+    await waitForFirebase();
+    await window.fsApi.deleteDoc(window.fsApi.doc(window.db,"deptCustodyRequests",id));
+    window.deptCustodyRequests=(window.deptCustodyRequests||[]).filter(c=>c._id!==id);
+    renderDeptCustody(); showToast('تم الحذف','success');
+  } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+function printDeptCustodyForm(id) {
+  const c=(window.deptCustodyRequests||[]).find(x=>x._id===id);
+  if (!c) return;
+  const cn=window._settings?.companyName||'شركة ثمار القمة المحدودة';
+  const reqColor=c.requestStatus==='معتمد'?'#2E7D32':c.requestStatus==='مرفوض'?'#C62828':'#B45309';
+  const win=window.open('','_blank');
+  win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>عهدة إدارة - '+c.seqNum+'</title>'+
+  '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">'+
+  '<style>body{font-family:\'Cairo\',Arial,sans-serif;font-size:13px;direction:rtl;padding:24px;color:#0E1D3A}'+
+  '.hdr{border-bottom:3px solid #1C3F8A;padding-bottom:12px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start}'+
+  '.ttl{font-size:20px;font-weight:700;color:#1C3F8A}.sub{font-size:13px;color:#5B7AAA;margin-top:2px}'+
+  'table{width:100%;border-collapse:collapse;margin-bottom:14px}'+
+  'td{border:1px solid #C8DBF0;padding:9px 12px}.lbl{background:#F0F6FF;font-weight:700;color:#1C3F8A;width:30%}'+
+  '.sign{display:flex;gap:20px;margin-top:24px}.sbox{flex:1;border:1.5px solid #C8DBF0;border-radius:8px;padding:14px;min-height:110px}'+
+  '.stitle{font-weight:700;color:#1C3F8A;margin-bottom:8px;font-size:13px}.sline{border-top:2px dashed #B0CCE8;margin-top:30px;padding-top:5px;font-size:11px;color:#7090B0;text-align:center}'+
+  '.notes-box{border:1px solid #C8DBF0;border-radius:6px;padding:12px;margin-bottom:14px;background:#F8FBFF;min-height:50px}'+
+  '.badge{display:inline-block;padding:3px 10px;border-radius:100px;font-size:12px;font-weight:700}'+
+  '.badge-purple{background:#EDE7F6;color:#5B2D8E}'+
+  '@media print{.noprint{display:none}}</style></head><body>'+
+  '<div class="hdr">'+
+    '<div><div class="ttl">'+cn+'</div><div class="sub">نموذج طلب عهدة إدارة</div></div>'+
+    '<div style="font-size:12px;color:#5B7AAA;line-height:2;text-align:left">'+
+      '<div>الرقم: <strong style="color:#1C3F8A">'+c.seqNum+'</strong></div>'+
+      '<div>التاريخ: '+c.date+'</div>'+
+      '<div>الحالة: <strong style="color:'+reqColor+'">'+c.requestStatus+'</strong></div>'+
+    '</div>'+
+  '</div>'+
+  '<div style="text-align:center;font-size:15px;font-weight:700;color:#1C3F8A;background:#DBEAFE;padding:10px;border-radius:6px;margin-bottom:16px">📋 نموذج طلب عهدة إدارة</div>'+
+  '<table>'+
+    '<tr><td class="lbl">الإدارة</td><td colspan="3"><span class="badge badge-purple">'+c.dept+'</span></td></tr>'+
+    '<tr><td class="lbl">اسم الطالب</td><td style="font-weight:700;color:#1C3F8A">'+c.requesterName+'</td><td class="lbl">الوظيفة</td><td>'+(c.position||'-')+'</td></tr>'+
+    '<tr><td class="lbl">الصنف / الوصف</td><td colspan="3" style="font-weight:700">'+c.itemDesc+'</td></tr>'+
+    '<tr><td class="lbl">الكمية</td><td>'+c.qty+'</td><td class="lbl">المدة المتوقعة</td><td>'+(c.duration||'-')+'</td></tr>'+
+    '<tr><td class="lbl">التاريخ</td><td>'+c.date+'</td><td class="lbl">المسؤول عن الاعتماد</td><td>'+(c.approver||'-')+'</td></tr>'+
+  '</table>'+
+  '<div class="notes-box"><strong style="color:#3A5070">📌 الغرض من العهدة:</strong><br><div style="margin-top:6px">'+c.purpose+'</div></div>'+
+  (c.notes?'<div class="notes-box"><strong style="color:#3A5070">🗒️ ملاحظات:</strong><br><div style="margin-top:6px">'+c.notes+'</div></div>':'')+
+  '<div class="sign">'+
+    '<div class="sbox">'+
+      '<div class="stitle">توقيع الطالب</div>'+
+      '<div style="font-size:12px;color:#5B7AAA;margin-bottom:4px">الاسم: '+c.requesterName+'</div>'+
+      '<div style="font-size:12px;color:#5B7AAA;margin-bottom:4px">الإدارة: '+c.dept+'</div>'+
+      '<div class="sline">التوقيع</div>'+
+    '</div>'+
+    '<div class="sbox">'+
+      '<div class="stitle">اعتماد المسؤول</div>'+
+      '<div style="font-size:12px;color:#5B7AAA;margin-bottom:4px">الاسم: '+(c.approver||'____________________________')+'</div>'+
+      '<div style="font-size:12px;color:#5B7AAA;margin-bottom:4px">الصفة: ____________________________</div>'+
+      '<div class="sline">التوقيع / الختم</div>'+
+    '</div>'+
+  '</div>'+
+  '<div style="margin-top:14px;text-align:center;font-size:11px;color:#7090B0;border-top:1px solid #C8DBF0;padding-top:10px">'+cn+' | نظام إدارة الأصول | طلب عهدة إدارة | '+c.seqNum+'</div>'+
+  '<div class="noprint" style="text-align:center;margin-top:16px"><button onclick="window.print()" style="padding:10px 28px;background:#1C3F8A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:\'Cairo\',sans-serif;font-size:14px;font-weight:600">🖨️ طباعة</button></div>'+
+  '</body></html>');
+  win.document.close();
 }
 
 /* ────────── MODAL / TOAST ────────── */
@@ -2679,6 +3137,16 @@ if(typeof renderTypesList!=='undefined')window.renderTypesList=renderTypesList;
 if(typeof renderSubTypes!=='undefined')window.renderSubTypes=renderSubTypes;
 if(typeof renderCustody!=='undefined')window.renderCustody=renderCustody;
 if(typeof filterCustody!=='undefined')window.filterCustody=filterCustody;
+if(typeof renderDeptCustody!=='undefined')window.renderDeptCustody=renderDeptCustody;
+if(typeof filterDeptCustody!=='undefined')window.filterDeptCustody=filterDeptCustody;
+if(typeof openNewDeptCustody!=='undefined')window.openNewDeptCustody=openNewDeptCustody;
+if(typeof approveDeptCustody!=='undefined')window.approveDeptCustody=approveDeptCustody;
+if(typeof deleteDeptCustody!=='undefined')window.deleteDeptCustody=deleteDeptCustody;
+if(typeof printDeptCustodyForm!=='undefined')window.printDeptCustodyForm=printDeptCustodyForm;
+if(typeof populateHistoryAssetSelect!=='undefined')window.populateHistoryAssetSelect=populateHistoryAssetSelect;
+if(typeof searchAssetHistory!=='undefined')window.searchAssetHistory=searchAssetHistory;
+if(typeof loadAssetHistoryById!=='undefined')window.loadAssetHistoryById=loadAssetHistoryById;
+if(typeof printAssetHistory!=='undefined')window.printAssetHistory=printAssetHistory;
 if(typeof renderCustomers!=='undefined')window.renderCustomers=renderCustomers;
 if(typeof filterCustomers!=='undefined')window.filterCustomers=filterCustomers;
 if(typeof renderReturns!=='undefined')window.renderReturns=renderReturns;
