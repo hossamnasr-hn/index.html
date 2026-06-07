@@ -333,8 +333,8 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="nav-item" onclick="showPage('returns',this)" data-page="returns"><i class="ti ti-corner-up-left"></i> استرداد أصل</div>
       <div class="nav-item" onclick="showPage('maintenance',this)" data-page="maintenance"><i class="ti ti-tool"></i> الصيانة</div>
       <div class="nav-item" onclick="showPage('dispose',this)" data-page="dispose"><i class="ti ti-trash"></i> الإتلاف</div>
-      <div class="nav-item" id="nav-custody" onclick="showPage('custody',this)" data-page="custody"><i class="ti ti-file-invoice"></i> طلبات العهدة</div>
-      <div class="nav-item" id="nav-dept-custody" onclick="showPage('dept-custody',this)" data-page="dept-custody"><i class="ti ti-building"></i> عهدة الإدارات</div>
+      <div class="nav-item" id="nav-custody" style="display:none" onclick="showPage('custody',this)" data-page="custody"><i class="ti ti-file-invoice"></i> طلبات العهدة</div>
+      <div class="nav-item" id="nav-dept-custody" style="display:none" onclick="showPage('dept-custody',this)" data-page="dept-custody"><i class="ti ti-building"></i> عهدة الإدارات</div>
       <div class="nav-section">الإدارة</div>
       <div class="nav-item" onclick="showPage('types',this)" data-page="types"><i class="ti ti-tags"></i> أنواع الأصول</div>
       <div class="nav-item" onclick="showPage('reports',this)" data-page="reports"><i class="ti ti-chart-bar"></i> التقارير</div>
@@ -799,7 +799,7 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db,"users"));
   const existingUsers = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   
-  const NEW_PERMS = ["custody","dept_custody","settings"];
+  const NEW_PERMS = ["custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"];
   if (usersSnap.empty || existingUsers.length === 0) {
     await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms:["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"] });
     console.log("Admin user created");
@@ -812,9 +812,10 @@ async function initDefaultData() {
         updates.password = data.password||"admin123";
       }
       const currentPerms = data.perms || [];
+      // Add missing new perms to any user who has 'users' permission (admins) OR who already has some custody perms
       const missingPerms = NEW_PERMS.filter(p => !currentPerms.includes(p));
-      if (missingPerms.length > 0 && currentPerms.includes("users")) {
-        updates.perms = [...currentPerms, ...missingPerms];
+      if (missingPerms.length > 0 && (currentPerms.includes("users") || currentPerms.some(p=>p.startsWith("custody")||p.startsWith("dept_custody")))) {
+        updates.perms = [...new Set([...currentPerms, ...missingPerms])];
       }
       if (Object.keys(updates).length > 0) {
         await updateDoc(doc(db,"users",d.id), updates);
@@ -922,6 +923,13 @@ try {
         if (nameEl) nameEl.textContent = fresh.name;
         document.getElementById('header-role').textContent = fresh.role;
         if (!fresh.perms.includes('users')) document.getElementById('nav-users').style.display='none';
+        const ALL_CUSTODY_PERMS_SR = ['custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
+        if (fresh.perms.includes('users') && ALL_CUSTODY_PERMS_SR.some(p=>!fresh.perms.includes(p))) {
+          const upgraded = [...new Set([...fresh.perms, ...ALL_CUSTODY_PERMS_SR])];
+          fresh.perms = upgraded;
+          currentUser = fresh;
+          try { await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",fresh._id),{perms:upgraded}); } catch(e){}
+        }
         const _hasCustAcc = fresh.perms.some(p=>p==='custody'||p.startsWith('custody_'));
         const _hasDeptCustAcc = fresh.perms.some(p=>p==='dept_custody'||p.startsWith('dept_custody_'));
         const custodyNav = document.getElementById('nav-custody');
@@ -1088,8 +1096,9 @@ async function doLogin() {
     if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
     // Auto-grant custody & settings to any user who has 'users' permission (backward compat)
-    if (found.perms.includes('users') && (!found.perms.includes('custody') || !found.perms.includes('dept_custody') || !found.perms.includes('settings'))) {
-      const upgraded = [...new Set([...found.perms, 'custody', 'custody_add', 'custody_edit', 'custody_approve', 'custody_print', 'dept_custody', 'dept_custody_add', 'dept_custody_edit', 'dept_custody_approve', 'dept_custody_print', 'settings'])];
+    const ALL_CUSTODY_PERMS = ['custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
+    if (found.perms.includes('users') && ALL_CUSTODY_PERMS.some(p=>!found.perms.includes(p))) {
+      const upgraded = [...new Set([...found.perms, ...ALL_CUSTODY_PERMS])];
       found.perms = upgraded;
       // Also persist to Firebase silently
       try {
@@ -3042,11 +3051,11 @@ function printDeptCustodyForm(id) {
   '</table>'+
   '<div class="notes-box"><strong style="color:#3A5070">📌 الغرض من العهدة:</strong><br><div style="margin-top:6px">'+c.purpose+'</div></div>'+
   (c.notes?'<div class="notes-box"><strong style="color:#3A5070">🗒️ ملاحظات:</strong><br><div style="margin-top:6px">'+c.notes+'</div></div>':'')+
-  ((c.financialItems&&c.financialItems.length)?
+  (((c.financialItems&&c.financialItems.length)||(c.financialTotal>0))?
     '<div style="margin:14px 0"><strong style="color:#3A5070;font-size:13px">💰 البنود المالية (ريال سعودي)</strong>'+
     '<table style="margin-top:8px;width:100%;border-collapse:collapse;font-size:12px">'+
       '<thead><tr><th style="background:#1C3F8A;color:#fff;padding:6px 10px;text-align:right">وصف البند</th><th style="background:#1C3F8A;color:#fff;padding:6px 10px;text-align:left;width:120px">المبلغ (ريال)</th></tr></thead>'+
-      '<tbody>'+c.financialItems.map(fi=>'<tr><td style="border:1px solid #C8DBF0;padding:6px 10px">'+fi.desc+'</td><td style="border:1px solid #C8DBF0;padding:6px 10px;text-align:left;direction:ltr">'+Number(fi.amount||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+'</td></tr>').join('')+
+      '<tbody>'+(c.financialItems&&c.financialItems.length?c.financialItems.map(fi=>'<tr><td style="border:1px solid #C8DBF0;padding:6px 10px">'+(fi.desc||'-')+'</td><td style="border:1px solid #C8DBF0;padding:6px 10px;text-align:left;direction:ltr">'+Number(fi.amount||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+'</td></tr>').join(''):'<tr><td style="border:1px solid #C8DBF0;padding:6px 10px;color:#7090B0">—</td><td style="border:1px solid #C8DBF0;padding:6px 10px;text-align:left;direction:ltr">—</td></tr>')+
       '<tr><td style="border:1px solid #C8DBF0;padding:8px 10px;font-weight:700;background:#F0F6FF">الإجمالي</td><td style="border:1px solid #C8DBF0;padding:8px 10px;font-weight:700;color:#2E7D32;font-size:14px;text-align:left;direction:ltr;background:#F0F6FF">'+Number(c.financialTotal||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+' ريال</td></tr>'+
     '</tbody></table></div>':'')+
   '<div class="sign">'+
