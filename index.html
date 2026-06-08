@@ -244,7 +244,6 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
 .custody-badge-pending{background:#FEF3C7;color:#B45309;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
 .custody-badge-approved{background:#E8F5E9;color:#2E7D32;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
 .custody-badge-rejected{background:#FFEBEE;color:#C62828;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
-
 /* ── Notifications Bell ── */
 .notif-wrap{position:relative;display:inline-flex}
 .notif-btn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;transition:background .2s;position:relative;flex-shrink:0}
@@ -260,7 +259,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
 .notif-panel-close{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.2);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px}
 .notif-panel-close:hover{background:rgba(255,255,255,.35)}
 .notif-list{max-height:340px;overflow-y:auto}
-.notif-item{display:flex;align-items:flex-start;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border2);cursor:pointer;transition:background .15s;text-decoration:none}
+.notif-item{display:flex;align-items:flex-start;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border2);cursor:pointer;transition:background .15s}
 .notif-item:last-child{border-bottom:none}
 .notif-item:hover{background:var(--bg)}
 .notif-item.unread{background:linear-gradient(90deg,rgba(219,234,254,.5) 0%,transparent 100%)}
@@ -952,15 +951,14 @@ async function loadAllData() {
     window._settings = {...s, _id:settingsSnap.docs[0].id};
     if (s.companyName) if(window.applyCompanySettings)window.applyCompanySettings(s.companyName, s.logoUrl||'');
   }
-  // Only render if user is already logged in (session restore or post-login)
-  if (currentUser) {
-    try { renderAll(); populateTypeFilters(); } catch(e) { console.warn("Initial render:", e.message); }
-  }
+  // renderAll is in same scope now (IIFE converted)
+  try { renderAll(); populateTypeFilters(); } catch(e) { console.warn("Initial render:", e.message); }
 }
 
 window.reloadData = async function() {
   await loadAllData();
-  if (currentUser) { renderAll(); populateTypeFilters(); }
+  renderAll();
+  populateTypeFilters();
 };
 
 try {
@@ -1197,7 +1195,6 @@ async function doLogin() {
 
 function doLogout() {
   currentUser = null;
-  if (window._notifInterval) { clearInterval(window._notifInterval); window._notifInterval = null; }
   try { localStorage.removeItem('_assetSession'); } catch(e) {}
   resetNav();
   document.getElementById('login-screen').style.display='flex';
@@ -1404,7 +1401,7 @@ function showPage(id, el) {
 
 /* ────────── RENDER ALL ────────── */
 function renderAll() {
-  try { startNotifInterval(); renderNotifications(); } catch(e) { console.warn('renderNotifications:', e.message); }
+  if(currentUser){try{renderNotifications();}catch(e){}}
   try { renderStats(); } catch(e) { console.warn('renderStats:', e.message); }
   try { renderRecent(); } catch(e) { console.warn('renderRecent:', e.message); }
   try { renderAssets(); } catch(e) { console.warn('renderAssets:', e.message); }
@@ -3575,181 +3572,103 @@ if(typeof previewAssetImage!=='undefined')window.previewAssetImage=previewAssetI
 if(typeof onCustodyAssetChange!=='undefined')window.onCustodyAssetChange=onCustodyAssetChange;
 if(typeof filterCustody!=='undefined')window.filterCustody=filterCustody;
 
-// NOW start firebase after all functions are defined
-// Store the promise so login can wait for it
 
 /* ────────── NOTIFICATIONS SYSTEM ────────── */
 let _readNotifKeys = new Set();
 try { _readNotifKeys = new Set(JSON.parse(localStorage.getItem('_readNotifs')||'[]')); } catch(e) {}
 
 function getNotifications() {
-  if (!currentUser || !window._firebaseReady) return [];
+  if (!currentUser) return [];
   const notifs = [];
   const perms = currentUser.perms || [];
   const isAdmin = perms.includes('users');
-
-  // طلبات العهدة المعلقة
   const hasCustodyApprove = perms.includes('custody_approve') || isAdmin;
   const hasDeptApprove = perms.includes('dept_custody_approve') || isAdmin;
-
-  // عهدة الأصول - طلبات بانتظار الاعتماد
   if (hasCustodyApprove) {
     const pending = (window.custodyRequests||[]).filter(c=>c.status==='معلق'||c.status==='pending'||!c.status);
     if (pending.length > 0) {
       notifs.push({
-        key: 'custody_pending_' + pending.length,
-        type: 'custody',
-        icon: 'ti-file-invoice',
-        iconClass: 'notif-icon-custody',
-        title: 'طلبات عهدة أصول بانتظار الاعتماد',
-        desc: 'يوجد ' + pending.length + ' طلب' + (pending.length>1?' عهدة أصول':' عهدة أصل') + ' بانتظار مراجعتك واعتمادك',
-        tag: 'عهدة الأصول',
-        tagClass: 'notif-tag-purple',
-        count: pending.length,
-        page: 'custody',
-        navId: 'nav-custody'
+        key:'custody_pending_'+pending.length, type:'custody',
+        icon:'ti-file-invoice', iconClass:'notif-icon-custody',
+        title:'طلبات عهدة أصول بانتظار الاعتماد',
+        desc:'يوجد '+pending.length+' طلب'+(pending.length>1?' عهدة أصول':' عهدة أصل')+' بانتظار مراجعتك واعتمادك',
+        tag:'عهدة الأصول', tagClass:'notif-tag-purple', count:pending.length,
+        page:'custody', navId:'nav-custody'
       });
     }
   }
-
-  // عهدة الإدارات - طلبات بانتظار الاعتماد
   if (hasDeptApprove) {
     const deptPending = (window.deptCustodyRequests||[]).filter(c=>c.status==='معلق'||c.status==='pending'||!c.status);
     if (deptPending.length > 0) {
       notifs.push({
-        key: 'dept_custody_pending_' + deptPending.length,
-        type: 'dept',
-        icon: 'ti-building',
-        iconClass: 'notif-icon-dept',
-        title: 'طلبات عهدة الإدارات بانتظار الاعتماد',
-        desc: 'يوجد ' + deptPending.length + ' طلب' + (deptPending.length>1?' عهدة إدارات':' عهدة إدارة') + ' يستلزم اتخاذ الإجراء المناسب',
-        tag: 'عهدة الإدارات',
-        tagClass: 'notif-tag-amber',
-        count: deptPending.length,
-        page: 'dept-custody',
-        navId: 'nav-dept-custody'
+        key:'dept_custody_pending_'+deptPending.length, type:'dept',
+        icon:'ti-building', iconClass:'notif-icon-dept',
+        title:'طلبات عهدة الإدارات بانتظار الاعتماد',
+        desc:'يوجد '+deptPending.length+' طلب'+(deptPending.length>1?' عهدة إدارات':' عهدة إدارة')+' يستلزم اتخاذ الإجراء المناسب',
+        tag:'عهدة الإدارات', tagClass:'notif-tag-amber', count:deptPending.length,
+        page:'dept-custody', navId:'nav-dept-custody'
       });
     }
   }
-
-  // إشعار عام للمدير عند وجود أي طلبات معلقة من كلا النوعين
-  if (isAdmin) {
-    const allPending = (window.custodyRequests||[]).filter(c=>c.status==='معلق'||c.status==='pending'||!c.status).length
-                     + (window.deptCustodyRequests||[]).filter(c=>c.status==='معلق'||c.status==='pending'||!c.status).length;
-    if (allPending > 0 && !hasCustodyApprove && !hasDeptApprove) {
-      notifs.push({
-        key: 'admin_all_pending_' + allPending,
-        type: 'admin',
-        icon: 'ti-alert-circle',
-        iconClass: 'notif-icon-admin',
-        title: 'إجراءات معلقة تحتاج اعتماد',
-        desc: 'يوجد ' + allPending + ' طلب عهدة بانتظار المراجعة والاعتماد',
-        tag: 'مدير النظام',
-        tagClass: 'notif-tag-blue',
-        count: allPending,
-        page: 'custody',
-        navId: 'nav-custody'
-      });
-    }
-  }
-
   return notifs;
 }
 
 function renderNotifications() {
-  if (!currentUser || !window._firebaseReady) return;
+  if (!currentUser) return;
   const notifs = getNotifications();
-  const unread = notifs.filter(n => !_readNotifKeys.has(n.key));
+  const unread = notifs.filter(n=>!_readNotifKeys.has(n.key));
   const badge = document.getElementById('notif-badge');
   const countEl = document.getElementById('notif-panel-count');
   const list = document.getElementById('notif-list');
-  if (!badge || !list) return;
-
-  // update badge
-  if (unread.length > 0) {
-    badge.textContent = unread.length > 9 ? '9+' : unread.length;
-    badge.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
-  }
-  if (countEl) countEl.textContent = notifs.length;
-
-  // render list
+  if (!badge||!list) return;
+  if (unread.length>0) { badge.textContent=unread.length>9?'9+':unread.length; badge.style.display='flex'; }
+  else badge.style.display='none';
+  if (countEl) countEl.textContent=notifs.length;
   if (!notifs.length) {
-    list.innerHTML = '<div class="notif-empty"><i class="ti ti-bell-off"></i>لا توجد إشعارات<div style="font-size:12px;margin-top:4px;color:var(--text3)">جميع الطلبات تمت معالجتها</div></div>';
+    list.innerHTML='<div class="notif-empty"><i class="ti ti-bell-off"></i>لا توجد إشعارات<div style="font-size:12px;margin-top:4px;color:var(--text3)">جميع الطلبات تمت معالجتها</div></div>';
     return;
   }
-
-  list.innerHTML = notifs.map(n => {
-    const isUnread = !_readNotifKeys.has(n.key);
+  list.innerHTML=notifs.map(n=>{
+    const isUnread=!_readNotifKeys.has(n.key);
     return '<div class="notif-item '+(isUnread?'unread':'')+'" onclick="notifClick(''+n.page+'',''+n.navId+'',''+n.key+'')">' +
       '<div class="notif-icon-wrap '+n.iconClass+'"><i class="ti '+n.icon+'"></i></div>' +
       '<div class="notif-content">' +
-        '<div class="notif-title-row">' +
-          '<div class="notif-item-title">'+n.title+'</div>' +
-          (isUnread ? '<span class="notif-dot"></span>' : '') +
-        '</div>' +
+        '<div class="notif-title-row"><div class="notif-item-title">'+n.title+'</div>'+(isUnread?'<span class="notif-dot"></span>':'')+' </div>' +
         '<div class="notif-desc">'+n.desc+'</div>' +
-        '<div class="notif-meta">' +
-          '<span class="notif-tag '+n.tagClass+'">'+n.tag+'</span>' +
-          '<span><i class="ti ti-clock" style="font-size:10px"></i> الآن</span>' +
-          '<span style="background:var(--red-bg);color:var(--red);padding:1px 7px;border-radius:100px;font-size:10px;font-weight:700">'+n.count+' معلق</span>' +
-        '</div>' +
-      '</div>' +
-    '</div>';
+        '<div class="notif-meta"><span class="notif-tag '+n.tagClass+'">'+n.tag+'</span><span style="background:var(--red-bg);color:var(--red);padding:1px 7px;border-radius:100px;font-size:10px;font-weight:700">'+n.count+' معلق</span></div>' +
+      '</div></div>';
   }).join('');
 }
 
 function toggleNotifPanel(e) {
-  if (e) e.stopPropagation();
-  const panel = document.getElementById('notif-panel');
-  if (!panel) return;
-  const isOpen = panel.classList.contains('open');
-  // close any open panel first
+  if(e) e.stopPropagation();
+  const panel=document.getElementById('notif-panel');
+  if(!panel) return;
+  const isOpen=panel.classList.contains('open');
   document.querySelectorAll('.notif-panel.open').forEach(p=>p.classList.remove('open'));
-  if (!isOpen) {
-    panel.classList.add('open');
-    renderNotifications();
-  }
+  if(!isOpen){ panel.classList.add('open'); renderNotifications(); }
 }
-
-function closeNotifPanel() {
-  document.getElementById('notif-panel')?.classList.remove('open');
-}
-
-function notifClick(page, navId, key) {
-  // mark as read
+function closeNotifPanel(){ document.getElementById('notif-panel')?.classList.remove('open'); }
+function notifClick(page,navId,key){
   _readNotifKeys.add(key);
-  try { localStorage.setItem('_readNotifs', JSON.stringify([..._readNotifKeys])); } catch(e) {}
+  try{localStorage.setItem('_readNotifs',JSON.stringify([..._readNotifKeys]));}catch(e){}
   closeNotifPanel();
-  const navEl = document.getElementById(navId);
-  if (navEl) showPage(page, navEl);
+  const navEl=document.getElementById(navId);
+  if(navEl) showPage(page,navEl);
   renderNotifications();
 }
-
-function markAllRead() {
-  const notifs = getNotifications();
-  notifs.forEach(n => _readNotifKeys.add(n.key));
-  try { localStorage.setItem('_readNotifs', JSON.stringify([..._readNotifKeys])); } catch(e) {}
-  renderNotifications();
-  closeNotifPanel();
+function markAllRead(){
+  getNotifications().forEach(n=>_readNotifKeys.add(n.key));
+  try{localStorage.setItem('_readNotifs',JSON.stringify([..._readNotifKeys]));}catch(e){}
+  renderNotifications(); closeNotifPanel();
 }
-
-// Close panel when clicking outside
-document.addEventListener('click', function(e) {
-  const wrap = document.getElementById('notif-wrap');
-  if (wrap && !wrap.contains(e.target)) closeNotifPanel();
+document.addEventListener('click',function(e){
+  const wrap=document.getElementById('notif-wrap');
+  if(wrap&&!wrap.contains(e.target)) closeNotifPanel();
 });
 
-// Auto-refresh notifications every 30 seconds - only after login
-window._notifInterval = null;
-function startNotifInterval() {
-  if (window._notifInterval) return;
-  window._notifInterval = setInterval(function() {
-    if (currentUser) renderNotifications();
-  }, 30000);
-}
-
+// NOW start firebase after all functions are defined
+// Store the promise so login can wait for it
 window._firebasePromise = window._firebaseInit().catch(e => {
   console.error("Firebase init failed:", e);
   const hint = document.getElementById('login-hint');
