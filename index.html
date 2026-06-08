@@ -3630,7 +3630,7 @@ function renderNotifications() {
   }
   list.innerHTML=notifs.map(n=>{
     const isUnread=!_readNotifKeys.has(n.key);
-    return '<div class="notif-item '+(isUnread?'unread':'')+'" onclick="notifClick(''+n.page+'',''+n.navId+'',''+n.key+'')">' +
+    return '<div class="notif-item '+(isUnread?'unread':'')+'" onclick="notifClick(\''+n.page+'\',\''+n.navId+'\',\''+n.key+'\')">' +
       '<div class="notif-icon-wrap '+n.iconClass+'"><i class="ti '+n.icon+'"></i></div>' +
       '<div class="notif-content">' +
         '<div class="notif-title-row"><div class="notif-item-title">'+n.title+'</div>'+(isUnread?'<span class="notif-dot"></span>':'')+' </div>' +
