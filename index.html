@@ -952,14 +952,15 @@ async function loadAllData() {
     window._settings = {...s, _id:settingsSnap.docs[0].id};
     if (s.companyName) if(window.applyCompanySettings)window.applyCompanySettings(s.companyName, s.logoUrl||'');
   }
-  // renderAll is in same scope now (IIFE converted)
-  try { renderAll(); populateTypeFilters(); } catch(e) { console.warn("Initial render:", e.message); }
+  // Only render if user is already logged in (session restore or post-login)
+  if (currentUser) {
+    try { renderAll(); populateTypeFilters(); } catch(e) { console.warn("Initial render:", e.message); }
+  }
 }
 
 window.reloadData = async function() {
   await loadAllData();
-  renderAll();
-  populateTypeFilters();
+  if (currentUser) { renderAll(); populateTypeFilters(); }
 };
 
 try {
