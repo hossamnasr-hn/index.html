@@ -2002,7 +2002,7 @@ function viewCustomerDetails(id) {
         '<i class="ti ti-package"></i> الأصول المسلَّمة حالياً'+
         '<span style="background:var(--blue-bg);color:var(--blue);padding:2px 8px;border-radius:100px;font-size:11px;font-weight:700">'+activeH.length+'</span>'+
       '</div>'+
-      (activeH.length?'<button onclick="printCustomerCard(''+id+'')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:var(--font);font-weight:600"><i class="ti ti-printer"></i> طباعة كارت العميل</button>':'')+
+      (activeH.length?'<button onclick="printCustomerCard(\''+id+'\');" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:var(--font);font-weight:600"><i class="ti ti-printer"></i> طباعة كارت العميل</button>':'')+
     '</div>'+
     (activeH.length?
       '<div style="border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">'+
@@ -3465,7 +3465,7 @@ function printCustomerCard(id) {
   '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">'+
   '<style>'+
     '*{box-sizing:border-box;margin:0;padding:0}'+
-    'body{font-family:'Cairo',Arial,sans-serif;font-size:13px;direction:rtl;color:#0E1D3A;background:#F0F6FF;padding:20px}'+
+    'body{font-family:\'Cairo\',Arial,sans-serif;font-size:13px;direction:rtl;color:#0E1D3A;background:#F0F6FF;padding:20px}'+
     '.card{background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(28,63,138,.12);overflow:hidden;max-width:800px;margin:0 auto}'+
     '.card-header{background:linear-gradient(135deg,#1C3F8A 0%,#2655A8 100%);padding:20px 24px;display:flex;justify-content:space-between;align-items:center}'+
     '.card-header-left{display:flex;align-items:center;gap:14px}'+
@@ -3489,8 +3489,8 @@ function printCustomerCard(id) {
     '@media print{.noprint{display:none}body{background:#fff;padding:0}.card{box-shadow:none;border-radius:0}}'+
   '</style></head><body>'+
   '<div class="noprint">'+
-    '<button onclick="window.print()" style="padding:9px 24px;background:#1C3F8A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;margin-left:8px">🖨️ طباعة الكارت</button>'+
-    '<button onclick="window.close()" style="padding:9px 18px;background:#eee;color:#333;border:none;border-radius:6px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px">إغلاق</button>'+
+    '<button onclick="window.print()" style="padding:9px 24px;background:#1C3F8A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:\'Cairo\',sans-serif;font-size:13px;font-weight:600;margin-left:8px">🖨️ طباعة الكارت</button>'+
+    '<button onclick="window.close()" style="padding:9px 18px;background:#eee;color:#333;border:none;border-radius:6px;cursor:pointer;font-family:\'Cairo\',sans-serif;font-size:13px">إغلاق</button>'+
   '</div>'+
   '<div class="card">'+
     '<div class="card-header">'+
