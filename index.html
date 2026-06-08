@@ -799,7 +799,7 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db,"users"));
   const existingUsers = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   
-  const ADMIN_FULL_PERMS = ["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"];
+  const ADMIN_FULL_PERMS = ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"];
   if (usersSnap.empty || existingUsers.length === 0) {
     await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms: ADMIN_FULL_PERMS });
     console.log("Admin user created");
@@ -925,7 +925,7 @@ try {
         const nameEl = document.getElementById('header-name');
         if (nameEl) nameEl.textContent = fresh.name;
         document.getElementById('header-role').textContent = fresh.role;
-        const ALL_CUSTODY_PERMS_SR = ['custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
+        const ALL_CUSTODY_PERMS_SR = ['dashboard','custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
         if (fresh.perms.includes('users') && ALL_CUSTODY_PERMS_SR.some(p=>!fresh.perms.includes(p))) {
           const upgraded = [...new Set([...fresh.perms, ...ALL_CUSTODY_PERMS_SR])];
           fresh.perms = upgraded;
@@ -935,6 +935,17 @@ try {
         applyNavPermissions(fresh.perms);
         const addBtnSR = document.getElementById('add-asset-btn');
         if (addBtnSR) addBtnSR.style.display = fresh.perms.includes('add') ? '' : 'none';
+        // إذا لم يملك المستخدم صلاحية لوحة التحكم، انتقل لأول صفحة مسموح بها
+        if (!fresh.perms.includes('dashboard')) {
+          redirectToFirstAllowedPage(fresh.perms);
+        } else {
+          document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+          const dash2 = document.getElementById('page-dashboard');
+          if (dash2) dash2.classList.add('active');
+          document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+          const navDash2 = document.getElementById('nav-dashboard');
+          if (navDash2) navDash2.classList.add('active');
+        }
         populateTypeFilters();
         renderAll();
         console.log("✅ Session restored for:", fresh.name);
@@ -1093,7 +1104,7 @@ async function doLogin() {
     if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
     // ترقية تلقائية للمديرين فقط (من يملكون صلاحية 'users') — لا نُغيِّر صلاحيات المستخدمين العاديين
-    const ADMIN_ALL_PERMS = ['view','add','edit','handover','dispose','maintenance','users','return','customers','custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
+    const ADMIN_ALL_PERMS = ['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
     if (found.perms.includes('users') && ADMIN_ALL_PERMS.some(p=>!found.perms.includes(p))) {
       const upgraded = [...new Set([...found.perms, ...ADMIN_ALL_PERMS])];
       found.perms = upgraded;
@@ -1104,6 +1115,18 @@ async function doLogin() {
     applyNavPermissions(found.perms);
     const addBtn = document.getElementById('add-asset-btn');
     if (addBtn) addBtn.style.display = found.perms.includes('add') ? '' : 'none';
+    // إذا لم يملك المستخدم صلاحية لوحة التحكم، انتقل لأول صفحة مسموح بها
+    if (!found.perms.includes('dashboard')) {
+      redirectToFirstAllowedPage(found.perms);
+    } else {
+      // تأكد من ظهور لوحة التحكم كصفحة نشطة
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+      const dash = document.getElementById('page-dashboard');
+      if (dash) dash.classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+      const navDash = document.getElementById('nav-dashboard');
+      if (navDash) navDash.classList.add('active');
+    }
     populateTypeFilters();
     renderAll();
   } catch(e) {
@@ -1150,7 +1173,7 @@ async function createAdminUser() {
             username: "admin",
             password: "admin123",
             role: data.role || "مدير",
-            perms: data.perms || ["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"]
+            perms: data.perms || ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"]
           });
         }
       }
@@ -1161,7 +1184,7 @@ async function createAdminUser() {
         username: "admin",
         password: "admin123",
         role: "مدير",
-        perms: ["view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"]
+        perms: ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"]
       };
       await add(col(window.db, "users"), adminData);
     }
@@ -1195,7 +1218,8 @@ function applyNavPermissions(perms) {
   const p = perms || [];
   const show = (id, cond) => { const el=document.getElementById(id); if(el) el.style.display=cond?'':'none'; };
 
-  // لوحة التحكم — دائماً ظاهرة
+  // لوحة التحكم — تظهر فقط إذا كان المستخدم يملك صلاحية dashboard
+  show('nav-dashboard', p.includes('dashboard'));
   show('nav-assets',          p.includes('view'));
   show('nav-inventory',       p.includes('view'));
 
@@ -1222,7 +1246,7 @@ function applyNavPermissions(perms) {
 
 function resetNav() {
   // يُخفي كل عناصر القائمة عند تسجيل الخروج
-  ['nav-assets','nav-inventory','nav-section-ops','nav-customers','nav-handover',
+  ['nav-dashboard','nav-assets','nav-inventory','nav-section-ops','nav-customers','nav-handover',
    'nav-returns','nav-maintenance','nav-dispose','nav-custody','nav-dept-custody',
    'nav-section-admin','nav-types','nav-reports','nav-asset-history','nav-users','nav-settings'
   ].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
@@ -1256,12 +1280,49 @@ async function saveChangePassword() {
 /* ────────── NAVIGATION ────────── */
 // خريطة الصفحات والصلاحيات المطلوبة للوصول إليها
 const PAGE_PERMS = {
+  'dashboard': 'dashboard',
   'assets': 'view', 'inventory': 'view', 'customers': 'customers',
   'handover': 'handover', 'returns': 'return', 'maintenance': 'maintenance',
   'dispose': 'dispose', 'custody': 'custody', 'dept-custody': 'dept_custody',
   'types': 'add', 'reports': 'view', 'asset-history': 'view',
-  'users': 'users', 'settings': 'settings', 'dashboard': null
+  'users': 'users', 'settings': 'settings'
 };
+
+// الانتقال لأول صفحة يملك المستخدم صلاحيتها
+function redirectToFirstAllowedPage(perms) {
+  const p = perms || [];
+  const ORDER = [
+    {page:'assets', navId:'nav-assets', perm:'view'},
+    {page:'inventory', navId:'nav-inventory', perm:'view'},
+    {page:'customers', navId:'nav-customers', perm:'customers'},
+    {page:'handover', navId:'nav-handover', perm:'handover'},
+    {page:'returns', navId:'nav-returns', perm:'return'},
+    {page:'maintenance', navId:'nav-maintenance', perm:'maintenance'},
+    {page:'dispose', navId:'nav-dispose', perm:'dispose'},
+    {page:'custody', navId:'nav-custody', perm:'custody'},
+    {page:'dept-custody', navId:'nav-dept-custody', perm:'dept_custody'},
+    {page:'reports', navId:'nav-reports', perm:'view'},
+    {page:'asset-history', navId:'nav-asset-history', perm:'view'},
+    {page:'users', navId:'nav-users', perm:'users'},
+    {page:'settings', navId:'nav-settings', perm:'settings'},
+  ];
+  for (const entry of ORDER) {
+    const hasPerm = entry.perm === 'custody'
+      ? p.some(x=>x==='custody'||x.startsWith('custody_'))
+      : entry.perm === 'dept_custody'
+      ? p.some(x=>x==='dept_custody'||x.startsWith('dept_custody_'))
+      : p.includes(entry.perm);
+    if (hasPerm) {
+      document.querySelectorAll('.page').forEach(pg=>pg.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+      const pageEl = document.getElementById('page-'+entry.page);
+      if (pageEl) pageEl.classList.add('active');
+      const navEl = document.getElementById(entry.navId);
+      if (navEl) navEl.classList.add('active');
+      return;
+    }
+  }
+}
 
 function showPage(id, el) {
   // التحقق من الصلاحية المطلوبة للصفحة
@@ -2466,6 +2527,7 @@ function renderReports() {
 
 /* ────────── USERS ────────── */
 const ALL_PERMS=[
+  {key:'dashboard',label:'لوحة التحكم'},
   {key:'view',label:'عرض الأصول'},{key:'add',label:'إضافة أصول'},{key:'edit',label:'تعديل أصول'},
   {key:'handover',label:'تسليم أصل'},{key:'maintenance',label:'صيانة'},{key:'dispose',label:'إتلاف'},
   {key:'users',label:'إدارة المستخدمين'},{key:'return',label:'استرداد أصل'},{key:'customers',label:'العملاء'},
@@ -2484,6 +2546,7 @@ const ALL_PERMS=[
   {key:'dept_custody_print',label:'عهدة الإدارات — طباعة'},
 ];
 const PERM_LABELS={
+  dashboard:'لوحة التحكم',
   view:'عرض',add:'إضافة',edit:'تعديل',handover:'تسليم',maintenance:'صيانة',dispose:'إتلاف',
   users:'مستخدمون',return:'استرداد',customers:'العملاء',settings:'الإعدادات',
   custody:'عهدة أصول-اطلاع',custody_add:'عهدة أصول-إضافة',custody_edit:'عهدة أصول-تعديل',custody_approve:'عهدة أصول-موافقة',custody_print:'عهدة أصول-طباعة',
@@ -2541,8 +2604,15 @@ function userFormHTML(u) {
     '<div class="field"><label>الدور</label><select id="u-role"><option value="مدير" '+(u&&u.role==='مدير'?'selected':'')+'>مدير</option><option value="مشرف" '+(u&&u.role==='مشرف'?'selected':'')+'>مشرف</option><option value="موظف" '+((!u||u.role==='موظف')?'selected':'')+'>موظف</option></select></div>'+
     '</div>'+
     '<div class="form-section">الصلاحيات</div>'+
+    // صلاحية لوحة التحكم — في قسم بارز منفصل
+    '<div style="background:var(--blue-bg);border:2px solid var(--blue-light);border-radius:var(--radius);padding:12px;margin-bottom:10px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:8px"><i class="ti ti-dashboard"></i> لوحة التحكم الرئيسية</div>'+
+    '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:rgba(255,255,255,.7);cursor:pointer;border:1px solid var(--blue-light)">'+
+    '<input type="checkbox" name="perm" value="dashboard" '+(u&&(u.perms||[]).includes('dashboard')?'checked':'')+' style="width:16px;height:16px;accent-color:var(--blue)">'+
+    '<span style="font-size:13px;font-weight:600;color:var(--blue)">السماح برؤية لوحة التحكم (الإحصائيات والملخصات)</span></label>'+
+    '</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">'+
-    ALL_PERMS.filter(p=>!p.key.startsWith('custody')&&!p.key.startsWith('dept_custody')).map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:var(--bg);cursor:pointer;border:1px solid var(--border)">'+
+    ALL_PERMS.filter(p=>p.key!=='dashboard'&&!p.key.startsWith('custody')&&!p.key.startsWith('dept_custody')).map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:var(--bg);cursor:pointer;border:1px solid var(--border)">'+
       '<input type="checkbox" name="perm" value="'+p.key+'" '+(u&&(u.perms||[]).includes(p.key)?'checked':'')+' style="width:15px;height:15px;accent-color:var(--blue)">'+
       '<span style="font-size:13px">'+p.label+'</span></label>'
     ).join('')+
@@ -2571,10 +2641,10 @@ function userFormHTML(u) {
 }
 function setPresetPerms(p) {
   const pre={
-    admin:['view','add','edit','handover','dispose','maintenance','users','return','customers','settings',
+    admin:['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','settings',
            'custody','custody_add','custody_edit','custody_approve','custody_print',
            'dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print'],
-    manager:['view','add','edit','handover','dispose','maintenance','return','customers',
+    manager:['dashboard','view','add','edit','handover','dispose','maintenance','return','customers',
              'custody','custody_add','custody_approve','custody_print',
              'dept_custody','dept_custody_add','dept_custody_approve','dept_custody_print'],
     viewer:['view','custody','custody_print','dept_custody','dept_custody_print']
