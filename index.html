@@ -1944,18 +1944,80 @@ function openEditCustomer(id) {
   document.getElementById('modal-overlay').classList.add('show');
 }
 
+function _barsFromCode(str) {
+  let bars=''; const w=2; let x=8;
+  for(let i=0;i<str.length;i++){
+    const c=str.charCodeAt(i);
+    const b1=(c%3)+1, b2=((c>>2)%3)+1;
+    bars+='<rect x="'+x+'" y="4" width="'+(b1*w)+'" height="40" fill="#1C3F8A"/>'; x+=b1*w+w;
+    bars+='<rect x="'+x+'" y="4" width="'+(b2*w)+'" height="40" fill="#1C3F8A"/>'; x+=b2*w+2*w;
+  }
+  return {bars,width:x+8};
+}
+
 function viewCustomerDetails(id) {
   const c = getCustomers().find(x=>x._id===id);
   if (!c) return;
   const activeH = getHandovers().filter(h=>h.clientId===id&&h.status==='مُسلَّم');
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-user"></i> '+c.name;
+
+  // build asset rows with inline barcode SVG
+  function assetRowHTML(h) {
+    const asset = getAssets().find(a=>a._id===h.assetId)||{};
+    const code = asset.code||h.assetCode||'';
+    let barcodeHTML = '';
+    if (code) {
+      const {bars,width} = _barsFromCode(code);
+      barcodeHTML = '<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;margin-top:4px">'+
+        '<svg viewBox="0 0 '+width+' 58" width="110" height="38" xmlns="http://www.w3.org/2000/svg">'+bars+
+        '<text x="'+(width/2)+'" y="55" text-anchor="middle" font-size="9" font-family="monospace" fill="#333">'+code+'</text></svg>'+
+        '<span style="font-size:10px;font-family:monospace;color:#3A5070;letter-spacing:.5px">'+code+'</span>'+
+      '</div>';
+    }
+    return '<tr>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid var(--border)">'+
+        '<div style="font-weight:700;font-size:13px">'+h.assetName+'</div>'+
+        (h.assetType?'<div style="font-size:11px;color:var(--text3)">'+h.assetType+(h.assetSubType?' / '+h.assetSubType:'')+'</div>':'')+
+        barcodeHTML+
+      '</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;font-size:15px;color:var(--blue)">'+h.qty+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid var(--border);text-align:center;font-size:12px;color:var(--text2)">'+h.date+'</td>'+
+    '</tr>';
+  }
+
+  document.getElementById('modal-title').innerHTML = '<i class="ti ti-user-circle" style="color:var(--blue)"></i> '+c.name;
   document.getElementById('modal-body').innerHTML =
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">'+
-      ['السجل التجاري|'+(c.crNumber||'-'),'الجوال|'+(c.phone||'-'),'العنوان|'+(c.address||'-'),'المسؤول|'+(c.contactPerson||'-')].map(p=>{const[k,v]=p.split('|');return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px"><div style="font-size:11px;color:var(--text3);margin-bottom:3px">'+k+'</div><div style="font-weight:700;font-size:13px">'+v+'</div></div>';}).join('')+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">'+
+      [
+        ['السجل التجاري',c.crNumber||'-','ti-building'],
+        ['الجوال',c.phone||'-','ti-phone'],
+        ['العنوان',c.address||'-','ti-map-pin'],
+        ['المسؤول',c.contactPerson||'-','ti-user']
+      ].map(([k,v,ic])=>'<div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;display:flex;align-items:flex-start;gap:8px">'+
+        '<i class="ti '+ic+'" style="font-size:16px;color:var(--blue);margin-top:1px;flex-shrink:0"></i>'+
+        '<div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">'+k+'</div><div style="font-weight:700;font-size:13px">'+v+'</div></div>'+
+      '</div>').join('')+
     '</div>'+
-    '<div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--blue)">الأصول المسلَّمة حالياً ('+activeH.length+')</div>'+
-    (activeH.length?'<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg2)"><th style="padding:8px;text-align:right">الأصل</th><th style="padding:8px;text-align:center">العدد</th><th style="padding:8px;text-align:center">التاريخ</th></tr></thead><tbody>'+activeH.map(h=>'<tr><td style="padding:8px;border-bottom:1px solid var(--border)">'+h.assetName+'</td><td style="padding:8px;text-align:center;border-bottom:1px solid var(--border)">'+h.qty+'</td><td style="padding:8px;text-align:center;border-bottom:1px solid var(--border)">'+h.date+'</td></tr>').join('')+'</tbody></table>':'<div style="color:var(--text3);font-size:12px">لا توجد أصول مسلَّمة حالياً</div>');
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--blue);display:flex;align-items:center;gap:6px">'+
+        '<i class="ti ti-package"></i> الأصول المسلَّمة حالياً'+
+        '<span style="background:var(--blue-bg);color:var(--blue);padding:2px 8px;border-radius:100px;font-size:11px;font-weight:700">'+activeH.length+'</span>'+
+      '</div>'+
+      (activeH.length?'<button onclick="printCustomerCard(''+id+'')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:var(--font);font-weight:600"><i class="ti ti-printer"></i> طباعة كارت العميل</button>':'')+
+    '</div>'+
+    (activeH.length?
+      '<div style="border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">'+
+      '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+        '<thead><tr style="background:linear-gradient(135deg,var(--blue) 0%,#2655A8 100%)">'+
+          '<th style="padding:10px 12px;text-align:right;color:#fff;font-weight:700"><i class="ti ti-package" style="margin-left:5px"></i>الأصل / الباركود</th>'+
+          '<th style="padding:10px 12px;text-align:center;color:#fff;font-weight:700">العدد</th>'+
+          '<th style="padding:10px 12px;text-align:center;color:#fff;font-weight:700">التاريخ</th>'+
+        '</tr></thead>'+
+        '<tbody>'+activeH.map(assetRowHTML).join('')+'</tbody>'+
+      '</table></div>'
+    :'<div style="text-align:center;padding:28px;color:var(--text3);font-size:13px"><i class="ti ti-package-off" style="font-size:32px;display:block;margin-bottom:8px;opacity:.4"></i>لا توجد أصول مسلَّمة حالياً</div>');
+
   document.getElementById('modal-save-btn').style.display='none';
+  document.getElementById('modal-box').className = 'modal wider';
   document.getElementById('modal-overlay').classList.add('show');
 }
 
@@ -3335,6 +3397,140 @@ function printHandoverForm(hid) {
   win.document.close();
 }
 
+/* ────────── PRINT CUSTOMER CARD ────────── */
+function printCustomerCard(id) {
+  const c = getCustomers().find(x=>x._id===id);
+  if (!c) return;
+  const activeH = getHandovers().filter(h=>h.clientId===id&&h.status==='مُسلَّم');
+  const cn = window._settings?.companyName||'شركة ثمار القمة المحدودة';
+  const logoUrl = window._settings?.logoUrl||'';
+  const logoHTML = logoUrl?'<img src="'+logoUrl+'" style="height:56px;max-width:110px;object-fit:contain;border-radius:6px" alt="logo">':'';
+
+  // barcode SVG generator (same algorithm as main app)
+  function barsFromCode(str) {
+    let bars=''; const w=2; let x=8;
+    for(let i=0;i<str.length;i++){
+      const ch=str.charCodeAt(i);
+      const b1=(ch%3)+1, b2=((ch>>2)%3)+1;
+      bars+='<rect x="'+x+'" y="4" width="'+(b1*w)+'" height="44" fill="#1C3F8A"/>'; x+=b1*w+w;
+      bars+='<rect x="'+x+'" y="4" width="'+(b2*w)+'" height="44" fill="#1C3F8A"/>'; x+=b2*w+2*w;
+    }
+    return {bars,width:x+8};
+  }
+
+  // Build assets rows HTML
+  let assetsHTML = '';
+  if (activeH.length) {
+    assetsHTML = activeH.map((h,idx)=>{
+      const asset = getAssets().find(a=>a._id===h.assetId)||{};
+      const code = asset.code||h.assetCode||'';
+      let barcodeCell = '<td style="padding:10px 12px;border:1px solid #C8DBF0;text-align:center;vertical-align:middle">—</td>';
+      if (code) {
+        const {bars,width} = barsFromCode(code);
+        barcodeCell = '<td style="padding:10px 12px;border:1px solid #C8DBF0;text-align:center;vertical-align:middle">'+
+          '<svg viewBox="0 0 '+width+' 62" width="120" height="44" xmlns="http://www.w3.org/2000/svg">'+bars+
+          '<text x="'+(width/2)+'" y="58" text-anchor="middle" font-size="9" font-family="monospace" fill="#333">'+code+'</text></svg>'+
+          '<div style="font-size:10px;font-family:monospace;color:#3A5070;margin-top:2px;letter-spacing:.5px">'+code+'</div>'+
+        '</td>';
+      }
+      return '<tr style="background:'+(idx%2===0?'#fff':'#F8FBFF')+'">'+
+        '<td style="padding:10px 12px;border:1px solid #C8DBF0;font-weight:700;vertical-align:middle">'+h.assetName+
+          (h.assetType?'<div style="font-size:10px;color:#7090B0;font-weight:400;margin-top:2px">'+h.assetType+(h.assetSubType?' / '+h.assetSubType:'')+'</div>':'')+
+        '</td>'+
+        barcodeCell+
+        '<td style="padding:10px 12px;border:1px solid #C8DBF0;text-align:center;font-weight:700;font-size:16px;color:#1C3F8A;vertical-align:middle">'+h.qty+'</td>'+
+        '<td style="padding:10px 12px;border:1px solid #C8DBF0;text-align:center;font-size:12px;color:#5B7AAA;vertical-align:middle">'+h.date+'</td>'+
+      '</tr>';
+    }).join('');
+  } else {
+    assetsHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#7090B0;border:1px solid #C8DBF0">لا توجد أصول مسلَّمة حالياً</td></tr>';
+  }
+
+  const infoItems = [
+    ['السجل التجاري', c.crNumber||'—'],
+    ['الرقم الضريبي', c.taxNumber||'—'],
+    ['الجوال', c.phone||'—'],
+    ['الجوال الثانوي', c.phone2||'—'],
+    ['الهاتف الثابت', c.landline||'—'],
+    ['البريد الإلكتروني', c.email||'—'],
+    ['المدينة', c.city||'—'],
+    ['العنوان', c.address||'—'],
+    ['المسؤول', c.contactPerson||'—'],
+    ['تاريخ التسجيل', c.date||'—'],
+  ];
+
+  const win = window.open('','_blank');
+  win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">'+
+  '<title>كارت عميل - '+c.name+'</title>'+
+  '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">'+
+  '<style>'+
+    '*{box-sizing:border-box;margin:0;padding:0}'+
+    'body{font-family:'Cairo',Arial,sans-serif;font-size:13px;direction:rtl;color:#0E1D3A;background:#F0F6FF;padding:20px}'+
+    '.card{background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(28,63,138,.12);overflow:hidden;max-width:800px;margin:0 auto}'+
+    '.card-header{background:linear-gradient(135deg,#1C3F8A 0%,#2655A8 100%);padding:20px 24px;display:flex;justify-content:space-between;align-items:center}'+
+    '.card-header-left{display:flex;align-items:center;gap:14px}'+
+    '.card-title{color:#fff;font-size:18px;font-weight:700}'+
+    '.card-sub{color:rgba(255,255,255,.75);font-size:12px;margin-top:2px}'+
+    '.card-id{background:rgba(255,255,255,.15);color:#fff;padding:4px 12px;border-radius:100px;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,.3)}'+
+    '.card-body{padding:20px 24px}'+
+    '.section-title{font-size:13px;font-weight:700;color:#1C3F8A;border-right:3px solid #1C3F8A;padding-right:10px;margin-bottom:12px;margin-top:20px;display:flex;align-items:center;gap:6px}'+
+    '.section-title:first-child{margin-top:0}'+
+    '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px}'+
+    '.info-item{background:#F8FBFF;border:1px solid #DBEAFE;border-radius:6px;padding:8px 12px}'+
+    '.info-label{font-size:10px;color:#7090B0;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}'+
+    '.info-value{font-size:13px;font-weight:700;color:#0E1D3A}'+
+    '.notes-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:12px;margin-top:8px;font-size:12px;color:#92400E;line-height:1.6}'+
+    'table{width:100%;border-collapse:collapse;margin-top:4px}'+
+    'thead tr{background:linear-gradient(135deg,#1C3F8A 0%,#2655A8 100%)}'+
+    'thead th{padding:10px 12px;color:#fff;font-weight:700;text-align:right;font-size:12px}'+
+    'thead th:nth-child(2),thead th:nth-child(3){text-align:center}'+
+    '.footer{background:#F0F6FF;border-top:1px solid #C8DBF0;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#7090B0}'+
+    '.noprint{padding:14px;text-align:center;border-bottom:1px solid #eee;background:#fff}'+
+    '@media print{.noprint{display:none}body{background:#fff;padding:0}.card{box-shadow:none;border-radius:0}}'+
+  '</style></head><body>'+
+  '<div class="noprint">'+
+    '<button onclick="window.print()" style="padding:9px 24px;background:#1C3F8A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;margin-left:8px">🖨️ طباعة الكارت</button>'+
+    '<button onclick="window.close()" style="padding:9px 18px;background:#eee;color:#333;border:none;border-radius:6px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px">إغلاق</button>'+
+  '</div>'+
+  '<div class="card">'+
+    '<div class="card-header">'+
+      '<div class="card-header-left">'+logoHTML+
+        '<div>'+
+          '<div class="card-title">'+c.name+'</div>'+
+          '<div class="card-sub">'+cn+' — كارت بيانات العميل</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="text-align:left">'+
+        '<div class="card-id">'+new Date().toLocaleDateString('ar-SA')+'</div>'+
+        '<div style="color:rgba(255,255,255,.7);font-size:11px;margin-top:6px;text-align:center">'+activeH.length+' أصل مسلَّم</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="card-body">'+
+      '<div class="section-title">📋 بيانات العميل</div>'+
+      '<div class="info-grid">'+
+        infoItems.map(([k,v])=>'<div class="info-item"><div class="info-label">'+k+'</div><div class="info-value">'+v+'</div></div>').join('')+
+      '</div>'+
+      (c.notes?'<div class="notes-box">📝 <strong>ملاحظات:</strong> '+c.notes+'</div>':'')+
+      '<div class="section-title" style="margin-top:20px">📦 الأصول المسلَّمة حالياً ('+activeH.length+')</div>'+
+      '<table>'+
+        '<thead><tr>'+
+          '<th>الأصل</th>'+
+          '<th style="text-align:center;width:140px">الباركود</th>'+
+          '<th style="text-align:center;width:70px">العدد</th>'+
+          '<th style="text-align:center;width:100px">تاريخ التسليم</th>'+
+        '</tr></thead>'+
+        '<tbody>'+assetsHTML+'</tbody>'+
+      '</table>'+
+    '</div>'+
+    '<div class="footer">'+
+      '<span>'+cn+' | نظام إدارة الأصول</span>'+
+      '<span>'+new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'})+'</span>'+
+    '</div>'+
+  '</div>'+
+  '</body></html>');
+  win.document.close();
+}
+
 /* ────────── PRINT CUSTODY FORM ────────── */
 function printCustodyForm(id) {
   const c=(window.custodyRequests||[]).find(x=>x._id===id);
@@ -3551,6 +3747,7 @@ if(typeof switchAttrsTab!=='undefined')window.switchAttrsTab=switchAttrsTab;
 if(typeof printReport!=='undefined')window.printReport=printReport;
 if(typeof printHandoverForm!=='undefined')window.printHandoverForm=printHandoverForm;
 if(typeof printCustodyForm!=='undefined')window.printCustodyForm=printCustodyForm;
+if(typeof printCustomerCard!=='undefined')window.printCustomerCard=printCustomerCard;
 if(typeof updateSubTypeOptions!=='undefined')window.updateSubTypeOptions=updateSubTypeOptions;
 if(typeof onHandoverAssetChange!=='undefined')window.onHandoverAssetChange=onHandoverAssetChange;
 if(typeof onHandoverCustomerSelect!=='undefined')window.onHandoverCustomerSelect=onHandoverCustomerSelect;
