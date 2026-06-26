@@ -216,7 +216,14 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
   .table-card{box-shadow:none!important;border:1px solid #ccc!important}
 }
 
-/* ── Image ── */
+/* ── Reset Danger Zone ── */
+#reset-confirm-input:focus{outline:none;border-color:var(--red)!important;background:#fff!important}
+.reset-step{display:none}.reset-step.active{display:block}
+.countdown-ring{width:54px;height:54px;border-radius:50%;background:var(--red-bg);border:3px solid var(--red);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--red);margin:0 auto 10px;transition:all .3s}
+.reset-progress{height:6px;background:var(--bg2);border-radius:100px;overflow:hidden;margin:10px 0}
+.reset-progress-fill{height:100%;background:var(--red);border-radius:100px;transition:width .05s linear}
+
+
 .asset-img{width:48px;height:48px;border-radius:6px;object-fit:cover;border:1px solid var(--border);cursor:pointer}
 .asset-img-placeholder{width:48px;height:48px;border-radius:6px;background:var(--bg2);border:1px dashed var(--border2);display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:18px}
 .img-upload-area{border:2px dashed var(--border2);border-radius:var(--radius);padding:20px;text-align:center;cursor:pointer;color:var(--text2);font-size:13px;transition:border-color .2s;margin-bottom:8px}
@@ -783,6 +790,30 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
             <button class="btn-save" onclick="saveSettings()"><i class="ti ti-device-floppy"></i> حفظ الإعدادات</button>
           </div>
         </div>
+
+        <!-- منطقة الخطر - مدير النظام فقط -->
+        <div id="reset-danger-zone" class="table-card" style="padding:24px;max-width:520px;margin-top:20px;border:2px solid var(--red);display:none">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+            <div style="width:38px;height:38px;background:var(--red-bg);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <i class="ti ti-alert-triangle" style="color:var(--red);font-size:20px"></i>
+            </div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--red)">منطقة الخطر</div>
+              <div style="font-size:12px;color:var(--text2)">إجراءات حساسة — لمدير النظام فقط</div>
+            </div>
+          </div>
+          <div class="alert alert-danger" style="margin-bottom:16px">
+            <i class="ti ti-info-circle"></i>
+            <div>
+              <strong>تصفير قاعدة البيانات</strong> سيحذف نهائياً جميع البيانات المدخلة مع الإبقاء على المستخدمين والإعدادات.
+              <br>تشمل البيانات المحذوفة: الأصول، العملاء، التسليمات، الاسترداد، الصيانة، الإتلاف، طلبات العهدة، عهدة الإدارات، وجميع التصنيفات.
+              <br><strong>هذا الإجراء لا يمكن التراجع عنه.</strong>
+            </div>
+          </div>
+          <button onclick="openResetConfirmModal()" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:var(--red);color:#fff;border:none;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);transition:opacity .2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+            <i class="ti ti-database-off"></i> تصفير جميع البيانات
+          </button>
+        </div>
       </div>
 
     </div>
@@ -1004,6 +1035,7 @@ try {
         }
         populateTypeFilters();
         renderAll();
+        try { if(window.showDangerZoneIfAdmin) window.showDangerZoneIfAdmin(); } catch(e){}
         console.log("✅ Session restored for:", fresh.name);
       } else {
         localStorage.removeItem('_assetSession');
@@ -1105,6 +1137,203 @@ async function saveSettings() {
     showToast('تم حفظ الإعدادات', 'success');
     await window.reloadData();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+/* ────────── RESET ALL DATA ────────── */
+let _resetCountdownTimer = null;
+
+function openResetConfirmModal() {
+  if (!can('users')) { showToast('هذه الميزة لمدير النظام فقط','error'); return; }
+
+  // إلغاء أي عداد تنازلي سابق
+  if (_resetCountdownTimer) { clearInterval(_resetCountdownTimer); _resetCountdownTimer = null; }
+
+  document.getElementById('modal-title').innerHTML = '<i class="ti ti-database-off" style="color:var(--red)"></i> <span style="color:var(--red)">تصفير قاعدة البيانات</span>';
+  document.getElementById('modal-box').className = 'modal wide';
+  document.getElementById('modal-save-btn').style.display = 'none';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="alert alert-danger" style="margin-bottom:16px;font-size:13px">
+      <i class="ti ti-alert-triangle" style="font-size:18px;flex-shrink:0"></i>
+      <div>
+        <strong>تحذير: هذا الإجراء لا رجعة فيه!</strong><br>
+        سيتم حذف جميع البيانات التالية نهائياً من Firebase:
+        <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:12px">
+          <span>✗ جميع الأصول ومخزونها</span>
+          <span>✗ سجلات العملاء</span>
+          <span>✗ سجلات التسليم</span>
+          <span>✗ سجلات الاسترداد</span>
+          <span>✗ سجلات الصيانة</span>
+          <span>✗ سجلات الإتلاف</span>
+          <span>✗ طلبات العهدة</span>
+          <span>✗ عهدة الإدارات</span>
+          <span>✗ أنواع الأصول والتصنيفات</span>
+          <span>✗ الخصائص والمواصفات</span>
+        </div>
+        <div style="margin-top:8px;color:var(--green);font-weight:700">✔ يُحتفظ بـ: المستخدمين — إعدادات الشركة</div>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label style="font-size:13px;font-weight:700;color:var(--red)">لتأكيد العملية، اكتب: <code style="background:var(--red-bg);color:var(--red);padding:1px 6px;border-radius:4px">تصفير</code> في الحقل أدناه</label>
+      <input type="text" id="reset-confirm-input" placeholder='اكتب "تصفير" هنا...'
+        style="width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:var(--radius);font-size:15px;font-family:var(--font);margin-top:8px;text-align:center;color:var(--red);font-weight:700"
+        oninput="checkResetConfirmInput()">
+    </div>
+    <div id="reset-execute-wrap" style="display:none;margin-top:14px">
+      <div style="text-align:center;margin-bottom:8px">
+        <div class="countdown-ring" id="reset-countdown-ring">5</div>
+        <div style="font-size:12px;color:var(--text2)">جارٍ التنفيذ خلال...</div>
+      </div>
+      <div class="reset-progress"><div class="reset-progress-fill" id="reset-progress-fill" style="width:100%"></div></div>
+      <button id="reset-cancel-btn" onclick="cancelResetCountdown()" style="width:100%;padding:9px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);font-family:var(--font);font-size:13px;cursor:pointer;font-weight:600;margin-top:6px">
+        <i class="ti ti-x"></i> إلغاء
+      </button>
+    </div>
+    <div id="reset-doing-wrap" style="display:none;margin-top:14px;text-align:center">
+      <i class="ti ti-loader" style="font-size:28px;color:var(--red);animation:spin 1s linear infinite"></i>
+      <div style="margin-top:8px;font-size:13px;font-weight:700;color:var(--red)" id="reset-status-msg">جارٍ حذف البيانات...</div>
+    </div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  `;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function checkResetConfirmInput() {
+  const val = (document.getElementById('reset-confirm-input')?.value || '').trim();
+  const wrap = document.getElementById('reset-execute-wrap');
+  if (!wrap) return;
+  if (val === 'تصفير') {
+    wrap.style.display = 'block';
+    startResetCountdown();
+  } else {
+    wrap.style.display = 'none';
+    cancelResetCountdown();
+  }
+}
+
+function startResetCountdown() {
+  if (_resetCountdownTimer) return; // لا تبدأ مرتين
+  let secondsLeft = 5;
+  const ringEl = document.getElementById('reset-countdown-ring');
+  const fillEl = document.getElementById('reset-progress-fill');
+  if (!ringEl || !fillEl) return;
+  ringEl.textContent = secondsLeft;
+  fillEl.style.width = '100%';
+
+  const totalMs = 5000;
+  const startTime = Date.now();
+  _resetCountdownTimer = setInterval(() => {
+    const elapsed = Date.now() - startTime;
+    const remaining = Math.max(0, totalMs - elapsed);
+    const secs = Math.ceil(remaining / 1000);
+    if (ringEl) ringEl.textContent = secs;
+    if (fillEl) fillEl.style.width = (remaining / totalMs * 100) + '%';
+    if (remaining <= 0) {
+      clearInterval(_resetCountdownTimer);
+      _resetCountdownTimer = null;
+      executeResetAllData();
+    }
+  }, 50);
+}
+
+function cancelResetCountdown() {
+  if (_resetCountdownTimer) { clearInterval(_resetCountdownTimer); _resetCountdownTimer = null; }
+  const ring = document.getElementById('reset-countdown-ring');
+  const fill = document.getElementById('reset-progress-fill');
+  if (ring) ring.textContent = '5';
+  if (fill) fill.style.width = '100%';
+}
+
+async function executeResetAllData() {
+  if (!can('users')) { showToast('هذه الميزة لمدير النظام فقط','error'); return; }
+
+  // إخفاء زر الإلغاء وعرض شاشة التنفيذ
+  const execWrap  = document.getElementById('reset-execute-wrap');
+  const doingWrap = document.getElementById('reset-doing-wrap');
+  const inputEl   = document.getElementById('reset-confirm-input');
+  if (execWrap)  execWrap.style.display  = 'none';
+  if (doingWrap) doingWrap.style.display = 'block';
+  if (inputEl)   inputEl.disabled = true;
+
+  const setMsg = (txt) => {
+    const el = document.getElementById('reset-status-msg');
+    if (el) el.textContent = txt;
+  };
+
+  try {
+    await waitForFirebase();
+    const {collection:col, getDocs:gDocs, deleteDoc:del, doc:docRef, addDoc:add} = window.fsApi;
+    const db = window.db;
+
+    // المجموعات المراد حذفها (باستثناء users و settings)
+    const COLLECTIONS_TO_DELETE = [
+      'assets', 'handovers', 'maintenances', 'disposes',
+      'custodyRequests', 'customers', 'returns', 'deptCustodyRequests',
+      'assetTypes', 'assetSubTypes', 'attributes'
+    ];
+
+    for (const colName of COLLECTIONS_TO_DELETE) {
+      setMsg('جارٍ حذف: ' + colName + '...');
+      const snap = await gDocs(col(db, colName));
+      for (const d of snap.docs) {
+        await del(docRef(db, colName, d.id));
+      }
+    }
+
+    // إعادة إنشاء البيانات الافتراضية للتصنيفات
+    setMsg('جارٍ إعادة إنشاء التصنيفات الافتراضية...');
+    const defaultTypes = ["ثلاجات العرض","معدات المطبخ","أجهزة إلكترونية","أثاث","مركبات","أخرى"];
+    for (const t of defaultTypes) await add(col(db,"assetTypes"),{name:t});
+    const defaultSubTypes = [
+      {name:"باب واحد",parentType:"ثلاجات العرض"},
+      {name:"بابين",parentType:"ثلاجات العرض"},
+      {name:"ثلاثة أبواب",parentType:"ثلاجات العرض"},
+      {name:"عرض مفتوح",parentType:"ثلاجات العرض"},
+    ];
+    for (const s of defaultSubTypes) await add(col(db,"assetSubTypes"),s);
+    const defaultAttrs = [
+      {type:"manufacturer",value:"Samsung"},{type:"manufacturer",value:"LG"},
+      {type:"manufacturer",value:"Hisense"},{type:"manufacturer",value:"Carrier"},
+      {type:"manufacturer",value:"Trane"},{type:"capacity",value:"200L"},
+      {type:"capacity",value:"300L"},{type:"capacity",value:"500L"},
+      {type:"capacity",value:"700L"},{type:"capacity",value:"1000L"},
+    ];
+    for (const a of defaultAttrs) await add(col(db,"attributes"),a);
+
+    // تفريغ المصفوفات المحلية
+    window.assets            = [];
+    window.handovers         = [];
+    window.maintenances      = [];
+    window.disposes          = [];
+    window.custodyRequests   = [];
+    window.customers         = [];
+    window.returns           = [];
+    window.deptCustodyRequests = [];
+
+    // إعادة تحميل كامل من Firebase
+    setMsg('جارٍ إعادة تحميل البيانات...');
+    await window.reloadData();
+
+    closeModal();
+    showToast('✅ تم تصفير قاعدة البيانات بنجاح', 'success');
+
+    // تسجيل العملية في localStorage للمراجعة
+    try {
+      const log = JSON.parse(localStorage.getItem('_resetLog')||'[]');
+      log.push({ by: currentUser?.name, at: new Date().toISOString() });
+      localStorage.setItem('_resetLog', JSON.stringify(log.slice(-20)));
+    } catch(e) {}
+
+  } catch(err) {
+    console.error('Reset error:', err);
+    setMsg('❌ خطأ أثناء التصفير: ' + err.message);
+    showToast('خطأ: ' + err.message, 'error');
+  }
+}
+
+/* كشف منطقة الخطر عند الدخول للإعدادات */
+function showDangerZoneIfAdmin() {
+  const zone = document.getElementById('reset-danger-zone');
+  if (zone) zone.style.display = can('users') ? '' : 'none';
 }
 
 /* ────────── AUTH ────────── */
@@ -1397,6 +1626,7 @@ function showPage(id, el) {
   document.getElementById('page-'+id).classList.add('active');
   if (el) el.classList.add('active');
   renderAll();
+  if (id === 'settings') { try { showDangerZoneIfAdmin(); } catch(e){} }
 }
 
 /* ────────── RENDER ALL ────────── */
@@ -3736,6 +3966,10 @@ if(typeof openEditUser!=='undefined')window.openEditUser=openEditUser;
 if(typeof openChangePassword!=='undefined')window.openChangePassword=openChangePassword;
 if(typeof saveSettings!=='undefined')window.saveSettings=saveSettings;
 if(typeof previewSettingsLogo!=='undefined')window.previewSettingsLogo=previewSettingsLogo;
+if(typeof openResetConfirmModal!=='undefined')window.openResetConfirmModal=openResetConfirmModal;
+if(typeof checkResetConfirmInput!=='undefined')window.checkResetConfirmInput=checkResetConfirmInput;
+if(typeof cancelResetCountdown!=='undefined')window.cancelResetCountdown=cancelResetCountdown;
+if(typeof showDangerZoneIfAdmin!=='undefined')window.showDangerZoneIfAdmin=showDangerZoneIfAdmin;
 if(typeof addAssetType!=='undefined')window.addAssetType=addAssetType;
 if(typeof deleteType!=='undefined')window.deleteType=deleteType;
 if(typeof addSubType!=='undefined')window.addSubType=addSubType;
