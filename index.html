@@ -1412,17 +1412,26 @@ applyStoredDarkMode();
    📱 MOBILE SIDEBAR
 ══════════════════════════════════════ */
 function toggleSidebar() {
+  // يعمل فقط على شاشات الجوال (أقل من 768px)
+  if (window.innerWidth > 768) return;
   try {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
     if (!sidebar) return;
     const isOpen = sidebar.classList.toggle('open');
-    if (overlay) {
-      if (isOpen) overlay.style.display = 'block';
-      else overlay.style.display = 'none';
-    }
+    if (overlay) overlay.style.display = isOpen ? 'block' : 'none';
   } catch(e) { console.warn('toggleSidebar:', e); }
 }
+
+// إغلاق القائمة تلقائياً عند التبديل لسطح المكتب
+window.addEventListener('resize', function() {
+  if (window.innerWidth > 768) {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.style.display = 'none';
+  }
+});
 
 /* ══════════════════════════════════════
    🔍 GLOBAL SEARCH
@@ -1777,7 +1786,7 @@ function showShortcutsModal() {
         <span class="shortcut-desc"><i class="ti ti-bell" style="color:var(--amber);margin-left:4px"></i> تعليم إشعارات مقروءة</span>
         <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">B</span></div>
       </div>
-      <div class="shortcut-item">
+      <div class="shortcut-item" id="shortcut-mobile-menu" style="${window.innerWidth <= 768 ? '' : 'display:none'}">
         <span class="shortcut-desc"><i class="ti ti-menu-2" style="color:var(--text2);margin-left:4px"></i> قائمة الجوال</span>
         <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">M</span></div>
       </div>
@@ -1913,11 +1922,11 @@ document.addEventListener('keydown', function(e) {
     return;
   }
 
-  // ══ Alt+M — فتح/إغلاق القائمة الجانبية (مفيد للجوال) ══
+  // ══ Alt+M — فتح/إغلاق القائمة الجانبية (للجوال فقط) ══
   if (e.altKey && !e.ctrlKey && e.key === 'm') {
     e.preventDefault();
     e.stopPropagation();
-    toggleSidebar();
+    if (window.innerWidth <= 768) toggleSidebar();
     return;
   }
 });
