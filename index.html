@@ -6,6 +6,8 @@
 <title id="page-title">نظام إدارة الأصول - ثمار القمة</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
   --bg:#F0F6FF;--bg2:#E3EEFB;--bg3:#D3E5F7;
@@ -310,6 +312,226 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
 .return-reason-card:hover{border-color:var(--blue);background:var(--blue-bg)}
 .return-reason-card.selected{border-color:var(--blue);background:var(--blue);color:#fff}
 .return-reason-card i{font-size:20px;display:block;margin-bottom:4px}
+
+/* ══════════════════════════════════════
+   🌙 DARK MODE
+══════════════════════════════════════ */
+html.dark{
+  --bg:#0F172A;--bg2:#1E293B;--bg3:#263348;
+  --card:#1E293B;--border:#2D4060;--border2:#374B66;
+  --text:#E2EBF8;--text2:#94A8C4;--text3:#5A7090;
+  --blue:#4D7FE8;--blue-bg:#1A2C4E;--blue-light:#2A4070;
+  --green:#4CAF50;--green-bg:#1A2E1B;
+  --amber:#F59E0B;--amber-bg:#2D2108;
+  --red:#F87171;--red-bg:#2D1515;
+  --purple:#A78BFA;--purple-bg:#1E1535;
+  --teal:#2DD4BF;--teal-bg:#0D2828;
+  --shadow:0 1px 3px rgba(0,0,0,.4);--shadow-lg:0 4px 16px rgba(0,0,0,.5);
+}
+html.dark #header{background:#0D1F40;border-bottom-color:#1A2E55}
+html.dark .login-card{background:#1E293B;border-color:#2D4060}
+html.dark #login-screen{background:linear-gradient(145deg,#0F172A 0%,#1A2540 50%,#0F1E20 100%)}
+html.dark .field input,html.dark .field select,html.dark .field textarea{background:var(--bg3);border-color:var(--border);color:var(--text)}
+html.dark .filter-select{background:var(--bg2);border-color:var(--border);color:var(--text)}
+html.dark table thead th{background:var(--bg2)}
+html.dark tr:hover td{background:var(--bg3)}
+html.dark .modal{background:var(--bg2);border-color:var(--border)}
+html.dark .modal-header,html.dark .modal-footer{border-color:var(--border)}
+html.dark .search-box{background:var(--bg2);border-color:var(--border)}
+html.dark .search-box input{color:var(--text)}
+html.dark .type-chip{background:var(--bg2);border-color:var(--border)}
+html.dark .attr-chip{background:var(--bg2);border-color:var(--border);color:var(--text)}
+html.dark .return-reason-card{border-color:var(--border)}
+html.dark .notif-panel{background:var(--bg2);border-color:var(--border)}
+html.dark .notif-item:hover{background:var(--bg3)}
+html.dark .modal-body::-webkit-scrollbar-track{background:var(--bg2)}
+html.dark .logo-preview-box{background:var(--bg3)}
+html.dark code.tag{background:var(--bg3);border-color:var(--border);color:var(--text2)}
+html.dark .btn-cancel{background:var(--bg3);border-color:var(--border);color:var(--text)}
+html.dark .global-search-bar input{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:#fff}
+html.dark .global-search-bar input::placeholder{color:rgba(255,255,255,.4)}
+html.dark .gs-dropdown{background:#1E293B;border-color:#2D4060}
+html.dark .gs-item:hover{background:#263348}
+html.dark .gs-item-page{color:#94A8C4}
+.dark-toggle{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;transition:all .2s;flex-shrink:0}
+.dark-toggle:hover{background:rgba(255,255,255,.28);transform:rotate(20deg)}
+
+/* ══════════════════════════════════════
+   🔍 GLOBAL SEARCH
+══════════════════════════════════════ */
+.global-search-bar{position:relative;flex:1;max-width:340px}
+.global-search-bar input{width:100%;padding:7px 36px 7px 12px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:var(--radius);color:#fff;font-family:var(--font);font-size:13px;outline:none;transition:all .2s}
+.global-search-bar input::placeholder{color:rgba(255,255,255,.5)}
+.global-search-bar input:focus{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5)}
+.global-search-bar .gs-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.6);font-size:15px;pointer-events:none}
+.gs-kbd{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:10px;color:rgba(255,255,255,.4);background:rgba(255,255,255,.1);padding:1px 5px;border-radius:3px;pointer-events:none}
+.gs-dropdown{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);z-index:400;max-height:400px;overflow-y:auto;display:none;animation:panel-slide .15s ease}
+.gs-dropdown.open{display:block}
+.gs-section{font-size:10px;font-weight:700;color:var(--text3);padding:8px 14px 4px;text-transform:uppercase;letter-spacing:.5px;border-top:1px solid var(--border)}
+.gs-section:first-child{border-top:none}
+.gs-item{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;transition:background .15s}
+.gs-item:hover{background:var(--bg)}
+.gs-item-icon{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.gs-item-name{font-size:13px;font-weight:600;color:var(--text);flex:1}
+.gs-item-page{font-size:11px;color:var(--text3)}
+.gs-no-results{padding:24px;text-align:center;color:var(--text3);font-size:13px}
+.gs-shortcut-hint{padding:8px 14px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);display:flex;justify-content:space-between}
+
+/* ══════════════════════════════════════
+   📊 CHARTS DASHBOARD
+══════════════════════════════════════ */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px}
+.chart-card{background:var(--card);border-radius:var(--radius-lg);border:1px solid var(--border);padding:16px;box-shadow:var(--shadow)}
+.chart-card h4{font-size:13px;font-weight:700;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.chart-card.wide{grid-column:span 2}
+.chart-canvas-wrap{position:relative;height:200px}
+.chart-canvas-wrap.tall{height:240px}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-top:10px}
+.kpi-item{text-align:center;padding:8px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)}
+.kpi-val{font-size:20px;font-weight:800;line-height:1.1}
+.kpi-lbl{font-size:10px;color:var(--text3);margin-top:3px}
+
+/* ══════════════════════════════════════
+   📋 AUDIT LOG
+══════════════════════════════════════ */
+.audit-item{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border2);transition:background .15s}
+.audit-item:last-child{border-bottom:none}
+.audit-item:hover{background:var(--bg)}
+.audit-icon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;margin-top:1px}
+.audit-add{background:var(--green-bg);color:var(--green)}
+.audit-edit{background:var(--blue-bg);color:var(--blue)}
+.audit-delete{background:var(--red-bg);color:var(--red)}
+.audit-login{background:var(--amber-bg);color:var(--amber)}
+.audit-reset{background:var(--red-bg);color:var(--red)}
+.audit-handover{background:var(--purple-bg);color:var(--purple)}
+.audit-system{background:var(--teal-bg);color:var(--teal)}
+.audit-content{flex:1}
+.audit-title{font-size:13px;font-weight:700;color:var(--text)}
+.audit-desc{font-size:12px;color:var(--text2);margin-top:2px}
+.audit-meta{font-size:11px;color:var(--text3);margin-top:4px;display:flex;gap:12px;flex-wrap:wrap}
+
+/* ══════════════════════════════════════
+   📱 MOBILE RESPONSIVE
+══════════════════════════════════════ */
+.mobile-menu-btn{display:none;width:36px;height:36px;border-radius:6px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;align-items:center;justify-content:center;cursor:pointer;font-size:22px;flex-shrink:0;transition:background .2s}
+.mobile-menu-btn:hover{background:rgba(255,255,255,.28)}
+#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:44;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+#sidebar-overlay.show{display:block}
+
+@media(max-width:768px){
+  /* ── إظهار زر القائمة ── */
+  .mobile-menu-btn{display:flex !important}
+
+  /* ── الشريط الجانبي يتحول لـ drawer منزلق ── */
+  #sidebar{
+    position:fixed !important;
+    top:54px !important;
+    right:0 !important;
+    width:220px !important;
+    height:calc(100vh - 54px) !important;
+    z-index:45 !important;
+    transform:translateX(110%) !important;
+    transition:transform .28s cubic-bezier(.4,0,.2,1) !important;
+    box-shadow:-4px 0 24px rgba(0,0,0,.25) !important;
+    overflow-y:auto !important;
+    border-left:none !important;
+    padding:12px 8px !important;
+  }
+  #sidebar.open{
+    transform:translateX(0) !important;
+  }
+
+  /* ── المحتوى يأخذ كامل العرض ── */
+  #content{padding:12px !important;width:100% !important;max-height:calc(100vh - 54px) !important}
+
+  /* ── الهيدر ── */
+  #header{padding:0 10px !important}
+  #header-name{display:none !important}
+  .logo span#header-company-name{display:none !important}
+
+  /* ── الرسوم البيانية ── */
+  .charts-grid{grid-template-columns:1fr !important}
+  .chart-card.wide{grid-column:span 1 !important}
+
+  /* ── الإحصاءات ── */
+  .stats-grid{grid-template-columns:repeat(2,1fr) !important}
+
+  /* ── البحث الشامل ── */
+  .global-search-bar{max-width:140px !important}
+  .global-search-bar input{font-size:12px;padding:5px 8px}
+
+  /* ── الجداول ── */
+  table{font-size:11px}
+  td,th{padding:6px 8px}
+
+  /* ── التقارير والنماذج ── */
+  .report-grid{grid-template-columns:1fr !important}
+  .form-row{grid-template-columns:1fr !important}
+  .form-row.three{grid-template-columns:1fr !important}
+  .modal{max-width:96vw !important;margin:8px}
+
+  /* ── عناوين الصفحات ── */
+  .page-title{font-size:15px;gap:6px}
+  .page-title > div{flex-wrap:wrap;gap:6px}
+
+  /* ── أزرار الإجراءات ── */
+  .btn-action{padding:4px 7px;font-size:11px}
+  .add-btn{padding:7px 12px;font-size:12px}
+
+  /* ── بطاقات العملاء ── */
+  .customer-card{flex-direction:column;gap:8px}
+
+  /* ── الاحصاءات قيم أصغر ── */
+  .stat-val{font-size:20px}
+}
+
+@media(max-width:480px){
+  .stats-grid{grid-template-columns:repeat(2,1fr) !important}
+  .notif-panel{width:300px !important;right:-50px}
+  .user-info{gap:4px}
+  .role-badge{display:none}
+  .btn-sm{padding:4px 8px;font-size:11px}
+}
+
+/* ══════════════════════════════════════
+   📅 DATE RANGE FILTER
+══════════════════════════════════════ */
+.date-range-wrap{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.date-range-wrap input[type=date]{padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:12px;background:var(--bg);color:var(--text);font-family:var(--font)}
+html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:var(--border);color:var(--text);color-scheme:dark}
+.date-range-wrap label{font-size:12px;color:var(--text2);font-weight:600;white-space:nowrap}
+
+/* ══════════════════════════════════════
+   ⌨️ KEYBOARD SHORTCUTS MODAL
+══════════════════════════════════════ */
+.shortcut-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.shortcut-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)}
+.shortcut-key{display:flex;gap:4px}
+.kbd{background:var(--card);border:1px solid var(--border);border-bottom:2px solid var(--border2);border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700;font-family:monospace;color:var(--text)}
+.shortcut-desc{font-size:12px;color:var(--text2)}
+
+/* ══════════════════════════════════════
+   📤 EXPORT BUTTON
+══════════════════════════════════════ */
+.export-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:var(--green-bg);color:var(--green);border:1px solid #A0D080;border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:var(--font);font-weight:600;transition:all .15s}
+.export-btn:hover{background:var(--green);color:#fff}
+.export-btn-excel{background:#E8F5E9;color:#1B5E20;border-color:#81C784}
+.export-btn-excel:hover{background:#2E7D32;color:#fff}
+
+/* ══════════════════════════════════════
+   ✨ ENHANCED STATS CARDS
+══════════════════════════════════════ */
+.stat-card{position:relative;overflow:hidden}
+.stat-trend{font-size:11px;margin-top:6px;display:flex;align-items:center;gap:3px;font-weight:600}
+.stat-trend.up{color:var(--green)}.stat-trend.down{color:var(--red)}.stat-trend.neutral{color:var(--text3)}
+.stat-icon{position:absolute;top:12px;left:14px;font-size:28px;opacity:.08;pointer-events:none}
+
+/* ══════════════════════════════════════
+   🔔 ENHANCED NOTIFICATIONS
+══════════════════════════════════════ */
+.notif-time{font-size:10px;color:var(--text3);white-space:nowrap}
+.notif-priority-high{border-right:3px solid var(--red)}
+.notif-priority-medium{border-right:3px solid var(--amber)}
 </style>
 </head>
 <body>
@@ -352,16 +574,31 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
 <!-- App Shell -->
 <div id="app-shell" class="hidden" style="display:flex;flex-direction:column;min-height:100vh">
   <div id="header">
-    <div class="logo">
+    <div class="logo" style="gap:8px">
+      <button class="mobile-menu-btn" onclick="toggleSidebar()" title="القائمة"><i class="ti ti-menu-2"></i></button>
       <div class="logo-img" id="header-logo-wrap">
         <i class="ti ti-building-factory-2" style="font-size:20px;color:var(--blue)" id="header-logo-icon"></i>
       </div>
       <span id="header-company-name">نظام إدارة الأصول</span>
     </div>
+    <!-- البحث الشامل -->
+    <div class="global-search-bar" id="global-search-wrap">
+      <i class="ti ti-search gs-icon"></i>
+      <input type="text" id="global-search-input" placeholder="بحث شامل... (Ctrl+K)"
+        oninput="onGlobalSearch(this.value)" onfocus="showGsDropdown()" onblur="hideGsDropdown()"
+        autocomplete="off" spellcheck="false">
+      <div class="gs-dropdown" id="gs-dropdown"></div>
+    </div>
     <div class="user-info">
       <span class="role-badge" id="header-role"></span>
       <div class="avatar" id="header-avatar">AD</div>
       <span id="header-name" style="font-size:13px;font-weight:600;color:#fff"></span>
+      <!-- زر الوضع الليلي -->
+      <button class="dark-toggle" id="dark-toggle-btn" onclick="toggleDarkMode()" title="الوضع الليلي / الفاتح">
+        <i class="ti ti-moon" id="dark-toggle-icon"></i>
+      </button>
+      <!-- زر اختصارات لوحة المفاتيح -->
+      <button class="btn-sm" onclick="showShortcutsModal()" title="اختصارات لوحة المفاتيح" style="padding:5px 8px"><i class="ti ti-keyboard"></i></button>
       <div class="notif-wrap" id="notif-wrap">
         <button class="notif-btn" onclick="toggleNotifPanel(event)" title="الإشعارات">
           <i class="ti ti-bell"></i>
@@ -384,6 +621,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <button class="btn-sm" onclick="doLogout()"><i class="ti ti-logout"></i> خروج</button>
     </div>
   </div>
+  <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
   <div id="main">
     <div id="sidebar">
       <div class="nav-section">الرئيسية</div>
@@ -404,6 +642,7 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="nav-item" id="nav-asset-history" style="display:none" onclick="showPage('asset-history',this)" data-page="asset-history"><i class="ti ti-history"></i> سجل الأصل</div>
       <div class="nav-item" id="nav-users" style="display:none" onclick="showPage('users',this)" data-page="users"><i class="ti ti-user-shield"></i> المستخدمون</div>
       <div class="nav-item" id="nav-settings" style="display:none" onclick="showPage('settings',this)" data-page="settings"><i class="ti ti-settings"></i> الإعدادات</div>
+      <div class="nav-item" id="nav-audit" style="display:none" onclick="showPage('audit',this)" data-page="audit"><i class="ti ti-activity"></i> سجل النشاط</div>
     </div>
     <div id="content">
 
@@ -411,10 +650,25 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="page active" id="page-dashboard">
         <div class="page-title">
           <span><i class="ti ti-dashboard"></i> لوحة التحكم</span>
-          <button class="report-page-btn" onclick="printReport('dashboard')"><i class="ti ti-printer"></i> طباعة التقرير</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="export-btn export-btn-excel" onclick="exportDashboardExcel()"><i class="ti ti-file-spreadsheet"></i> تصدير Excel</button>
+            <button class="report-page-btn" onclick="printReport('dashboard')"><i class="ti ti-printer"></i> طباعة</button>
+          </div>
         </div>
         <div class="stats-grid" id="stats-grid"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <!-- رسوم بيانية -->
+        <div class="charts-grid" id="charts-grid">
+          <div class="chart-card wide">
+            <h4><i class="ti ti-chart-bar" style="color:var(--blue)"></i> توزيع الأصول حسب الحالة</h4>
+            <div class="chart-canvas-wrap tall"><canvas id="chart-status"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h4><i class="ti ti-chart-pie" style="color:var(--purple)"></i> توزيع حسب النوع</h4>
+            <div class="chart-canvas-wrap"><canvas id="chart-type"></canvas></div>
+          </div>
+        </div>
+        <!-- آخر العمليات -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px" id="recent-grid">
           <div class="table-card">
             <div class="table-toolbar"><span style="font-size:13px;font-weight:700"><i class="ti ti-clock" style="color:var(--blue)"></i> آخر الأصول المضافة</span></div>
             <table><thead><tr><th>الكود</th><th>الاسم</th><th>النوع</th><th>الحالة</th><th>التاريخ</th></tr></thead>
@@ -432,7 +686,8 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="page" id="page-assets">
         <div class="page-title">
           <span><i class="ti ti-package"></i> سجل الأصول</span>
-          <div style="display:flex;gap:8px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="export-btn export-btn-excel" onclick="exportTableExcel('assets-body','سجل_الأصول',['الصورة','الكود','الاسم','النوع','النوع الفرعي','الإجمالي','متاح','عند عميل','صيانة','تالف','الحالة'])"><i class="ti ti-file-spreadsheet"></i> Excel</button>
             <button class="add-btn" id="add-asset-btn" onclick="openAddAsset()"><i class="ti ti-plus"></i> إضافة أصل</button>
             <button class="report-page-btn" onclick="printReport('assets')"><i class="ti ti-printer"></i> تقرير</button>
           </div>
@@ -504,7 +759,8 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
       <div class="page" id="page-handover">
         <div class="page-title">
           <span><i class="ti ti-transfer"></i> سجل تسليم الأصول</span>
-          <div style="display:flex;gap:8px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="export-btn export-btn-excel" onclick="exportTableExcel('handover-body','سجل_التسليم',['#','الأصل','النوع الفرعي','العدد','العميل','الجوال','العنوان','المسؤول','التاريخ','الحالة'])"><i class="ti ti-file-spreadsheet"></i> Excel</button>
             <button class="add-btn" onclick="openNewHandover()"><i class="ti ti-plus"></i> تسليم جديد</button>
             <button class="report-page-btn" onclick="printReport('handover')"><i class="ti ti-file-analytics"></i> تقرير</button>
           </div>
@@ -518,6 +774,10 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
                 <option value="مُسلَّم">مُسلَّم</option>
                 <option value="مُرتجع">مُرتجع</option>
               </select>
+              <div class="date-range-wrap">
+                <label>من:</label><input type="date" id="handover-date-from" onchange="filterHandovers()">
+                <label>إلى:</label><input type="date" id="handover-date-to" onchange="filterHandovers()">
+              </div>
             </div>
           </div>
           <table>
@@ -765,6 +1025,43 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
         </div>
       </div>
 
+
+      <!-- Audit Log -->
+      <div class="page" id="page-audit">
+        <div class="page-title">
+          <span><i class="ti ti-activity"></i> سجل النشاط</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="export-btn export-btn-excel" onclick="exportAuditExcel()"><i class="ti ti-file-spreadsheet"></i> Excel</button>
+            <button class="btn-action danger" onclick="clearAuditLog()"><i class="ti ti-trash"></i> مسح السجل</button>
+          </div>
+        </div>
+        <div class="table-card" style="margin-bottom:16px">
+          <div class="table-toolbar">
+            <div class="toolbar-left">
+              <div class="search-box"><i class="ti ti-search" style="font-size:14px;color:var(--text3)"></i><input type="text" id="audit-search" placeholder="بحث في السجل..." oninput="filterAuditLog()"></div>
+              <select class="filter-select" id="audit-filter-type" onchange="filterAuditLog()">
+                <option value="">جميع الأحداث</option>
+                <option value="login">تسجيل دخول</option>
+                <option value="add">إضافة</option>
+                <option value="edit">تعديل</option>
+                <option value="delete">حذف</option>
+                <option value="handover">تسليم</option>
+                <option value="reset">تصفير</option>
+                <option value="system">النظام</option>
+              </select>
+              <div class="date-range-wrap">
+                <label>من:</label><input type="date" id="audit-date-from" onchange="filterAuditLog()">
+                <label>إلى:</label><input type="date" id="audit-date-to" onchange="filterAuditLog()">
+              </div>
+            </div>
+            <span id="audit-count-label" style="font-size:12px;color:var(--text3)"></span>
+          </div>
+          <div id="audit-list" style="max-height:65vh;overflow-y:auto">
+            <div class="notif-empty"><i class="ti ti-activity" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3"></i>لا توجد سجلات بعد</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Settings -->
       <div class="page" id="page-settings">
         <div class="page-title"><span><i class="ti ti-settings"></i> إعدادات النظام</span></div>
@@ -886,7 +1183,7 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db,"users"));
   const existingUsers = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   
-  const ADMIN_FULL_PERMS = ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"];
+  const ADMIN_FULL_PERMS = ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","audit","custody","custody_add","custody_edit","custody_approve","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"];
   if (usersSnap.empty || existingUsers.length === 0) {
     await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms: ADMIN_FULL_PERMS });
     console.log("Admin user created");
@@ -1087,6 +1384,404 @@ function getAssetSubTypes(parentType) { return (window.assetSubTypes||[]).filter
 function getAttributes(type) { return (window.assetAttributes||[]).filter(a=>a.type===type).map(a=>a.value); }
 function getCustomers()    { return window.customers || []; }
 function getReturns()      { return window.returns || []; }
+
+/* ══════════════════════════════════════
+   🌙 DARK MODE
+══════════════════════════════════════ */
+function toggleDarkMode() {
+  const isDark = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('_darkMode', isDark ? '1' : '0');
+  const icon = document.getElementById('dark-toggle-icon');
+  if (icon) icon.className = isDark ? 'ti ti-sun' : 'ti ti-moon';
+  // أعد رسم الرسوم البيانية بعد تغيير الثيم
+  setTimeout(() => { try { renderDashboardCharts(); } catch(e){} }, 100);
+}
+function applyStoredDarkMode() {
+  const val = localStorage.getItem('_darkMode');
+  if (val === '1') {
+    document.documentElement.classList.add('dark');
+    const icon = document.getElementById('dark-toggle-icon');
+    if (icon) icon.className = 'ti ti-sun';
+  }
+}
+// تطبيق عند التحميل
+applyStoredDarkMode();
+
+/* ══════════════════════════════════════
+   📱 MOBILE SIDEBAR
+══════════════════════════════════════ */
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const isOpen = sidebar.classList.toggle('open');
+  if (overlay) overlay.classList.toggle('show', isOpen);
+}
+
+/* ══════════════════════════════════════
+   🔍 GLOBAL SEARCH
+══════════════════════════════════════ */
+let _gsTimer = null;
+function onGlobalSearch(val) {
+  clearTimeout(_gsTimer);
+  _gsTimer = setTimeout(() => renderGsResults(val), 150);
+}
+function renderGsResults(q) {
+  const dd = document.getElementById('gs-dropdown');
+  if (!dd) return;
+  if (!q || q.length < 2) { dd.classList.remove('open'); return; }
+  const lq = q.toLowerCase();
+  let html = '';
+  // بحث في الأصول
+  const assets = (window.assets||[]).filter(a=>
+    a.name?.toLowerCase().includes(lq) || a.code?.toLowerCase().includes(lq));
+  if (assets.length) {
+    html += '<div class="gs-section"><i class="ti ti-package"></i> الأصول</div>';
+    html += assets.slice(0,4).map(a=>
+      `<div class="gs-item" onmousedown="gsNavigate('assets','nav-assets')">
+        <div class="gs-item-icon" style="background:var(--blue-bg);color:var(--blue)"><i class="ti ti-package"></i></div>
+        <span class="gs-item-name">${a.name}</span>
+        <span class="gs-item-page">${a.code}</span>
+      </div>`).join('');
+  }
+  // بحث في العملاء
+  const customers = (window.customers||[]).filter(c=>
+    c.name?.toLowerCase().includes(lq) || c.cr?.toLowerCase().includes(lq));
+  if (customers.length) {
+    html += '<div class="gs-section"><i class="ti ti-users"></i> العملاء</div>';
+    html += customers.slice(0,3).map(c=>
+      `<div class="gs-item" onmousedown="gsNavigate('customers','nav-customers')">
+        <div class="gs-item-icon" style="background:var(--teal-bg);color:var(--teal)"><i class="ti ti-user"></i></div>
+        <span class="gs-item-name">${c.name}</span>
+        <span class="gs-item-page">عميل</span>
+      </div>`).join('');
+  }
+  // بحث في التسليمات
+  const handovers = (window.handovers||[]).filter(h=>
+    h.assetName?.toLowerCase().includes(lq) || h.clientName?.toLowerCase().includes(lq));
+  if (handovers.length) {
+    html += '<div class="gs-section"><i class="ti ti-transfer"></i> التسليمات</div>';
+    html += handovers.slice(0,3).map(h=>
+      `<div class="gs-item" onmousedown="gsNavigate('handover','nav-handover')">
+        <div class="gs-item-icon" style="background:var(--purple-bg);color:var(--purple)"><i class="ti ti-transfer"></i></div>
+        <span class="gs-item-name">${h.assetName}</span>
+        <span class="gs-item-page">${h.clientName||''}</span>
+      </div>`).join('');
+  }
+  if (!html) {
+    html = `<div class="gs-no-results"><i class="ti ti-search-off" style="font-size:28px;display:block;margin-bottom:8px;opacity:.4"></i>لا نتائج لـ "${q}"</div>`;
+  }
+  html += `<div class="gs-shortcut-hint"><span>↑↓ للتنقل</span><span>Enter للانتقال</span><span>Esc للإغلاق</span></div>`;
+  dd.innerHTML = html;
+  dd.classList.add('open');
+}
+function gsNavigate(page, navId) {
+  const navEl = document.getElementById(navId);
+  if (navEl) showPage(page, navEl);
+  const inp = document.getElementById('global-search-input');
+  if (inp) inp.value = '';
+  hideGsDropdown();
+}
+function showGsDropdown() {
+  const val = (document.getElementById('global-search-input')||{}).value;
+  if (val && val.length >= 2) renderGsResults(val);
+}
+function hideGsDropdown() {
+  setTimeout(() => {
+    const dd = document.getElementById('gs-dropdown');
+    if (dd) dd.classList.remove('open');
+  }, 200);
+}
+
+/* ══════════════════════════════════════
+   📊 DASHBOARD CHARTS
+══════════════════════════════════════ */
+let _chartStatus = null;
+let _chartType = null;
+
+function renderDashboardCharts() {
+  const isDark = document.documentElement.classList.contains('dark');
+  const textColor = isDark ? '#94A8C4' : '#3A5070';
+  const gridColor = isDark ? '#2D4060' : '#C8DBF0';
+  Chart.defaults.color = textColor;
+  Chart.defaults.font.family = "'Cairo', sans-serif";
+
+  const assets = getAssets();
+  const statusData = {
+    متاح: assets.reduce((s,a)=>s+(a.availableQty||0),0),
+    'عند عميل': assets.reduce((s,a)=>s+(a.clientQty||0),0),
+    صيانة: assets.reduce((s,a)=>s+(a.maintenanceQty||0),0),
+    تالف: assets.reduce((s,a)=>s+(a.damagedQty||0),0),
+    متلف: assets.reduce((s,a)=>s+(a.disposedQty||0),0),
+  };
+
+  // رسم بياني الحالة
+  const ctxStatus = document.getElementById('chart-status');
+  if (ctxStatus) {
+    if (_chartStatus) _chartStatus.destroy();
+    _chartStatus = new Chart(ctxStatus, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(statusData),
+        datasets: [{
+          label: 'عدد الوحدات',
+          data: Object.values(statusData),
+          backgroundColor: ['#4CAF50CC','#1C3F8ACC','#F59E0BCC','#EF4444CC','#9333EACC'],
+          borderColor: ['#4CAF50','#1C3F8A','#F59E0B','#EF4444','#9333EA'],
+          borderWidth: 2, borderRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { grid: { color: gridColor }, ticks: { color: textColor } },
+          x: { grid: { display: false }, ticks: { color: textColor } }
+        }
+      }
+    });
+  }
+
+  // رسم بياني النوع
+  const typeMap = {};
+  assets.forEach(a => { const t=a.type||'أخرى'; typeMap[t]=(typeMap[t]||0)+a.totalQty; });
+  const ctxType = document.getElementById('chart-type');
+  if (ctxType) {
+    if (_chartType) _chartType.destroy();
+    const palette = ['#1C3F8A','#2E7D32','#B45309','#C62828','#5B2D8E','#0D7377','#1565C0','#558B2F'];
+    _chartType = new Chart(ctxType, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(typeMap),
+        datasets: [{
+          data: Object.values(typeMap),
+          backgroundColor: palette.map(c=>c+'CC'),
+          borderColor: palette,
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 11, family: "'Cairo',sans-serif" }, color: textColor, padding: 8 } }
+        }
+      }
+    });
+  }
+}
+
+/* ══════════════════════════════════════
+   📋 AUDIT LOG
+══════════════════════════════════════ */
+let _auditLog = [];
+try { _auditLog = JSON.parse(localStorage.getItem('_auditLog')||'[]'); } catch(e) {}
+
+function logAudit(type, title, desc) {
+  const entry = {
+    id: Date.now()+'_'+Math.random().toString(36).slice(2,6),
+    type, title, desc,
+    user: currentUser?.name || 'النظام',
+    role: currentUser?.role || '',
+    at: new Date().toISOString()
+  };
+  _auditLog.unshift(entry);
+  if (_auditLog.length > 500) _auditLog = _auditLog.slice(0, 500);
+  try { localStorage.setItem('_auditLog', JSON.stringify(_auditLog)); } catch(e){}
+}
+
+function renderAuditLog() {
+  filterAuditLog();
+}
+
+function filterAuditLog() {
+  const q = (document.getElementById('audit-search')||{}).value?.toLowerCase()||'';
+  const typeF = (document.getElementById('audit-filter-type')||{}).value||'';
+  const from = (document.getElementById('audit-date-from')||{}).value||'';
+  const to   = (document.getElementById('audit-date-to')||{}).value||'';
+
+  let filtered = _auditLog.filter(e => {
+    if (typeF && e.type !== typeF) return false;
+    if (q && !e.title?.toLowerCase().includes(q) && !e.desc?.toLowerCase().includes(q) && !e.user?.toLowerCase().includes(q)) return false;
+    if (from && e.at.slice(0,10) < from) return false;
+    if (to   && e.at.slice(0,10) > to)   return false;
+    return true;
+  });
+
+  const countEl = document.getElementById('audit-count-label');
+  if (countEl) countEl.textContent = `${filtered.length} سجل`;
+
+  const list = document.getElementById('audit-list');
+  if (!list) return;
+  if (!filtered.length) {
+    list.innerHTML = '<div class="notif-empty" style="padding:40px"><i class="ti ti-activity" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3"></i>لا توجد سجلات مطابقة</div>';
+    return;
+  }
+
+  const iconMap = {
+    add:'ti-plus',edit:'ti-edit',delete:'ti-trash',login:'ti-login',
+    handover:'ti-transfer',reset:'ti-database-off',system:'ti-settings'
+  };
+  const clsMap = {
+    add:'audit-add',edit:'audit-edit',delete:'audit-delete',login:'audit-login',
+    handover:'audit-handover',reset:'audit-reset',system:'audit-system'
+  };
+
+  list.innerHTML = filtered.map(e => {
+    const dt = new Date(e.at);
+    const timeStr = dt.toLocaleString('ar-SA',{dateStyle:'short',timeStyle:'short'});
+    return `<div class="audit-item">
+      <div class="audit-icon ${clsMap[e.type]||'audit-system'}"><i class="ti ${iconMap[e.type]||'ti-point'}"></i></div>
+      <div class="audit-content">
+        <div class="audit-title">${e.title}</div>
+        ${e.desc?`<div class="audit-desc">${e.desc}</div>`:''}
+        <div class="audit-meta">
+          <span><i class="ti ti-user" style="font-size:11px"></i> ${e.user}</span>
+          <span><i class="ti ti-shield" style="font-size:11px"></i> ${e.role}</span>
+          <span><i class="ti ti-clock" style="font-size:11px"></i> ${timeStr}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function clearAuditLog() {
+  if (!can('users')) { showToast('هذه الميزة لمدير النظام فقط','error'); return; }
+  if (!confirm('هل تريد مسح سجل النشاط بالكامل؟')) return;
+  _auditLog = [];
+  try { localStorage.removeItem('_auditLog'); } catch(e){}
+  renderAuditLog();
+  showToast('تم مسح سجل النشاط','success');
+}
+
+function exportAuditExcel() {
+  if (!window.XLSX) { showToast('مكتبة Excel غير محملة','error'); return; }
+  const rows = _auditLog.map(e => ({
+    'النوع': e.type, 'العنوان': e.title, 'التفاصيل': e.desc||'',
+    'المستخدم': e.user, 'الدور': e.role,
+    'التاريخ والوقت': new Date(e.at).toLocaleString('ar-SA')
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'سجل_النشاط');
+  XLSX.writeFile(wb, `سجل_النشاط_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+/* ══════════════════════════════════════
+   📤 EXCEL EXPORT
+══════════════════════════════════════ */
+function exportTableExcel(tbodyId, fileName, headers) {
+  if (!window.XLSX) { showToast('مكتبة Excel غير محملة','error'); return; }
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) { showToast('لا توجد بيانات للتصدير','error'); return; }
+  const rows = [];
+  tbody.querySelectorAll('tr').forEach(tr => {
+    const cells = tr.querySelectorAll('td');
+    if (!cells.length) return;
+    const row = {};
+    cells.forEach((td,i) => {
+      if (headers[i]) row[headers[i]] = td.innerText.trim();
+    });
+    rows.push(row);
+  });
+  if (!rows.length) { showToast('لا توجد بيانات','error'); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, fileName);
+  XLSX.writeFile(wb, `${fileName}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('تم تصدير الملف بنجاح ✅','success');
+  logAudit('system','تصدير Excel',`تم تصدير ${fileName}`);
+}
+
+function exportDashboardExcel() {
+  if (!window.XLSX) { showToast('مكتبة Excel غير محملة','error'); return; }
+  const assets = getAssets();
+  const rows = assets.map(a=>({
+    'الكود':a.code,'الاسم':a.name,'النوع':a.type,'النوع الفرعي':a.subType||'',
+    'الإجمالي':a.totalQty,'متاح':a.availableQty,'عند عميل':a.clientQty,
+    'صيانة':a.maintenanceQty,'تالف':a.damagedQty,'الحالة':a.status
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'الأصول');
+  XLSX.writeFile(wb, `ملخص_الأصول_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('تم تصدير التقرير ✅','success');
+}
+
+/* ══════════════════════════════════════
+   ⌨️ KEYBOARD SHORTCUTS
+══════════════════════════════════════ */
+function showShortcutsModal() {
+  document.getElementById('modal-title').innerHTML = '<i class="ti ti-keyboard"></i> اختصارات لوحة المفاتيح';
+  document.getElementById('modal-box').className = 'modal wide';
+  document.getElementById('modal-save-btn').style.display = 'none';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="shortcut-grid">
+      <div class="shortcut-item"><span class="shortcut-desc">بحث شامل</span><div class="shortcut-key"><span class="kbd">Ctrl</span><span class="kbd">K</span></div></div>
+      <div class="shortcut-item"><span class="shortcut-desc">إضافة أصل جديد</span><div class="shortcut-key"><span class="kbd">Ctrl</span><span class="kbd">N</span></div></div>
+      <div class="shortcut-item"><span class="shortcut-desc">لوحة التحكم</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">H</span></div></div>
+      <div class="shortcut-item"><span class="shortcut-desc">سجل الأصول</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">A</span></div></div>
+      <div class="shortcut-item"><span class="shortcut-desc">العملاء</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">C</span></div></div>
+      <div class="shortcut-item"><span class="shortcut-desc">التقارير</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">R</span></div></div>
+      <div class="shortcut-item"><span class="shortcut-desc">إغلاق النافذة</span><div class="shortcut-key"><span class="kbd">Esc</span></div></div>
+      <div class="shortcut-item"><span class="shortcut-desc">الوضع الليلي</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">D</span></div></div>
+      <div class="shortcut-item"><span class="shortcut-desc">الإعدادات</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">S</span></div></div>
+      <div class="shortcut-item"><span class="shortcut-desc">تعليم الإشعارات مقروءة</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">B</span></div></div>
+    </div>
+    <div class="alert alert-info" style="margin-top:14px;font-size:12px"><i class="ti ti-info-circle"></i> تعمل الاختصارات في أي مكان بالنظام ما لم يكن المؤشر في حقل نص.</div>
+  `;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+// مستمع اختصارات لوحة المفاتيح
+document.addEventListener('keydown', function(e) {
+  const tag = document.activeElement?.tagName?.toLowerCase();
+  const inInput = ['input','textarea','select'].includes(tag);
+
+  // Ctrl+K — بحث شامل
+  if (e.ctrlKey && e.key === 'k') {
+    e.preventDefault();
+    const gs = document.getElementById('global-search-input');
+    if (gs) { gs.focus(); gs.select(); }
+    return;
+  }
+  // Escape — إغلاق النوافذ
+  if (e.key === 'Escape') {
+    closeModal();
+    closeNotifPanel();
+    const dd = document.getElementById('gs-dropdown');
+    if (dd) dd.classList.remove('open');
+    return;
+  }
+  if (inInput) return;
+
+  // Ctrl+N — إضافة أصل
+  if (e.ctrlKey && e.key === 'n') {
+    e.preventDefault();
+    if (can('add')) openAddAsset();
+    return;
+  }
+  // Alt+H — لوحة التحكم
+  if (e.altKey && e.key === 'h') { e.preventDefault(); const n=document.getElementById('nav-dashboard'); if(n)showPage('dashboard',n); return; }
+  // Alt+A — الأصول
+  if (e.altKey && e.key === 'a') { e.preventDefault(); const n=document.getElementById('nav-assets'); if(n&&n.style.display!=='none')showPage('assets',n); return; }
+  // Alt+C — العملاء
+  if (e.altKey && e.key === 'c') { e.preventDefault(); const n=document.getElementById('nav-customers'); if(n&&n.style.display!=='none')showPage('customers',n); return; }
+  // Alt+R — التقارير
+  if (e.altKey && e.key === 'r') { e.preventDefault(); const n=document.getElementById('nav-reports'); if(n&&n.style.display!=='none')showPage('reports',n); return; }
+  // Alt+D — Dark Mode
+  if (e.altKey && e.key === 'd') { e.preventDefault(); toggleDarkMode(); return; }
+  // Alt+S — الإعدادات
+  if (e.altKey && e.key === 's') { e.preventDefault(); const n=document.getElementById('nav-settings'); if(n&&n.style.display!=='none')showPage('settings',n); return; }
+  // Alt+B — تعليم الإشعارات
+  if (e.altKey && e.key === 'b') { e.preventDefault(); markAllRead(); return; }
+});
+
+/* ── إضافة تسجيل النشاط إلى الوظائف الموجودة ── */
+// سيتم حقنه لاحقاً عبر wrapping
+
+/* ══════════════════════════════════════
+   📅 DATE RANGE FILTER — Handovers
+══════════════════════════════════════ */
+// يتم دمجه مع filterHandovers الموجودة
 
 /* ────────── SETTINGS ────────── */
 function applyCompanySettings(name, logoUrl) {
@@ -1379,6 +2074,8 @@ async function doLogin() {
     }
 
     currentUser = found;
+    // تسجيل حدث الدخول
+    try { logAudit('login','تسجيل دخول',`${found.name} (${found.role}) سجّل دخوله للنظام`); } catch(e){}
     // Save session to localStorage for auto-login on refresh
     try { localStorage.setItem('_assetSession', JSON.stringify({_id:found._id, username:found.username, name:found.name, role:found.role, perms:found.perms})); } catch(e) {}
     document.getElementById('login-error').style.display='none';
@@ -1389,7 +2086,7 @@ async function doLogin() {
     if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
     // ترقية تلقائية للمديرين فقط (من يملكون صلاحية 'users') — لا نُغيِّر صلاحيات المستخدمين العاديين
-    const ADMIN_ALL_PERMS = ['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
+    const ADMIN_ALL_PERMS = ['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','audit','custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
     if (found.perms.includes('users') && ADMIN_ALL_PERMS.some(p=>!found.perms.includes(p))) {
       const upgraded = [...new Set([...found.perms, ...ADMIN_ALL_PERMS])];
       found.perms = upgraded;
@@ -1526,14 +2223,14 @@ function applyNavPermissions(perms) {
   show('nav-reports',       p.includes('view'));
   show('nav-asset-history', p.includes('view'));
   show('nav-users',         p.includes('users'));
+  show('nav-audit',         p.includes('audit') || p.includes('users'));
   show('nav-settings',      p.includes('settings'));
 }
 
 function resetNav() {
-  // يُخفي كل عناصر القائمة عند تسجيل الخروج
   ['nav-dashboard','nav-assets','nav-inventory','nav-section-ops','nav-customers','nav-handover',
    'nav-returns','nav-maintenance','nav-dispose','nav-custody','nav-dept-custody',
-   'nav-section-admin','nav-types','nav-reports','nav-asset-history','nav-users','nav-settings'
+   'nav-section-admin','nav-types','nav-reports','nav-asset-history','nav-users','nav-audit','nav-settings'
   ].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
 }
 
@@ -1570,7 +2267,7 @@ const PAGE_PERMS = {
   'handover': 'handover', 'returns': 'return', 'maintenance': 'maintenance',
   'dispose': 'dispose', 'custody': 'custody', 'dept-custody': 'dept_custody',
   'types': 'add', 'reports': 'view', 'asset-history': 'view',
-  'users': 'users', 'settings': 'settings'
+  'users': 'users', 'audit': 'audit', 'settings': 'settings'
 };
 
 // الانتقال لأول صفحة يملك المستخدم صلاحيتها
@@ -1617,7 +2314,9 @@ function showPage(id, el) {
       showToast('ليس لديك صلاحية الوصول لهذه الصفحة','error'); return;
     } else if (requiredPerm === 'dept_custody' && !currentUser?.perms?.some(p=>p==='dept_custody'||p.startsWith('dept_custody_'))) {
       showToast('ليس لديك صلاحية الوصول لهذه الصفحة','error'); return;
-    } else if (requiredPerm !== 'custody' && requiredPerm !== 'dept_custody' && !can(requiredPerm)) {
+    } else if (requiredPerm === 'audit' && !can('audit') && !can('users')) {
+      showToast('ليس لديك صلاحية الوصول لسجل النشاط','error'); return;
+    } else if (requiredPerm !== 'custody' && requiredPerm !== 'dept_custody' && requiredPerm !== 'audit' && !can(requiredPerm)) {
       showToast('ليس لديك صلاحية الوصول لهذه الصفحة','error'); return;
     }
   }
@@ -1625,6 +2324,13 @@ function showPage(id, el) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   if (el) el.classList.add('active');
+  // إغلاق الشريط الجانبي في الجوال بعد الانتقال
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar && sidebar.classList.contains('open')) {
+    sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('show');
+  }
   renderAll();
   if (id === 'settings') { try { showDangerZoneIfAdmin(); } catch(e){} }
 }
@@ -1634,6 +2340,7 @@ function renderAll() {
   if(currentUser){try{renderNotifications();}catch(e){}}
   try { renderStats(); } catch(e) { console.warn('renderStats:', e.message); }
   try { renderRecent(); } catch(e) { console.warn('renderRecent:', e.message); }
+  try { renderDashboardCharts(); } catch(e) { console.warn('renderCharts:', e.message); }
   try { renderAssets(); } catch(e) { console.warn('renderAssets:', e.message); }
   try { renderInventory(); } catch(e) { console.warn('renderInventory:', e.message); }
   try { renderHandovers(); } catch(e) { console.warn('renderHandovers:', e.message); }
@@ -1647,6 +2354,7 @@ function renderAll() {
   try { renderReturns(); } catch(e) { console.warn('renderReturns:', e.message); }
   try { populateHistoryAssetSelect(); } catch(e) { console.warn('populateHistoryAssetSelect:', e.message); }
   try { renderDeptCustody(); } catch(e) { console.warn('renderDeptCustody:', e.message); }
+  try { renderAuditLog(); } catch(e) { console.warn('renderAuditLog:', e.message); }
 }
 
 /* ────────── STATUS BADGE ────────── */
@@ -2395,9 +3103,15 @@ async function saveHandover() {
 function filterHandovers() {
   const q = (document.getElementById('handover-search')||{}).value?.toLowerCase()||'';
   const st = (document.getElementById('filter-handover-status')||{}).value||'';
-  const filtered = getHandovers().filter(h=>
-    (!q||(h.assetName||'').toLowerCase().includes(q)||(h.clientName||'').toLowerCase().includes(q))&&(!st||h.status===st)
-  );
+  const from = (document.getElementById('handover-date-from')||{}).value||'';
+  const to   = (document.getElementById('handover-date-to')||{}).value||'';
+  const filtered = getHandovers().filter(h=>{
+    if (q && !(h.assetName||'').toLowerCase().includes(q) && !(h.clientName||'').toLowerCase().includes(q)) return false;
+    if (st && h.status !== st) return false;
+    if (from && (h.date||'') < from) return false;
+    if (to   && (h.date||'') > to)   return false;
+    return true;
+  });
   renderHandoverRows(filtered);
 }
 function renderHandovers() { filterHandovers(); }
@@ -2880,6 +3594,7 @@ const ALL_PERMS=[
   {key:'view',label:'عرض الأصول'},{key:'add',label:'إضافة أصول'},{key:'edit',label:'تعديل أصول'},
   {key:'handover',label:'تسليم أصل'},{key:'maintenance',label:'صيانة'},{key:'dispose',label:'إتلاف'},
   {key:'users',label:'إدارة المستخدمين'},{key:'return',label:'استرداد أصل'},{key:'customers',label:'العملاء'},
+  {key:'audit',label:'سجل النشاط'},
   {key:'settings',label:'الإعدادات'},
   // عهدة الأصول
   {key:'custody',label:'عهدة الأصول — اطلاع فقط'},
@@ -2897,7 +3612,7 @@ const ALL_PERMS=[
 const PERM_LABELS={
   dashboard:'لوحة التحكم',
   view:'عرض',add:'إضافة',edit:'تعديل',handover:'تسليم',maintenance:'صيانة',dispose:'إتلاف',
-  users:'مستخدمون',return:'استرداد',customers:'العملاء',settings:'الإعدادات',
+  users:'مستخدمون',return:'استرداد',customers:'العملاء',audit:'سجل النشاط',settings:'الإعدادات',
   custody:'عهدة أصول-اطلاع',custody_add:'عهدة أصول-إضافة',custody_edit:'عهدة أصول-تعديل',custody_approve:'عهدة أصول-موافقة',custody_print:'عهدة أصول-طباعة',
   dept_custody:'عهدة إدارات-اطلاع',dept_custody_add:'عهدة إدارات-إضافة',dept_custody_edit:'عهدة إدارات-تعديل',dept_custody_approve:'عهدة إدارات-موافقة',dept_custody_print:'عهدة إدارات-طباعة',
 };
@@ -2944,6 +3659,8 @@ function openEditUser(id) {
   document.getElementById('modal-overlay').classList.add('show');
 }
 function userFormHTML(u) {
+  // سجل النشاط يكون مفعلاً افتراضياً للمستخدمين الجدد (u===null) أو من يملكه
+  const hasAudit = !u || (u.perms||[]).includes('audit');
   return '<div class="form-row" style="margin-bottom:12px">'+
     '<div class="field"><label>الاسم الكامل</label><input type="text" id="u-name" value="'+(u?u.name:'')+'" placeholder="الاسم الكامل"></div>'+
     '<div class="field"><label>اسم المستخدم</label><input type="text" id="u-username" value="'+(u?u.username:'')+'" placeholder="username" style="direction:ltr;text-align:right"></div>'+
@@ -2953,15 +3670,24 @@ function userFormHTML(u) {
     '<div class="field"><label>الدور</label><select id="u-role"><option value="مدير" '+(u&&u.role==='مدير'?'selected':'')+'>مدير</option><option value="مشرف" '+(u&&u.role==='مشرف'?'selected':'')+'>مشرف</option><option value="موظف" '+((!u||u.role==='موظف')?'selected':'')+'>موظف</option></select></div>'+
     '</div>'+
     '<div class="form-section">الصلاحيات</div>'+
-    // صلاحية لوحة التحكم — في قسم بارز منفصل
+    // صلاحية لوحة التحكم
     '<div style="background:var(--blue-bg);border:2px solid var(--blue-light);border-radius:var(--radius);padding:12px;margin-bottom:10px">'+
     '<div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:8px"><i class="ti ti-dashboard"></i> لوحة التحكم الرئيسية</div>'+
     '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:rgba(255,255,255,.7);cursor:pointer;border:1px solid var(--blue-light)">'+
     '<input type="checkbox" name="perm" value="dashboard" '+(u&&(u.perms||[]).includes('dashboard')?'checked':'')+' style="width:16px;height:16px;accent-color:var(--blue)">'+
     '<span style="font-size:13px;font-weight:600;color:var(--blue)">السماح برؤية لوحة التحكم (الإحصائيات والملخصات)</span></label>'+
     '</div>'+
+    // سجل النشاط — مفعل افتراضياً لجميع المستخدمين
+    '<div style="background:var(--teal-bg);border:2px solid #80CCC0;border-radius:var(--radius);padding:12px;margin-bottom:10px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--teal);margin-bottom:4px"><i class="ti ti-activity"></i> سجل النشاط</div>'+
+    '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">يُتيح للمستخدم رؤية سجل العمليات المسجلة داخل النظام</div>'+
+    '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:rgba(255,255,255,.7);cursor:pointer;border:1px solid #80CCC0">'+
+    '<input type="checkbox" name="perm" value="audit" '+(hasAudit?'checked':'')+' style="width:16px;height:16px;accent-color:var(--teal)">'+
+    '<span style="font-size:13px;font-weight:600;color:var(--teal)">عرض سجل النشاط <span style="font-size:10px;background:var(--teal);color:#fff;padding:1px 6px;border-radius:100px;margin-right:4px">افتراضي</span></span></label>'+
+    '</div>'+
+    // باقي الصلاحيات (بدون audit وdashboard)
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">'+
-    ALL_PERMS.filter(p=>p.key!=='dashboard'&&!p.key.startsWith('custody')&&!p.key.startsWith('dept_custody')).map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:var(--bg);cursor:pointer;border:1px solid var(--border)">'+
+    ALL_PERMS.filter(p=>p.key!=='dashboard'&&p.key!=='audit'&&!p.key.startsWith('custody')&&!p.key.startsWith('dept_custody')).map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:var(--bg);cursor:pointer;border:1px solid var(--border)">'+
       '<input type="checkbox" name="perm" value="'+p.key+'" '+(u&&(u.perms||[]).includes(p.key)?'checked':'')+' style="width:15px;height:15px;accent-color:var(--blue)">'+
       '<span style="font-size:13px">'+p.label+'</span></label>'
     ).join('')+
@@ -2990,13 +3716,16 @@ function userFormHTML(u) {
 }
 function setPresetPerms(p) {
   const pre={
-    admin:['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','settings',
+    // المدير: كل الصلاحيات بما فيها audit
+    admin:['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','audit','settings',
            'custody','custody_add','custody_edit','custody_approve','custody_print',
            'dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print'],
-    manager:['dashboard','view','add','edit','handover','dispose','maintenance','return','customers',
+    // المشرف: audit مفعّل افتراضياً
+    manager:['dashboard','view','add','edit','handover','dispose','maintenance','return','customers','audit',
              'custody','custody_add','custody_approve','custody_print',
              'dept_custody','dept_custody_add','dept_custody_approve','dept_custody_print'],
-    viewer:['view','custody','custody_print','dept_custody','dept_custody_print']
+    // عرض فقط: audit مفعّل افتراضياً
+    viewer:['view','audit','custody','custody_print','dept_custody','dept_custody_print']
   };
   document.querySelectorAll('input[name="perm"]').forEach(c=>c.checked=(pre[p]||[]).includes(c.value));
 }
@@ -3970,6 +4699,21 @@ if(typeof openResetConfirmModal!=='undefined')window.openResetConfirmModal=openR
 if(typeof checkResetConfirmInput!=='undefined')window.checkResetConfirmInput=checkResetConfirmInput;
 if(typeof cancelResetCountdown!=='undefined')window.cancelResetCountdown=cancelResetCountdown;
 if(typeof showDangerZoneIfAdmin!=='undefined')window.showDangerZoneIfAdmin=showDangerZoneIfAdmin;
+if(typeof toggleDarkMode!=='undefined')window.toggleDarkMode=toggleDarkMode;
+if(typeof toggleSidebar!=='undefined')window.toggleSidebar=toggleSidebar;
+if(typeof onGlobalSearch!=='undefined')window.onGlobalSearch=onGlobalSearch;
+if(typeof showGsDropdown!=='undefined')window.showGsDropdown=showGsDropdown;
+if(typeof hideGsDropdown!=='undefined')window.hideGsDropdown=hideGsDropdown;
+if(typeof gsNavigate!=='undefined')window.gsNavigate=gsNavigate;
+if(typeof renderDashboardCharts!=='undefined')window.renderDashboardCharts=renderDashboardCharts;
+if(typeof renderAuditLog!=='undefined')window.renderAuditLog=renderAuditLog;
+if(typeof filterAuditLog!=='undefined')window.filterAuditLog=filterAuditLog;
+if(typeof clearAuditLog!=='undefined')window.clearAuditLog=clearAuditLog;
+if(typeof exportAuditExcel!=='undefined')window.exportAuditExcel=exportAuditExcel;
+if(typeof exportTableExcel!=='undefined')window.exportTableExcel=exportTableExcel;
+if(typeof exportDashboardExcel!=='undefined')window.exportDashboardExcel=exportDashboardExcel;
+if(typeof showShortcutsModal!=='undefined')window.showShortcutsModal=showShortcutsModal;
+if(typeof logAudit!=='undefined')window.logAudit=logAudit;
 if(typeof addAssetType!=='undefined')window.addAssetType=addAssetType;
 if(typeof deleteType!=='undefined')window.deleteType=deleteType;
 if(typeof addSubType!=='undefined')window.addSubType=addSubType;
