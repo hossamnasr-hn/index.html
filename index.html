@@ -415,7 +415,7 @@ html.dark .gs-item-page{color:#94A8C4}
 ══════════════════════════════════════ */
 .mobile-menu-btn{display:none;width:36px;height:36px;border-radius:6px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;align-items:center;justify-content:center;cursor:pointer;font-size:22px;flex-shrink:0;transition:background .2s}
 .mobile-menu-btn:hover{background:rgba(255,255,255,.28)}
-#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:44;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:44}
 #sidebar-overlay.show{display:block}
 
 @media(max-width:768px){
@@ -431,11 +431,12 @@ html.dark .gs-item-page{color:#94A8C4}
     height:calc(100vh - 54px) !important;
     z-index:45 !important;
     transform:translateX(110%) !important;
-    transition:transform .28s cubic-bezier(.4,0,.2,1) !important;
-    box-shadow:-4px 0 24px rgba(0,0,0,.25) !important;
+    transition:transform .25s ease !important;
+    box-shadow:-4px 0 20px rgba(0,0,0,.2) !important;
     overflow-y:auto !important;
     border-left:none !important;
     padding:12px 8px !important;
+    will-change:transform;
   }
   #sidebar.open{
     transform:translateX(0) !important;
@@ -1411,10 +1412,16 @@ applyStoredDarkMode();
    📱 MOBILE SIDEBAR
 ══════════════════════════════════════ */
 function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebar-overlay');
-  const isOpen = sidebar.classList.toggle('open');
-  if (overlay) overlay.classList.toggle('show', isOpen);
+  try {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (!sidebar) return;
+    const isOpen = sidebar.classList.toggle('open');
+    if (overlay) {
+      if (isOpen) overlay.style.display = 'block';
+      else overlay.style.display = 'none';
+    }
+  } catch(e) { console.warn('toggleSidebar:', e); }
 }
 
 /* ══════════════════════════════════════
@@ -1714,19 +1721,75 @@ function showShortcutsModal() {
   document.getElementById('modal-box').className = 'modal wide';
   document.getElementById('modal-save-btn').style.display = 'none';
   document.getElementById('modal-body').innerHTML = `
-    <div class="shortcut-grid">
-      <div class="shortcut-item"><span class="shortcut-desc">بحث شامل</span><div class="shortcut-key"><span class="kbd">Ctrl</span><span class="kbd">K</span></div></div>
-      <div class="shortcut-item"><span class="shortcut-desc">إضافة أصل جديد</span><div class="shortcut-key"><span class="kbd">Ctrl</span><span class="kbd">N</span></div></div>
-      <div class="shortcut-item"><span class="shortcut-desc">لوحة التحكم</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">H</span></div></div>
-      <div class="shortcut-item"><span class="shortcut-desc">سجل الأصول</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">A</span></div></div>
-      <div class="shortcut-item"><span class="shortcut-desc">العملاء</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">C</span></div></div>
-      <div class="shortcut-item"><span class="shortcut-desc">التقارير</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">R</span></div></div>
-      <div class="shortcut-item"><span class="shortcut-desc">إغلاق النافذة</span><div class="shortcut-key"><span class="kbd">Esc</span></div></div>
-      <div class="shortcut-item"><span class="shortcut-desc">الوضع الليلي</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">D</span></div></div>
-      <div class="shortcut-item"><span class="shortcut-desc">الإعدادات</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">S</span></div></div>
-      <div class="shortcut-item"><span class="shortcut-desc">تعليم الإشعارات مقروءة</span><div class="shortcut-key"><span class="kbd">Alt</span><span class="kbd">B</span></div></div>
+    <div class="alert alert-warning" style="margin-bottom:14px;font-size:12px">
+      <i class="ti ti-info-circle"></i>
+      <div>
+        اختصارات <strong>Ctrl+N / Ctrl+T / Ctrl+W</strong> محجوزة للمتصفح ولا يمكن تجاوزها — النظام يستخدم <strong>Alt+مفتاح</strong> بدلاً منها.
+        <br>في macOS استخدم <strong>Option</strong> بدلاً من Alt.
+      </div>
     </div>
-    <div class="alert alert-info" style="margin-top:14px;font-size:12px"><i class="ti ti-info-circle"></i> تعمل الاختصارات في أي مكان بالنظام ما لم يكن المؤشر في حقل نص.</div>
+    <div class="shortcut-grid">
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-search" style="color:var(--blue);margin-left:4px"></i> بحث شامل</span>
+        <div class="shortcut-key"><span class="kbd">Ctrl</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">K</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-plus" style="color:var(--green);margin-left:4px"></i> إضافة أصل جديد</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">N</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-dashboard" style="color:var(--blue);margin-left:4px"></i> لوحة التحكم</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">H</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-package" style="color:var(--blue);margin-left:4px"></i> سجل الأصول</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">A</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-users" style="color:var(--teal);margin-left:4px"></i> العملاء</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">C</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-transfer" style="color:var(--purple);margin-left:4px"></i> التسليمات</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">T</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-chart-bar" style="color:var(--purple);margin-left:4px"></i> التقارير</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">R</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-activity" style="color:var(--teal);margin-left:4px"></i> سجل النشاط</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">L</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-user-shield" style="color:var(--amber);margin-left:4px"></i> المستخدمون</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">U</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-settings" style="color:var(--text2);margin-left:4px"></i> الإعدادات</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">S</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-moon" style="color:var(--text2);margin-left:4px"></i> الوضع الليلي</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">D</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-bell" style="color:var(--amber);margin-left:4px"></i> تعليم إشعارات مقروءة</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">B</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-menu-2" style="color:var(--text2);margin-left:4px"></i> قائمة الجوال</span>
+        <div class="shortcut-key"><span class="kbd">Alt</span><span style="color:var(--text3);font-size:11px">+</span><span class="kbd">M</span></div>
+      </div>
+      <div class="shortcut-item">
+        <span class="shortcut-desc"><i class="ti ti-x" style="color:var(--red);margin-left:4px"></i> إغلاق النافذة / البحث</span>
+        <div class="shortcut-key"><span class="kbd">Esc</span></div>
+      </div>
+    </div>
+    <div class="alert alert-info" style="margin-top:12px;font-size:11px">
+      <i class="ti ti-bulb"></i>
+      <div>تعمل اختصارات <strong>Alt+مفتاح</strong> في أي مكان بالنظام ما لم يكن المؤشر داخل حقل نص. الضغط على <strong>Esc</strong> يعمل في جميع الأوقات.</div>
+    </div>
   `;
   document.getElementById('modal-overlay').classList.add('show');
 }
@@ -1736,43 +1799,127 @@ document.addEventListener('keydown', function(e) {
   const tag = document.activeElement?.tagName?.toLowerCase();
   const inInput = ['input','textarea','select'].includes(tag);
 
-  // Ctrl+K — بحث شامل
-  if (e.ctrlKey && e.key === 'k') {
+  // ══ Ctrl+K — بحث شامل (آمن في معظم المتصفحات داخل الصفحة) ══
+  if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === 'k') {
     e.preventDefault();
     const gs = document.getElementById('global-search-input');
     if (gs) { gs.focus(); gs.select(); }
     return;
   }
-  // Escape — إغلاق النوافذ
+
+  // ══ Escape — إغلاق كل النوافذ المفتوحة ══
   if (e.key === 'Escape') {
+    e.preventDefault();
     closeModal();
     closeNotifPanel();
     const dd = document.getElementById('gs-dropdown');
     if (dd) dd.classList.remove('open');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar && sidebar.classList.contains('open')) {
+      sidebar.classList.remove('open');
+      if (overlay) overlay.style.display = 'none';
+    }
     return;
   }
+
+  // ══ لا تُشغَّل الاختصارات أثناء الكتابة في حقل ══
   if (inInput) return;
 
-  // Ctrl+N — إضافة أصل
-  if (e.ctrlKey && e.key === 'n') {
+  // ══ Alt+N — إضافة أصل جديد (بدلاً من Ctrl+N المحجوز للمتصفح) ══
+  if (e.altKey && !e.ctrlKey && e.key === 'n') {
     e.preventDefault();
     if (can('add')) openAddAsset();
+    else showToast('ليس لديك صلاحية إضافة أصول','error');
     return;
   }
-  // Alt+H — لوحة التحكم
-  if (e.altKey && e.key === 'h') { e.preventDefault(); const n=document.getElementById('nav-dashboard'); if(n)showPage('dashboard',n); return; }
-  // Alt+A — الأصول
-  if (e.altKey && e.key === 'a') { e.preventDefault(); const n=document.getElementById('nav-assets'); if(n&&n.style.display!=='none')showPage('assets',n); return; }
-  // Alt+C — العملاء
-  if (e.altKey && e.key === 'c') { e.preventDefault(); const n=document.getElementById('nav-customers'); if(n&&n.style.display!=='none')showPage('customers',n); return; }
-  // Alt+R — التقارير
-  if (e.altKey && e.key === 'r') { e.preventDefault(); const n=document.getElementById('nav-reports'); if(n&&n.style.display!=='none')showPage('reports',n); return; }
-  // Alt+D — Dark Mode
-  if (e.altKey && e.key === 'd') { e.preventDefault(); toggleDarkMode(); return; }
-  // Alt+S — الإعدادات
-  if (e.altKey && e.key === 's') { e.preventDefault(); const n=document.getElementById('nav-settings'); if(n&&n.style.display!=='none')showPage('settings',n); return; }
-  // Alt+B — تعليم الإشعارات
-  if (e.altKey && e.key === 'b') { e.preventDefault(); markAllRead(); return; }
+
+  // ══ Alt+H — لوحة التحكم ══
+  if (e.altKey && !e.ctrlKey && e.key === 'h') {
+    e.preventDefault();
+    const n = document.getElementById('nav-dashboard');
+    if (n && n.style.display !== 'none') showPage('dashboard', n);
+    return;
+  }
+
+  // ══ Alt+A — سجل الأصول ══
+  if (e.altKey && !e.ctrlKey && e.key === 'a') {
+    e.preventDefault();
+    const n = document.getElementById('nav-assets');
+    if (n && n.style.display !== 'none') showPage('assets', n);
+    return;
+  }
+
+  // ══ Alt+C — العملاء ══
+  if (e.altKey && !e.ctrlKey && e.key === 'c') {
+    e.preventDefault();
+    const n = document.getElementById('nav-customers');
+    if (n && n.style.display !== 'none') showPage('customers', n);
+    return;
+  }
+
+  // ══ Alt+R — التقارير ══
+  if (e.altKey && !e.ctrlKey && e.key === 'r') {
+    e.preventDefault();
+    const n = document.getElementById('nav-reports');
+    if (n && n.style.display !== 'none') showPage('reports', n);
+    return;
+  }
+
+  // ══ Alt+T — التسليمات ══
+  if (e.altKey && !e.ctrlKey && e.key === 't') {
+    e.preventDefault();
+    const n = document.getElementById('nav-handover');
+    if (n && n.style.display !== 'none') showPage('handover', n);
+    return;
+  }
+
+  // ══ Alt+U — المستخدمون ══
+  if (e.altKey && !e.ctrlKey && e.key === 'u') {
+    e.preventDefault();
+    const n = document.getElementById('nav-users');
+    if (n && n.style.display !== 'none') showPage('users', n);
+    return;
+  }
+
+  // ══ Alt+L — سجل النشاط ══
+  if (e.altKey && !e.ctrlKey && e.key === 'l') {
+    e.preventDefault();
+    const n = document.getElementById('nav-audit');
+    if (n && n.style.display !== 'none') showPage('audit', n);
+    return;
+  }
+
+  // ══ Alt+D — الوضع الليلي / الفاتح ══
+  if (e.altKey && !e.ctrlKey && e.key === 'd') {
+    e.preventDefault();
+    toggleDarkMode();
+    return;
+  }
+
+  // ══ Alt+S — الإعدادات ══
+  if (e.altKey && !e.ctrlKey && e.key === 's') {
+    e.preventDefault();
+    const n = document.getElementById('nav-settings');
+    if (n && n.style.display !== 'none') showPage('settings', n);
+    return;
+  }
+
+  // ══ Alt+B — تعليم الإشعارات كمقروءة ══
+  if (e.altKey && !e.ctrlKey && e.key === 'b') {
+    e.preventDefault();
+    markAllRead();
+    showToast('تم تعليم جميع الإشعارات كمقروءة','success');
+    return;
+  }
+
+  // ══ Alt+M — فتح/إغلاق القائمة الجانبية (مفيد للجوال) ══
+  if (e.altKey && !e.ctrlKey && e.key === 'm') {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleSidebar();
+    return;
+  }
 });
 
 /* ── إضافة تسجيل النشاط إلى الوظائف الموجودة ── */
@@ -2329,7 +2476,7 @@ function showPage(id, el) {
   const overlay = document.getElementById('sidebar-overlay');
   if (sidebar && sidebar.classList.contains('open')) {
     sidebar.classList.remove('open');
-    if (overlay) overlay.classList.remove('show');
+    if (overlay) overlay.style.display = 'none';
   }
   renderAll();
   if (id === 'settings') { try { showDangerZoneIfAdmin(); } catch(e){} }
