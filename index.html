@@ -247,6 +247,25 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
 .map-link-btn:hover{background:#2E7D32;color:#fff}
 html.dark .map-link-btn{background:var(--green-bg);border-color:#2E7D32;color:var(--green)}
 
+/* ── Custody Asset Search ── */
+.asset-search-wrap{position:relative}
+.asset-search-input{width:100%;padding:9px 36px 9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);outline:none;transition:border-color .15s}
+.asset-search-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(28,63,138,.08)}
+.asset-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:15px;pointer-events:none}
+.asset-search-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);z-index:500;max-height:260px;overflow-y:auto;display:none}
+.asset-search-dropdown.open{display:block;animation:panel-slide .12s ease}
+.asset-search-item{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border2);transition:background .1s}
+.asset-search-item:last-child{border-bottom:none}
+.asset-search-item:hover{background:var(--blue-bg)}
+.asset-search-item-name{font-size:13px;font-weight:700;color:var(--text);flex:1}
+.asset-search-item-code{font-size:11px;font-family:monospace;color:var(--blue);font-weight:700;background:var(--blue-bg);padding:1px 6px;border-radius:4px;border:1px solid var(--blue-light)}
+.asset-search-item-meta{font-size:11px;color:var(--text3);margin-top:2px}
+.asset-search-no-result{padding:20px;text-align:center;color:var(--text3);font-size:12px}
+.asset-selected-badge{background:var(--green-bg);border:1px solid #80C860;border-radius:var(--radius);padding:7px 12px;margin-top:6px;font-size:12px;color:var(--green);display:flex;align-items:center;gap:8px}
+html.dark .asset-search-input{background:var(--bg2)}
+html.dark .asset-search-dropdown{background:var(--bg2)}
+html.dark .asset-search-item:hover{background:var(--bg3)}
+
 /* ── Complaints page ── */
 .complaint-badge-new{background:#FEF3C7;color:#B45309;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
 .complaint-badge-converted{background:#E8F5E9;color:#2E7D32;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
@@ -5183,8 +5202,6 @@ function filterCustody() { renderCustody(); }
 
 function openNewCustody() {
   if (!can('custody_add')) { showToast('ليس لديك صلاحية إضافة طلب عهدة','error'); return; }
-  const assets=getAssets();
-  const opts=assets.map(a=>'<option value="'+a._id+'" data-barcode="'+(a.barcode||a.code||a._id)+'" data-status="'+(a.status||'متاح')+'" data-name="'+a.name+'">'+a.name+' ['+(a.barcode||a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' ('+( a.status||'متاح')+')</option>').join('');
   const today=new Date().toISOString().split('T')[0];
   document.getElementById('modal-title').innerHTML='<i class="ti ti-file-invoice"></i> طلب عهدة جديد';
   document.getElementById('modal-body').innerHTML=
@@ -5192,10 +5209,21 @@ function openNewCustody() {
       '<div class="field"><label>التاريخ *</label><input type="date" id="cus-date" value="'+today+'"></div>'+
       '<div class="field"><label>اسم الطالب *</label><input type="text" id="cus-requester" placeholder="الاسم الكامل"></div>'+
     '</div>'+
-    '<div class="field" style="margin-bottom:12px"><label>الأصل المطلوب *</label>'+
-      '<select id="cus-asset" onchange="onCustodyAssetChange()"><option value="">-- اختر الأصل --</option>'+opts+'</select>'+
+    '<div class="field" style="margin-bottom:4px">'+
+      '<label>الأصل المطلوب * <span style="font-size:11px;color:var(--text3);font-weight:400">(ابحث بالاسم أو رقم الباركود)</span></label>'+
+      '<div class="asset-search-wrap">'+
+        '<i class="ti ti-barcode asset-search-icon"></i>'+
+        '<input type="text" id="cus-asset-search" class="asset-search-input" placeholder="اكتب اسم الأصل أو رقم الباركود..." oninput="filterCustodyAssets()" onfocus="filterCustodyAssets()" onblur="hideCustodyDropdown()" autocomplete="off">'+
+        '<div class="asset-search-dropdown" id="cus-asset-dropdown"></div>'+
+      '</div>'+
+      '<div id="cus-selected-asset" class="asset-selected-badge" style="display:none">'+
+        '<i class="ti ti-check-circle" style="font-size:16px"></i>'+
+        '<span id="cus-selected-text"></span>'+
+        '<button type="button" onclick="clearCustodyAsset()" style="margin-right:auto;background:none;border:none;cursor:pointer;color:var(--red);font-size:13px;padding:2px 4px" title="مسح الاختيار"><i class="ti ti-x"></i></button>'+
+      '</div>'+
+      '<input type="hidden" id="cus-asset">'+
     '</div>'+
-    '<div class="form-row" style="margin-bottom:12px">'+
+    '<div class="form-row" style="margin-bottom:12px;margin-top:10px">'+
       '<div class="field"><label>الباركود</label><input type="text" id="cus-barcode" readonly style="background:var(--bg2)"></div>'+
       '<div class="field"><label>حالة الأصل</label><input type="text" id="cus-status" readonly style="background:var(--bg2)"></div>'+
     '</div>'+
@@ -5209,36 +5237,134 @@ function openNewCustody() {
   document.getElementById('modal-box').className='modal wide';
   document.getElementById('modal-overlay').classList.add('show');
 }
-function onCustodyAssetChange() {
-  const sel=document.getElementById('cus-asset');
-  const opt=sel.options[sel.selectedIndex];
-  const assetId=sel.value;
-  const status=opt.dataset.status||'';
-  document.getElementById('cus-barcode').value=opt.dataset.barcode||'';
-  document.getElementById('cus-status').value=status;
-  const clientInfoEl=document.getElementById('cus-client-info');
-  if (clientInfoEl) {
-    if (status==='عند عميل') {
-      const activeH=getHandovers().find(h=>h.assetId===assetId&&h.status==='مُسلَّم');
-      if (activeH) {
-        clientInfoEl.style.display='';
-        clientInfoEl.innerHTML='<i class="ti ti-user" style="color:var(--amber)"></i> الأصل حالياً عند العميل: <strong>'+activeH.clientName+'</strong>';
-      } else { clientInfoEl.style.display='none'; }
-    } else { clientInfoEl.style.display='none'; }
+/* ══ دوال البحث في أصول العهدة ══ */
+function filterCustodyAssets() {
+  const q = (document.getElementById('cus-asset-search')?.value || '').trim().toLowerCase();
+  const dd = document.getElementById('cus-asset-dropdown');
+  if (!dd) return;
+
+  const assets = getAssets();
+  const filtered = q.length === 0
+    ? assets.slice(0, 30) // أول 30 عند فتح القائمة بدون بحث
+    : assets.filter(a => {
+        const code = (a.barcode||a.code||'').toLowerCase();
+        const name = (a.name||'').toLowerCase();
+        const sub  = (a.subType||'').toLowerCase();
+        const type = (a.type||'').toLowerCase();
+        return code.includes(q) || name.includes(q) || sub.includes(q) || type.includes(q);
+      });
+
+  if (!filtered.length) {
+    dd.innerHTML = '<div class="asset-search-no-result"><i class="ti ti-search-off" style="font-size:24px;display:block;margin-bottom:6px;opacity:.4"></i>لا توجد أصول مطابقة لـ "'+q+'"</div>';
+    dd.classList.add('open');
+    return;
   }
+
+  const statusColor = s => s==='متاح'?'var(--green)':s==='عند عميل'?'var(--amber)':s==='صيانة'?'var(--blue)':'var(--red)';
+  const statusBg    = s => s==='متاح'?'var(--green-bg)':s==='عند عميل'?'var(--amber-bg)':s==='صيانة'?'var(--blue-bg)':'var(--red-bg)';
+
+  dd.innerHTML = filtered.map(a => {
+    const code   = a.barcode || a.code || '';
+    const status = a.status || 'متاح';
+    const avail  = a.availableQty != null ? ` — متاح: ${a.availableQty}` : '';
+    return `<div class="asset-search-item" onmousedown="selectCustodyAsset('${a._id}','${(a.name||'').replace(/'/g,"\\'")}','${code}','${status}','${(a.subType||'').replace(/'/g,"\\'")}')">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="asset-search-item-name">${a.name}</span>
+          ${code ? `<span class="asset-search-item-code"><i class="ti ti-barcode" style="font-size:10px"></i> ${code}</span>` : ''}
+          <span style="font-size:10px;padding:1px 7px;border-radius:100px;font-weight:700;background:${statusBg(status)};color:${statusColor(status)}">${status}</span>
+        </div>
+        <div class="asset-search-item-meta">${a.type||''}${a.subType?' / '+a.subType:''}${avail}</div>
+      </div>
+    </div>`;
+  }).join('');
+  dd.classList.add('open');
+}
+
+function selectCustodyAsset(id, name, code, status, subType) {
+  // حفظ القيم
+  const hiddenInput = document.getElementById('cus-asset');
+  if (hiddenInput) hiddenInput.value = id;
+  const searchInput = document.getElementById('cus-asset-search');
+  if (searchInput) searchInput.value = name + (code ? ' — ' + code : '');
+  // إظهار البادج
+  const badge = document.getElementById('cus-selected-asset');
+  const text  = document.getElementById('cus-selected-text');
+  if (badge) badge.style.display = 'flex';
+  if (text)  text.textContent = name + (code ? ' | ' + code : '') + (subType ? ' | ' + subType : '');
+  // ملء الحقول
+  const barcodeEl = document.getElementById('cus-barcode');
+  const statusEl  = document.getElementById('cus-status');
+  if (barcodeEl) barcodeEl.value = code;
+  if (statusEl)  statusEl.value  = status;
+  // إغلاق القائمة
+  hideCustodyDropdown();
+  // إظهار اسم العميل إذا كان الأصل عند عميل
+  const clientInfoEl = document.getElementById('cus-client-info');
+  if (clientInfoEl) {
+    if (status === 'عند عميل') {
+      const activeH = getHandovers().find(h=>h.assetId===id&&h.status==='مُسلَّم');
+      if (activeH) {
+        clientInfoEl.style.display = '';
+        clientInfoEl.innerHTML = '<i class="ti ti-user" style="color:var(--amber)"></i> الأصل حالياً عند العميل: <strong>'+activeH.clientName+'</strong>';
+      } else { clientInfoEl.style.display = 'none'; }
+    } else { clientInfoEl.style.display = 'none'; }
+  }
+}
+
+function clearCustodyAsset() {
+  const hiddenInput = document.getElementById('cus-asset');
+  if (hiddenInput) hiddenInput.value = '';
+  const searchInput = document.getElementById('cus-asset-search');
+  if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+  const badge = document.getElementById('cus-selected-asset');
+  if (badge) badge.style.display = 'none';
+  const barcodeEl = document.getElementById('cus-barcode');
+  const statusEl  = document.getElementById('cus-status');
+  if (barcodeEl) barcodeEl.value = '';
+  if (statusEl)  statusEl.value  = '';
+  const dd = document.getElementById('cus-asset-dropdown');
+  if (dd) dd.classList.remove('open');
+  const clientInfoEl = document.getElementById('cus-client-info');
+  if (clientInfoEl) clientInfoEl.style.display = 'none';
+}
+
+function hideCustodyDropdown() {
+  setTimeout(() => {
+    const dd = document.getElementById('cus-asset-dropdown');
+    if (dd) dd.classList.remove('open');
+  }, 200);
+}
+
+function onCustodyAssetChange() {
+  // تبقّى للتوافق مع الكود القديم
 }
 async function saveCustodyRequest() {
   const date=document.getElementById('cus-date').value;
   const requesterName=document.getElementById('cus-requester').value.trim();
   const assetId=document.getElementById('cus-asset').value;
   const purpose=document.getElementById('cus-purpose').value.trim();
-  if (!date||!requesterName||!assetId||!purpose) { showToast('يرجى ملء الحقول الإلزامية','error'); return; }
-  const sel=document.getElementById('cus-asset');
-  const opt=sel.options[sel.selectedIndex];
+  if (!date||!requesterName) { showToast('يرجى ملء الحقول الإلزامية','error'); return; }
+  if (!assetId) { showToast('يرجى اختيار الأصل المطلوب من القائمة','error'); document.getElementById('cus-asset-search')?.focus(); return; }
+  if (!purpose) { showToast('يرجى إدخال الغرض من العهدة','error'); return; }
+  // جلب بيانات الأصل
+  const asset = getAssets().find(a=>a._id===assetId)||{};
   const custodyNum='CUS-'+Date.now().toString().slice(-6);
   const financialItems = getFinancialItems();
   const financialTotal = financialItems.reduce((s,i)=>s+(i.amount||0),0);
-  const rec={date,requesterName,assetId,assetName:opt.dataset.name||opt.text,barcode:document.getElementById('cus-barcode').value,assetStatus:document.getElementById('cus-status').value,purpose,notes:document.getElementById('cus-notes').value,financialItems,financialTotal,requestStatus:'قيد المراجعة',createdBy:currentUser?.name||'',createdAt:new Date().toISOString(),custodyNumber:custodyNum};
+  const rec={
+    date, requesterName, assetId,
+    assetName: asset.name || document.getElementById('cus-selected-text')?.textContent?.split('|')[0]?.trim() || '',
+    barcode: document.getElementById('cus-barcode').value,
+    assetStatus: document.getElementById('cus-status').value,
+    assetType: asset.type||'', assetSubType: asset.subType||'',
+    purpose, notes:document.getElementById('cus-notes').value,
+    financialItems, financialTotal,
+    requestStatus:'قيد المراجعة',
+    createdBy:currentUser?.name||'',
+    createdAt:new Date().toISOString(),
+    custodyNumber:custodyNum
+  };
   try {
     await waitForFirebase();
     const docRef=await window.fsApi.addDoc(window.fsApi.collection(window.db,"custodyRequests"),rec);
@@ -5246,7 +5372,7 @@ async function saveCustodyRequest() {
     window.custodyRequests=window.custodyRequests||[];
     window.custodyRequests.push(rec);
     closeModal(); renderCustody();
-    logAudit('custody','حفظ طلب عهدة',`تم حفظ طلب عهدة`);
+    logAudit('custody','حفظ طلب عهدة',`${rec.custodyNumber} — الأصل: ${rec.assetName} — الطالب: ${requesterName}`);
     showToast('تم حفظ الطلب','success');
     setTimeout(()=>printCustodyForm(rec._id),400);
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
@@ -6184,6 +6310,10 @@ if(typeof onComplaintAssetChange!=='undefined')window.onComplaintAssetChange=onC
 if(typeof onComplaintCustomerChange!=='undefined')window.onComplaintCustomerChange=onComplaintCustomerChange;
 if(typeof onComplaintTypeChange!=='undefined')window.onComplaintTypeChange=onComplaintTypeChange;
 if(typeof onCustodyAssetChange!=='undefined')window.onCustodyAssetChange=onCustodyAssetChange;
+if(typeof filterCustodyAssets!=='undefined')window.filterCustodyAssets=filterCustodyAssets;
+if(typeof selectCustodyAsset!=='undefined')window.selectCustodyAsset=selectCustodyAsset;
+if(typeof clearCustodyAsset!=='undefined')window.clearCustodyAsset=clearCustodyAsset;
+if(typeof hideCustodyDropdown!=='undefined')window.hideCustodyDropdown=hideCustodyDropdown;
 if(typeof exportTableExcel!=='undefined')window.exportTableExcel=exportTableExcel;
 if(typeof exportDashboardExcel!=='undefined')window.exportDashboardExcel=exportDashboardExcel;
 if(typeof showShortcutsModal!=='undefined')window.showShortcutsModal=showShortcutsModal;
@@ -6214,6 +6344,10 @@ if(typeof approveCustody!=='undefined')window.approveCustody=approveCustody;
 if(typeof deleteCustody!=='undefined')window.deleteCustody=deleteCustody;
 if(typeof openNewCustody!=='undefined')window.openNewCustody=openNewCustody;
 if(typeof onCustodyAssetChange!=='undefined')window.onCustodyAssetChange=onCustodyAssetChange;
+if(typeof filterCustodyAssets!=='undefined')window.filterCustodyAssets=filterCustodyAssets;
+if(typeof selectCustodyAsset!=='undefined')window.selectCustodyAsset=selectCustodyAsset;
+if(typeof clearCustodyAsset!=='undefined')window.clearCustodyAsset=clearCustodyAsset;
+if(typeof hideCustodyDropdown!=='undefined')window.hideCustodyDropdown=hideCustodyDropdown;
 if(typeof deleteUser!=='undefined')window.deleteUser=deleteUser;
 if(typeof setPresetPerms!=='undefined')window.setPresetPerms=setPresetPerms;
 if(typeof deleteCustomer!=='undefined')window.deleteCustomer=deleteCustomer;
@@ -6221,6 +6355,10 @@ if(typeof saveEditCustomer!=='undefined')window.saveEditCustomer=saveEditCustome
 if(typeof viewAssetImage!=='undefined')window.viewAssetImage=viewAssetImage;
 if(typeof previewAssetImage!=='undefined')window.previewAssetImage=previewAssetImage;
 if(typeof onCustodyAssetChange!=='undefined')window.onCustodyAssetChange=onCustodyAssetChange;
+if(typeof filterCustodyAssets!=='undefined')window.filterCustodyAssets=filterCustodyAssets;
+if(typeof selectCustodyAsset!=='undefined')window.selectCustodyAsset=selectCustodyAsset;
+if(typeof clearCustodyAsset!=='undefined')window.clearCustodyAsset=clearCustodyAsset;
+if(typeof hideCustodyDropdown!=='undefined')window.hideCustodyDropdown=hideCustodyDropdown;
 if(typeof filterCustody!=='undefined')window.filterCustody=filterCustody;
 
 
