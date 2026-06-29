@@ -3611,14 +3611,9 @@ function promptPrintBarcode(asset) {
   document.getElementById('modal-save-btn').textContent = 'طباعة الباركود';
   document.getElementById('modal-save-btn').className = 'btn-save success-btn';
   document.getElementById('modal-save-btn').onclick = () => { closeModal(); printAssetBarcode(asset); };
-  const footer = document.querySelector('.modal-footer');
-  const skipBtn = document.createElement('button');
-  skipBtn.className = 'btn-cancel';
-  skipBtn.textContent = 'تخطي';
-  skipBtn.onclick = closeModal;
-  // Insert skip before save button
-  const saveBtn = document.getElementById('modal-save-btn');
-  footer.insertBefore(skipBtn, saveBtn);
+  // استخدام زر الإلغاء الموجود بتغيير نصه فقط (بدون إضافة زر جديد)
+  const cancelBtn = document.querySelector('.modal-footer .btn-cancel');
+  if (cancelBtn) { cancelBtn.textContent = 'تخطي'; cancelBtn._origText = cancelBtn._origText || 'إلغاء'; }
   document.getElementById('modal-box').className = 'modal';
   document.getElementById('modal-overlay').classList.add('show');
 }
@@ -5453,6 +5448,9 @@ function closeModal() {
   btn.className='btn-save';
   document.getElementById('modal-box').className='modal';
   _pendingAttachments=[];
+  // استعادة نص زر الإلغاء إذا تغيّر
+  const cancelBtn = document.querySelector('.modal-footer .btn-cancel');
+  if (cancelBtn && cancelBtn._origText) { cancelBtn.textContent = cancelBtn._origText; }
   // Remove any extra buttons added dynamically to footer
   const footer = document.querySelector('.modal-footer');
   footer.querySelectorAll('button:not(#modal-save-btn):not(.btn-cancel)').forEach(b=>b.remove());
@@ -5827,6 +5825,23 @@ function printCustomerCard(id) {
     ['تاريخ التسجيل', c.date||'—'],
   ];
 
+  // رابط الموقع الجغرافي
+  const mapUrl = c.mapUrl || (c.lat&&c.lng ? `https://maps.google.com/?q=${c.lat},${c.lng}` : '');
+  const mapHTML = mapUrl
+    ? `<div style="margin:12px 0;padding:10px 14px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">📍</span>
+          <div>
+            <div style="font-size:10px;color:#2E7D32;font-weight:700;text-transform:uppercase;letter-spacing:.3px">الموقع الجغرافي</div>
+            <div style="font-size:12px;color:#1B5E20;margin-top:2px">${c.city||''}${c.city&&c.address?' — ':''}${c.address||''}</div>
+          </div>
+        </div>
+        <a href="${mapUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#2E7D32;color:#fff;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;font-family:'Cairo',sans-serif;white-space:nowrap">
+          🗺️ فتح الموقع
+        </a>
+      </div>`
+    : '';
+
   const win = window.open('','_blank');
   win.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">'+
   '<title>كارت عميل - '+c.name+'</title>'+
@@ -5878,6 +5893,7 @@ function printCustomerCard(id) {
       '<div class="info-grid">'+
         infoItems.map(([k,v])=>'<div class="info-item"><div class="info-label">'+k+'</div><div class="info-value">'+v+'</div></div>').join('')+
       '</div>'+
+      mapHTML+
       (c.notes?'<div class="notes-box">📝 <strong>ملاحظات:</strong> '+c.notes+'</div>':'')+
       '<div class="section-title" style="margin-top:20px">📦 الأصول المسلَّمة حالياً ('+activeH.length+')</div>'+
       '<table>'+
