@@ -220,6 +220,23 @@ code.tag{font-size:11px;background:var(--bg2);padding:2px 7px;border-radius:5px;
 
 /* ── Reset Danger Zone ── */
 #reset-confirm-input:focus{outline:none;border-color:var(--red)!important;background:#fff!important}
+
+/* ── Custody new badges ── */
+.custody-badge-closed{background:#1A1F2E;color:#8DA0C4;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
+.custody-badge-disbursed{background:#E0F2FE;color:#0369A1;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
+
+/* ── Map link ── */
+.map-link-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7;border-radius:var(--radius);font-size:12px;cursor:pointer;text-decoration:none;font-family:var(--font);font-weight:600;transition:all .15s}
+.map-link-btn:hover{background:#2E7D32;color:#fff}
+html.dark .map-link-btn{background:var(--green-bg);border-color:#2E7D32;color:var(--green)}
+
+/* ── Complaints page ── */
+.complaint-badge-new{background:#FEF3C7;color:#B45309;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
+.complaint-badge-converted{background:#E8F5E9;color:#2E7D32;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
+.complaint-badge-closed{background:#F3F4F6;color:#6B7280;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
+.complaint-badge-inprogress{background:#EDE9FE;color:#6D28D9;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:700}
+html.dark .complaint-badge-new{background:#2D2108;color:var(--amber)}
+html.dark .complaint-badge-converted{background:var(--green-bg);color:var(--green)}
 .reset-step{display:none}.reset-step.active{display:block}
 .countdown-ring{width:54px;height:54px;border-radius:50%;background:var(--red-bg);border:3px solid var(--red);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--red);margin:0 auto 10px;transition:all .3s}
 .reset-progress{height:6px;background:var(--bg2);border-radius:100px;overflow:hidden;margin:10px 0}
@@ -636,6 +653,7 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
       <div class="nav-item" id="nav-maintenance" style="display:none" onclick="showPage('maintenance',this)" data-page="maintenance"><i class="ti ti-tool"></i> الصيانة</div>
       <div class="nav-item" id="nav-dispose" style="display:none" onclick="showPage('dispose',this)" data-page="dispose"><i class="ti ti-trash"></i> الإتلاف</div>
       <div class="nav-item" id="nav-custody" style="display:none" onclick="showPage('custody',this)" data-page="custody"><i class="ti ti-file-invoice"></i> طلبات العهدة</div>
+      <div class="nav-item" id="nav-complaints" style="display:none" onclick="showPage('complaints',this)" data-page="complaints"><i class="ti ti-speakerphone"></i> البلاغات</div>
       <div class="nav-item" id="nav-dept-custody" style="display:none" onclick="showPage('dept-custody',this)" data-page="dept-custody"><i class="ti ti-building"></i> عهدة الإدارات</div>
       <div class="nav-section" id="nav-section-admin" style="display:none">الإدارة</div>
       <div class="nav-item" id="nav-types" style="display:none" onclick="showPage('types',this)" data-page="types"><i class="ti ti-tags"></i> أنواع الأصول</div>
@@ -1027,6 +1045,53 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
       </div>
 
 
+      <!-- Complaints / البلاغات -->
+      <div class="page" id="page-complaints">
+        <div class="page-title">
+          <span><i class="ti ti-speakerphone"></i> البلاغات</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="export-btn export-btn-excel" onclick="exportComplaintsExcel()"><i class="ti ti-file-spreadsheet"></i> Excel</button>
+            <button class="add-btn" id="add-complaint-btn" onclick="openNewComplaint()"><i class="ti ti-plus"></i> بلاغ جديد</button>
+            <button class="report-page-btn" onclick="printReport('complaints')"><i class="ti ti-printer"></i> تقرير</button>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-toolbar" style="flex-wrap:wrap;gap:8px">
+            <div class="toolbar-left" style="flex-wrap:wrap;gap:8px">
+              <div class="search-box"><i class="ti ti-search" style="font-size:14px;color:var(--text3)"></i><input type="text" id="complaint-search" placeholder="بحث برقم البلاغ أو اسم العميل أو الأصل..." oninput="filterComplaints()"></div>
+              <select class="filter-select" id="complaint-filter-type" onchange="filterComplaints()">
+                <option value="">📋 جميع الأنواع</option>
+                <option value="صيانة">🔧 صيانة</option>
+                <option value="عهدة">📦 طلب عهدة</option>
+                <option value="استفسار">💬 استفسار</option>
+                <option value="شكوى">⚠️ شكوى</option>
+                <option value="أخرى">📌 أخرى</option>
+              </select>
+              <select class="filter-select" id="complaint-filter-status" onchange="filterComplaints()">
+                <option value="">🔖 جميع الحالات</option>
+                <option value="جديد">جديد</option>
+                <option value="قيد المعالجة">قيد المعالجة</option>
+                <option value="تم التحويل">تم التحويل</option>
+                <option value="مغلق">مغلق</option>
+              </select>
+              <div class="date-range-wrap">
+                <label>من:</label><input type="date" id="complaint-date-from" onchange="filterComplaints()">
+                <label>إلى:</label><input type="date" id="complaint-date-to" onchange="filterComplaints()">
+              </div>
+            </div>
+            <span id="complaint-count-label" style="font-size:12px;color:var(--text3)"></span>
+          </div>
+          <table>
+            <thead><tr>
+              <th>رقم البلاغ</th><th>التاريخ</th><th>نوع البلاغ</th>
+              <th>الأصل / الباركود</th><th>العميل</th><th>الوصف</th>
+              <th>الحالة</th><th>رقم الطلب المحوَّل</th><th>المسجِّل</th><th>الإجراءات</th>
+            </tr></thead>
+            <tbody id="complaints-body"></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Audit Log -->
       <div class="page" id="page-audit">
         <div class="page-title">
@@ -1354,13 +1419,12 @@ try {
   // Update login hint to show ready
   const hint = document.getElementById('login-hint');
   if (hint && hint.textContent.includes('جارٍ')) {
-    hint.textContent = 'النظام جاهز - يمكنك تسجيل الدخول';
-    hint.style.color = '#2E7D32';
+    hint.innerHTML = '<span style="color:#2E7D32;font-weight:700"><i class="ti ti-check" style="font-size:13px"></i> البرنامج جاهز</span>';
   }
 } catch(err) {
   console.error("Firebase init error:", err);
   const hint = document.getElementById('login-hint');
-  if (hint) hint.innerHTML = '<span style="color:#C62828">⚠️ خطأ Firebase: ' + (err.code||err.message) + '</span>';
+  if (hint) hint.innerHTML = '<span style="color:#C62828">⚠️ خطأ في الاتصال بقاعدة البيانات</span>';
 }
 
 document.getElementById('password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
@@ -2135,6 +2199,475 @@ async function saveSettings() {
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
 
+/* ══════════════════════════════════════
+   🏷️ BARCODE PREFIX BY ASSET TYPE (Feature 5)
+══════════════════════════════════════ */
+const TYPE_PREFIXES = {
+  'ثلاجات العرض':'FRZ','ثلاجة عرض':'FRZ','ثلاجات':'FRZ','ثلاجة':'FRZ',
+  'مركبات':'VEH','مركبة':'VEH','سيارات':'VEH','سيارة':'VEH','شاحنات':'VEH',
+  'معدات المطبخ':'KIT','مطبخ':'KIT','معدات طبخ':'KIT',
+  'أجهزة إلكترونية':'ELC','إلكترونيات':'ELC','أجهزة':'ELC',
+  'أثاث':'FRN','مفروشات':'FRN','كراسي':'FRN','طاولات':'FRN',
+  'معدات':'EQP','آلات':'EQP','معدة':'EQP',
+  'حاسوب':'CMP','كمبيوتر':'CMP','أجهزة حاسوب':'CMP','لابتوب':'CMP',
+  'مكيفات':'ACU','مكيف':'ACU','تبريد':'ACU',
+  'هواتف':'PHN','جوالات':'PHN','هاتف':'PHN',
+  'طابعات':'PRT','طابعة':'PRT',
+  'شاشات':'SCR','شاشة':'SCR',
+};
+
+function getTypePrefix(typeName) {
+  if (!typeName) return 'AST';
+  if (TYPE_PREFIXES[typeName]) return TYPE_PREFIXES[typeName];
+  const lower = typeName;
+  for (const [key, prefix] of Object.entries(TYPE_PREFIXES)) {
+    if (lower.includes(key) || key.includes(lower)) return prefix;
+  }
+  // استخدام اول 3 احرف عربية محوّلة
+  const chars = [...typeName].filter(c => /[\u0600-\u06FF]/.test(c)).slice(0,3);
+  if (chars.length >= 2) {
+    const map = {'ث':'TH','ج':'JW','ح':'HM','خ':'KH','د':'DA','ذ':'ZD','ر':'RA','ز':'ZA','س':'SA','ش':'SH','ص':'SO','ض':'DH','ط':'TW','ظ':'ZH','ع':'AY','غ':'GH','ف':'FA','ق':'QA','ك':'KA','ل':'LA','م':'MA','ن':'NA','ه':'HA','و':'WA','ي':'YA','ا':'AL','ب':'BA','ت':'TA','ة':'TA','أ':'AL','إ':'AL','آ':'AL'};
+    return chars.map(c => map[c]||c).join('').replace(/[^A-Z]/g,'').slice(0,3).padEnd(3,'X');
+  }
+  return 'AST';
+}
+
+function generateAssetCode(typeName) {
+  const prefix = getTypePrefix(typeName);
+  const existing = getAssets().filter(a => (a.code||'').startsWith(prefix+'-'));
+  let maxNum = 0;
+  existing.forEach(a => {
+    const parts = (a.code||'').split('-');
+    const n = parseInt(parts[parts.length-1]);
+    if (!isNaN(n) && n > maxNum) maxNum = n;
+  });
+  return prefix + '-' + String(maxNum + 1).padStart(4,'0');
+}
+
+function autoFillAssetCode() {
+  const typeEl = document.getElementById('f-type');
+  const codeEl = document.getElementById('f-code');
+  if (!typeEl || !codeEl) return;
+  if (codeEl.dataset.manuallyEdited) return; // لا تغيير إذا عدّله المستخدم يدوياً
+  if (!window._editingAssetId) { // فقط عند الإضافة لا التعديل
+    codeEl.value = generateAssetCode(typeEl.value);
+  }
+}
+
+/* ══════════════════════════════════════
+   🗺️ GOOGLE MAPS PICKER (Feature 3)
+══════════════════════════════════════ */
+function openMapPicker() {
+  const latEl = document.getElementById('c-lat');
+  const lngEl = document.getElementById('c-lng');
+  const lat = parseFloat(latEl?.value) || 24.7136;
+  const lng = parseFloat(lngEl?.value) || 46.6753;
+  const mapUrl = `https://maps.google.com/?q=${lat},${lng}`;
+  // فتح خريطة جوجل
+  window.open(mapUrl, '_blank');
+  // عرض تعليمات
+  showToast('انسخ الرابط من خرائط جوجل والصقه في حقل الرابط، أو أدخل الإحداثيات يدوياً', 'info', 6000);
+}
+
+function openCustomerMapLink(mapUrl, lat, lng) {
+  if (mapUrl) { window.open(mapUrl, '_blank'); return; }
+  if (lat && lng) { window.open(`https://maps.google.com/?q=${lat},${lng}`, '_blank'); return; }
+  showToast('لا يوجد موقع مسجل لهذا العميل','error');
+}
+
+/* ══════════════════════════════════════
+   📋 CUSTODY — EDIT PENDING + CLOSE (Features 1 & 2)
+══════════════════════════════════════ */
+function editCustodyRequest(id) {
+  if (!can('custody_edit_pending')) { showToast('ليس لديك صلاحية تعديل العهدة','error'); return; }
+  const c = (window.custodyRequests||[]).find(x=>x._id===id);
+  if (!c) return;
+  if (c.requestStatus !== 'قيد المراجعة') { showToast('لا يمكن تعديل عهدة بعد اتخاذ قرار بشأنها','error'); return; }
+  const assets = getAssets();
+  const opts = assets.map(a=>'<option value="'+a._id+'" data-barcode="'+(a.barcode||a.code||a._id)+'" data-status="'+(a.status||'متاح')+'" data-name="'+a.name+'"'+(a._id===c.assetId?' selected':'')+'>'+a.name+' ['+(a.barcode||a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' ('+(a.status||'متاح')+')</option>').join('');
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-edit" style="color:var(--amber)"></i> تعديل طلب عهدة';
+  document.getElementById('modal-body').innerHTML=
+    '<div class="alert alert-warning" style="margin-bottom:12px"><i class="ti ti-info-circle"></i> تعديل مسموح فقط قبل اتخاذ القرار (قيد المراجعة)</div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>التاريخ *</label><input type="date" id="cus-date" value="'+(c.date||'')+'"></div>'+
+      '<div class="field"><label>اسم الطالب *</label><input type="text" id="cus-requester" value="'+(c.requesterName||'')+'"></div>'+
+    '</div>'+
+    '<div class="field" style="margin-bottom:12px"><label>الأصل المطلوب *</label>'+
+      '<select id="cus-asset" onchange="onCustodyAssetChange()"><option value="">-- اختر الأصل --</option>'+opts+'</select>'+
+    '</div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>الباركود</label><input type="text" id="cus-barcode" value="'+(c.barcode||'')+'" readonly style="background:var(--bg2)"></div>'+
+      '<div class="field"><label>حالة الأصل</label><input type="text" id="cus-status" value="'+(c.assetStatus||'')+'" readonly style="background:var(--bg2)"></div>'+
+    '</div>'+
+    '<div id="cus-client-info" style="display:none;padding:8px 12px;background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--radius);margin-bottom:10px;font-size:13px;color:var(--amber)"></div>'+
+    '<div class="field" style="margin-bottom:12px"><label>الغرض *</label><textarea id="cus-purpose">'+(c.purpose||'')+'</textarea></div>'+
+    financialItemsHTML(c.financialItems||[])+
+    '<div class="field" style="margin-top:10px"><label>ملاحظات</label><textarea id="cus-notes">'+(c.notes||'')+'</textarea></div>';
+  document.getElementById('modal-save-btn').textContent='حفظ التعديلات';
+  document.getElementById('modal-save-btn').onclick=()=>saveEditCustodyRequest(id);
+  document.getElementById('modal-box').className='modal wide';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+async function saveEditCustodyRequest(id) {
+  const date=document.getElementById('cus-date').value;
+  const requesterName=document.getElementById('cus-requester').value.trim();
+  const assetId=document.getElementById('cus-asset').value;
+  const purpose=document.getElementById('cus-purpose').value.trim();
+  if (!date||!requesterName||!assetId||!purpose) { showToast('يرجى ملء الحقول الإلزامية','error'); return; }
+  const sel=document.getElementById('cus-asset');
+  const opt=sel.options[sel.selectedIndex];
+  const financialItems=getFinancialItems();
+  const financialTotal=financialItems.reduce((s,i)=>s+(i.amount||0),0);
+  const updates={date,requesterName,assetId,assetName:opt.dataset.name||opt.text,barcode:document.getElementById('cus-barcode').value,assetStatus:document.getElementById('cus-status').value,purpose,notes:document.getElementById('cus-notes').value,financialItems,financialTotal,updatedAt:new Date().toISOString(),updatedBy:currentUser?.name||''};
+  try {
+    await waitForFirebase();
+    await window.fsApi.updateDoc(window.fsApi.doc(window.db,"custodyRequests",id),updates);
+    const idx=(window.custodyRequests||[]).findIndex(c=>c._id===id);
+    if (idx>=0) window.custodyRequests[idx]={...window.custodyRequests[idx],...updates};
+    logAudit('edit','تعديل طلب عهدة قيد المراجعة',`تم تعديل الطلب: ${updates.assetName||''}`);
+    closeModal(); renderCustody();
+    showToast('تم حفظ التعديلات','success');
+  } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+function openCloseCustody(id) {
+  if (!can('custody_close')) { showToast('ليس لديك صلاحية إقفال العهدة','error'); return; }
+  const c=(window.custodyRequests||[]).find(x=>x._id===id);
+  if (!c) return;
+  if (c.requestStatus!=='معتمد') { showToast('يمكن إقفال العهدة المعتمدة فقط','error'); return; }
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-lock" style="color:var(--blue)"></i> إقفال العهدة';
+  document.getElementById('modal-body').innerHTML=
+    '<div class="alert alert-info" style="margin-bottom:14px"><i class="ti ti-info-circle"></i>'+
+    ' إقفال العهدة يتم بعد صرف المبلغ وتسليم الفواتير. الرقم: <strong>'+( c.custodyNumber||'—')+'</strong></div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>عدد الفواتير *</label><input type="number" id="close-invoice-count" min="1" placeholder="عدد الفواتير المرفقة"></div>'+
+      '<div class="field"><label>إجمالي مبالغ الفواتير (ريال) *</label><input type="number" id="close-invoice-total" step="0.01" min="0" placeholder="0.00"></div>'+
+    '</div>'+
+    '<div class="field" style="margin-bottom:12px"><label>ملاحظات الإقفال</label><textarea id="close-notes" rows="3" placeholder="ملاحظات إضافية عند الإقفال..."></textarea></div>'+
+    '<div class="field" style="margin-bottom:12px"><label>تاريخ الإقفال</label><input type="date" id="close-date" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
+    '<div style="background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--radius);padding:10px;font-size:12px;color:var(--amber)">'+
+    '<i class="ti ti-alert-triangle"></i> بعد الإقفال لن يمكن تعديل هذا الطلب</div>';
+  document.getElementById('modal-save-btn').className='btn-save';
+  document.getElementById('modal-save-btn').textContent='تأكيد الإقفال';
+  document.getElementById('modal-save-btn').onclick=()=>saveCloseCustody(id);
+  document.getElementById('modal-box').className='modal wide';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+async function saveCloseCustody(id) {
+  const invoiceCount=parseInt(document.getElementById('close-invoice-count').value)||0;
+  const invoiceTotal=parseFloat(document.getElementById('close-invoice-total').value)||0;
+  const notes=document.getElementById('close-notes').value.trim();
+  const closeDate=document.getElementById('close-date').value;
+  if (!invoiceCount||invoiceCount<1) { showToast('يرجى إدخال عدد الفواتير','error'); return; }
+  if (!invoiceTotal||invoiceTotal<0) { showToast('يرجى إدخال إجمالي مبالغ الفواتير','error'); return; }
+  const updates={requestStatus:'مُقفل',invoiceCount,invoiceTotal,closeNotes:notes,closedAt:closeDate,closedBy:currentUser?.name||''};
+  try {
+    await waitForFirebase();
+    await window.fsApi.updateDoc(window.fsApi.doc(window.db,"custodyRequests",id),updates);
+    const idx=(window.custodyRequests||[]).findIndex(c=>c._id===id);
+    if (idx>=0) window.custodyRequests[idx]={...window.custodyRequests[idx],...updates};
+    logAudit('custody','إقفال عهدة',`إقفال طلب عهدة — الفواتير: ${invoiceCount} — الإجمالي: ${invoiceTotal} ريال`);
+    closeModal(); renderCustody();
+    showToast('تم إقفال العهدة بنجاح ✅','success');
+  } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+/* ══════════════════════════════════════
+   📣 COMPLAINTS (Feature 6)
+══════════════════════════════════════ */
+let _complaints = [];
+try { _complaints = JSON.parse(localStorage.getItem('_complaints')||'[]'); } catch(e) {}
+// تحميل من Firebase عند أول استخدام
+async function loadComplaints() {
+  try {
+    await waitForFirebase();
+    const snap = await window.fsApi.getDocs(window.fsApi.collection(window.db,'complaints'));
+    _complaints = snap.docs.map(d=>({...d.data(),_id:d.id}));
+    try { localStorage.setItem('_complaints', JSON.stringify(_complaints)); } catch(e){}
+  } catch(e) { console.warn('loadComplaints:', e); }
+}
+
+function generateComplaintNumber() {
+  const existing = _complaints.filter(c=>(c.complaintNumber||'').startsWith('BLG-'));
+  let maxNum = existing.reduce((m,c)=>{
+    const n=parseInt((c.complaintNumber||'').replace('BLG-',''));
+    return isNaN(n)?m:Math.max(m,n);
+  },0);
+  return 'BLG-' + String(maxNum+1).padStart(5,'0');
+}
+
+function openNewComplaint() {
+  if (!can('complaints_add')) { showToast('ليس لديك صلاحية إضافة بلاغ','error'); return; }
+  const today = new Date().toISOString().slice(0,10);
+  const assets = getAssets();
+  const customers = getCustomers();
+  const assetOpts = '<option value="">-- اختر الأصل (اختياري) --</option>'+
+    assets.map(a=>'<option value="'+a._id+'" data-code="'+(a.code||'')+'" data-type="'+a.type+'">'+a.name+' ['+(a.code||'')+'] ('+(a.status||'متاح')+')</option>').join('');
+  const custOpts = '<option value="">-- اختر العميل (اختياري) --</option>'+
+    customers.map(c=>'<option value="'+c._id+'" data-name="'+c.name+'" data-phone="'+(c.phone||'')+'" data-address="'+(c.address||'')+'">'+c.name+'</option>').join('');
+
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-speakerphone" style="color:var(--amber)"></i> بلاغ جديد';
+  document.getElementById('modal-body').innerHTML=
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>رقم البلاغ</label><input id="blg-number" value="'+generateComplaintNumber()+'" readonly style="background:var(--bg2);font-weight:700"></div>'+
+      '<div class="field"><label>تاريخ البلاغ *</label><input type="date" id="blg-date" value="'+today+'"></div>'+
+    '</div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>نوع البلاغ *</label>'+
+        '<select id="blg-type" onchange="onComplaintTypeChange()">'+
+          '<option value="صيانة">🔧 طلب صيانة</option>'+
+          '<option value="عهدة">📦 طلب عهدة</option>'+
+          '<option value="استفسار">💬 استفسار</option>'+
+          '<option value="شكوى">⚠️ شكوى</option>'+
+          '<option value="أخرى">📌 أخرى</option>'+
+        '</select>'+
+      '</div>'+
+      '<div class="field"><label>الأولوية</label>'+
+        '<select id="blg-priority">'+
+          '<option value="عادي">🟢 عادي</option>'+
+          '<option value="متوسط">🟡 متوسط</option>'+
+          '<option value="عاجل">🔴 عاجل</option>'+
+        '</select>'+
+      '</div>'+
+    '</div>'+
+    '<div class="field" style="margin-bottom:12px"><label>الأصل المرتبط بالبلاغ</label>'+
+      '<select id="blg-asset" onchange="onComplaintAssetChange()">'+assetOpts+'</select>'+
+    '</div>'+
+    '<div class="form-row" style="margin-bottom:10px" id="blg-asset-info-row" style="display:none">'+
+      '<div class="field"><label>كود الأصل / الباركود</label><input id="blg-barcode" readonly style="background:var(--bg2)"></div>'+
+      '<div class="field"><label>نوع الأصل</label><input id="blg-asset-type" readonly style="background:var(--bg2)"></div>'+
+    '</div>'+
+    '<div class="field" style="margin-bottom:12px"><label>العميل</label>'+
+      '<select id="blg-customer" onchange="onComplaintCustomerChange()">'+custOpts+'</select>'+
+    '</div>'+
+    '<div id="blg-customer-info" style="display:none;padding:8px 12px;background:var(--blue-bg);border:1px solid var(--blue-light);border-radius:var(--radius);margin-bottom:10px;font-size:12px;color:var(--blue)"></div>'+
+    '<div class="field" style="margin-bottom:12px"><label>وصف البلاغ *</label>'+
+      '<textarea id="blg-desc" rows="3" placeholder="اشرح البلاغ بالتفصيل..."></textarea>'+
+    '</div>'+
+    '<div class="field" style="margin-bottom:12px"><label>ملاحظات إضافية</label>'+
+      '<textarea id="blg-notes" rows="2" placeholder="ملاحظات..."></textarea>'+
+    '</div>';
+  document.getElementById('modal-save-btn').textContent='حفظ البلاغ';
+  document.getElementById('modal-save-btn').onclick=saveNewComplaint;
+  document.getElementById('modal-box').className='modal wide';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function onComplaintAssetChange() {
+  const sel=document.getElementById('blg-asset');
+  const opt=sel.options[sel.selectedIndex];
+  const barcodeEl=document.getElementById('blg-barcode');
+  const typeEl=document.getElementById('blg-asset-type');
+  const row=document.getElementById('blg-asset-info-row');
+  if (sel.value && barcodeEl && typeEl) {
+    if(barcodeEl) barcodeEl.value=opt.dataset.code||'';
+    if(typeEl) typeEl.value=opt.dataset.type||'';
+    if(row) row.style.display='';
+  } else if(row) row.style.display='none';
+}
+
+function onComplaintCustomerChange() {
+  const sel=document.getElementById('blg-customer');
+  const opt=sel.options[sel.selectedIndex];
+  const infoEl=document.getElementById('blg-customer-info');
+  if (sel.value && infoEl) {
+    const phone=opt.dataset.phone;
+    const address=opt.dataset.address;
+    infoEl.style.display='';
+    infoEl.innerHTML='<i class="ti ti-user"></i> <strong>'+opt.dataset.name+'</strong>'+
+      (phone?' &nbsp;|&nbsp; 📞 '+phone:'')+
+      (address?' &nbsp;|&nbsp; 📍 '+address:'');
+  } else if(infoEl) infoEl.style.display='none';
+}
+
+function onComplaintTypeChange() {}
+
+async function saveNewComplaint() {
+  const desc=document.getElementById('blg-desc').value.trim();
+  const type=document.getElementById('blg-type').value;
+  const date=document.getElementById('blg-date').value;
+  if (!desc) { showToast('يرجى إدخال وصف البلاغ','error'); return; }
+  const assetSel=document.getElementById('blg-asset');
+  const custSel=document.getElementById('blg-customer');
+  const rec={
+    complaintNumber:document.getElementById('blg-number').value,
+    date, type,
+    priority:document.getElementById('blg-priority').value,
+    assetId:assetSel.value||'',
+    assetName:(assetSel.value?(assetSel.options[assetSel.selectedIndex]?.text||''):''),
+    assetBarcode:document.getElementById('blg-barcode')?.value||'',
+    assetType:document.getElementById('blg-asset-type')?.value||'',
+    customerId:custSel.value||'',
+    customerName:(custSel.value?(custSel.options[custSel.selectedIndex]?.dataset.name||''):''),
+    customerPhone:(custSel.value?(custSel.options[custSel.selectedIndex]?.dataset.phone||''):''),
+    customerAddress:(custSel.value?(custSel.options[custSel.selectedIndex]?.dataset.address||''):''),
+    description:desc,
+    notes:document.getElementById('blg-notes').value.trim(),
+    status:'جديد',
+    createdBy:currentUser?.name||'',
+    createdAt:new Date().toISOString(),
+    convertedTo:null, convertedRef:null
+  };
+  try {
+    await waitForFirebase();
+    const docRef=await window.fsApi.addDoc(window.fsApi.collection(window.db,'complaints'),rec);
+    rec._id=docRef.id;
+    _complaints.unshift(rec);
+    try { localStorage.setItem('_complaints',JSON.stringify(_complaints.slice(0,500))); } catch(e){}
+    logAudit('add','إضافة بلاغ جديد',`${rec.complaintNumber} — ${type} — ${rec.customerName||'—'}`);
+    closeModal(); renderComplaints();
+    showToast('تم حفظ البلاغ ✅','success');
+  } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+function openConvertComplaint(id) {
+  if (!can('complaints_convert')) { showToast('ليس لديك صلاحية تحويل البلاغ','error'); return; }
+  const c=_complaints.find(x=>x._id===id);
+  if (!c) return;
+  if (c.status==='تم التحويل'||c.status==='مغلق') { showToast('هذا البلاغ محوّل أو مغلق بالفعل','error'); return; }
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-git-pull-request" style="color:var(--purple)"></i> تحويل البلاغ '+c.complaintNumber;
+  document.getElementById('modal-body').innerHTML=
+    '<div class="alert alert-info" style="margin-bottom:14px"><i class="ti ti-info-circle"></i> اختر نوع الطلب الذي سيُنشأ من هذا البلاغ</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'+
+      '<button onclick="convertToMaintenance(\''+id+'\')" style="padding:16px;border:2px solid var(--amber);border-radius:var(--radius);background:var(--amber-bg);cursor:pointer;font-family:var(--font);text-align:center">'+
+        '<i class="ti ti-tool" style="font-size:28px;color:var(--amber);display:block;margin-bottom:8px"></i>'+
+        '<div style="font-weight:700;color:var(--amber)">تحويل لطلب صيانة</div>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:4px">يُفتح نموذج الصيانة محمّلاً ببيانات البلاغ</div>'+
+      '</button>'+
+      '<button onclick="convertToCustody(\''+id+'\')" style="padding:16px;border:2px solid var(--purple);border-radius:var(--radius);background:var(--purple-bg);cursor:pointer;font-family:var(--font);text-align:center">'+
+        '<i class="ti ti-file-invoice" style="font-size:28px;color:var(--purple);display:block;margin-bottom:8px"></i>'+
+        '<div style="font-weight:700;color:var(--purple)">تحويل لطلب عهدة</div>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:4px">يُفتح نموذج العهدة محمّلاً ببيانات البلاغ</div>'+
+      '</button>'+
+    '</div>'+
+    '<div class="form-row" style="margin-bottom:0">'+
+      '<div class="field"><label>ملاحظة التحويل</label><input id="convert-note" placeholder="ملاحظة اختيارية"></div>'+
+    '</div>';
+  document.getElementById('modal-save-btn').style.display='none';
+  document.getElementById('modal-box').className='modal';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+async function updateComplaintStatus(id, status, convertedTo, convertedRef) {
+  const updates={status,convertedTo:convertedTo||null,convertedRef:convertedRef||null,updatedAt:new Date().toISOString()};
+  try {
+    await waitForFirebase();
+    await window.fsApi.updateDoc(window.fsApi.doc(window.db,'complaints',id),updates);
+    const idx=_complaints.findIndex(c=>c._id===id);
+    if (idx>=0) _complaints[idx]={..._complaints[idx],...updates};
+    try { localStorage.setItem('_complaints',JSON.stringify(_complaints.slice(0,500))); } catch(e){}
+    renderComplaints();
+  } catch(e) { console.warn('updateComplaintStatus:',e); }
+}
+
+function convertToMaintenance(complaintId) {
+  const c=_complaints.find(x=>x._id===complaintId);
+  if (!c) return;
+  closeModal();
+  // فتح نموذج الصيانة محمّلاً ببيانات البلاغ
+  const navEl=document.getElementById('nav-maintenance');
+  if (navEl&&navEl.style.display!=='none') showPage('maintenance',navEl);
+  setTimeout(()=>{
+    openNewMaintenance();
+    setTimeout(()=>{
+      const assetSel=document.getElementById('m-asset');
+      if (assetSel&&c.assetId) {
+        assetSel.value=c.assetId;
+        assetSel.dispatchEvent(new Event('change'));
+      }
+      const faultEl=document.getElementById('m-fault');
+      if (faultEl) faultEl.value=c.description+'\n[مرتبط بالبلاغ: '+c.complaintNumber+']';
+      const notesEl=document.getElementById('m-notes');
+      if (notesEl) notesEl.value='بلاغ: '+c.complaintNumber+' | العميل: '+(c.customerName||'—');
+    },300);
+  },200);
+  updateComplaintStatus(complaintId,'تم التحويل','صيانة','');
+  logAudit('custody','تحويل بلاغ لصيانة',`${c.complaintNumber} → طلب صيانة`);
+  showToast('تم تحويل البلاغ لطلب صيانة','success');
+}
+
+function convertToCustody(complaintId) {
+  const c=_complaints.find(x=>x._id===complaintId);
+  if (!c) return;
+  closeModal();
+  const navEl=document.getElementById('nav-custody');
+  if (navEl&&navEl.style.display!=='none') showPage('custody',navEl);
+  setTimeout(()=>{
+    openNewCustody();
+    setTimeout(()=>{
+      const assetSel=document.getElementById('cus-asset');
+      if (assetSel&&c.assetId) {
+        assetSel.value=c.assetId;
+        assetSel.dispatchEvent(new Event('change'));
+      }
+      const purposeEl=document.getElementById('cus-purpose');
+      if (purposeEl) purposeEl.value=c.description+'\n[مرتبط بالبلاغ: '+c.complaintNumber+']';
+      const reqEl=document.getElementById('cus-requester');
+      if (reqEl&&c.customerName) reqEl.value=c.customerName;
+    },300);
+  },200);
+  updateComplaintStatus(complaintId,'تم التحويل','عهدة','');
+  logAudit('custody','تحويل بلاغ لعهدة',`${c.complaintNumber} → طلب عهدة`);
+  showToast('تم تحويل البلاغ لطلب عهدة','success');
+}
+
+async function closeComplaint(id) {
+  if (!confirm('إغلاق هذا البلاغ؟')) return;
+  await updateComplaintStatus(id,'مغلق',null,null);
+  logAudit('system','إغلاق بلاغ',`تم إغلاق البلاغ`);
+  showToast('تم إغلاق البلاغ','success');
+}
+
+function renderComplaints() { filterComplaints(); }
+function filterComplaints() {
+  const tbody=document.getElementById('complaints-body'); if (!tbody) return;
+  const q=(document.getElementById('complaint-search')?.value||'').toLowerCase();
+  const typeF=document.getElementById('complaint-filter-type')?.value||'';
+  const statusF=document.getElementById('complaint-filter-status')?.value||'';
+  const from=document.getElementById('complaint-date-from')?.value||'';
+  const to=document.getElementById('complaint-date-to')?.value||'';
+  const list=[..._complaints].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).filter(c=>{
+    if (typeF&&c.type!==typeF) return false;
+    if (statusF&&c.status!==statusF) return false;
+    if (q&&!(c.complaintNumber||'').toLowerCase().includes(q)&&!(c.customerName||'').toLowerCase().includes(q)&&!(c.assetName||'').toLowerCase().includes(q)&&!(c.description||'').toLowerCase().includes(q)) return false;
+    if (from&&(c.date||'')<from) return false;
+    if (to&&(c.date||'')>to) return false;
+    return true;
+  });
+  const countEl=document.getElementById('complaint-count-label');
+  if (countEl) countEl.textContent=list.length+' بلاغ';
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="10" class="empty-row">لا توجد بلاغات مطابقة</td></tr>'; return; }
+  const statusBadgeC = s => s==='جديد'?'<span class="complaint-badge-new">جديد</span>':s==='تم التحويل'?'<span class="complaint-badge-converted">تم التحويل</span>':s==='مغلق'?'<span class="complaint-badge-closed">مغلق</span>':'<span class="complaint-badge-inprogress">قيد المعالجة</span>';
+  const priorityIcon = p => p==='عاجل'?'🔴':p==='متوسط'?'🟡':'🟢';
+  tbody.innerHTML=list.map((c,i)=>'<tr>'+
+    '<td><code class="tag">'+c.complaintNumber+'</code></td>'+
+    '<td style="font-size:12px">'+( c.date||'—')+'</td>'+
+    '<td>'+priorityIcon(c.priority)+' '+c.type+'</td>'+
+    '<td><div style="font-weight:600">'+(c.assetName||'—')+'</div>'+(c.assetBarcode?'<code class="tag" style="font-size:10px">'+c.assetBarcode+'</code>':'' )+'</td>'+
+    '<td style="font-weight:600">'+(c.customerName||'—')+(c.customerPhone?'<div style="font-size:11px;color:var(--text3)">📞 '+c.customerPhone+'</div>':'' )+'</td>'+
+    '<td style="font-size:12px;max-width:200px;color:var(--text2)">'+(c.description||'—').slice(0,80)+(c.description?.length>80?'…':'')+'</td>'+
+    '<td>'+statusBadgeC(c.status)+'</td>'+
+    '<td style="font-size:11px;color:var(--text3)">'+(c.convertedTo?'→ '+c.convertedTo:'—')+'</td>'+
+    '<td style="font-size:12px;color:var(--text2)">'+(c.createdBy||'—')+'</td>'+
+    '<td style="white-space:nowrap">'+
+      (can('complaints_convert')&&c.status==='جديد'?'<button class="btn-action success" onclick="openConvertComplaint(\''+c._id+'\')" title="تحويل البلاغ"><i class="ti ti-git-pull-request"></i></button>':'')+
+      (can('complaints_convert')&&c.status!=='مغلق'?'<button class="btn-action" onclick="closeComplaint(\''+c._id+'\')" title="إغلاق البلاغ" style="color:var(--text2)"><i class="ti ti-x"></i></button>':'')+
+    '</td>'+
+  '</tr>').join('');
+}
+
+function exportComplaintsExcel() {
+  if (!window.XLSX) { showToast('مكتبة Excel غير محملة','error'); return; }
+  const rows=_complaints.map(c=>({'رقم البلاغ':c.complaintNumber,'التاريخ':c.date,'النوع':c.type,'الأولوية':c.priority,'الأصل':c.assetName,'الباركود':c.assetBarcode,'العميل':c.customerName,'الوصف':c.description,'الحالة':c.status,'تحويل إلى':c.convertedTo||'','المسجِّل':c.createdBy}));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'البلاغات');
+  XLSX.writeFile(wb,'البلاغات_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  showToast('تم تصدير البلاغات ✅','success');
+}
+
 /* ────────── RESET ALL DATA ────────── */
 let _resetCountdownTimer = null;
 
@@ -2334,6 +2867,30 @@ function showDangerZoneIfAdmin() {
 }
 
 /* ────────── AUTH ────────── */
+/* ── Emergency password reset (login page only) ── */
+async function showEmergencyReset() {
+  const hint = document.getElementById('login-hint');
+  if (!hint) return;
+  hint.innerHTML = '<div style="margin-top:8px;padding:10px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:6px;font-size:12px;color:#92400E">'+
+    '<strong>إعادة تعيين كلمة مرور المدير:</strong><br>'+
+    'سيتم تعيين كلمة المرور إلى <code>admin123</code><br><br>'+
+    '<button onclick="emergencyResetAdminPassword()" style="padding:6px 16px;background:#B45309;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:700">إعادة تعيين كلمة مرور المدير</button>'+
+  '</div>';
+}
+async function emergencyResetAdminPassword() {
+  try {
+    await waitForFirebase();
+    const {collection:col,getDocs:gDocs,doc:docRef,updateDoc:upd} = window.fsApi;
+    const snap = await gDocs(col(window.db,'users'));
+    const admins = snap.docs.filter(d=>d.data().username==='admin'||d.data().role==='مدير');
+    if (!admins.length) { document.getElementById('login-hint').innerHTML='<span style="color:red">❌ لم يُوجد حساب المدير</span>'; return; }
+    for (const d of admins) await upd(docRef(window.db,'users',d.id),{password:'admin123'});
+    document.getElementById('login-hint').innerHTML='<span style="color:#2E7D32;font-weight:700">✅ تمت إعادة التعيين — كلمة المرور الجديدة: <code>admin123</code></span>';
+    document.getElementById('password').value='admin123';
+    document.getElementById('username').value='admin';
+  } catch(e) { document.getElementById('login-hint').innerHTML='<span style="color:red">خطأ: '+e.message+'</span>'; }
+}
+
 async function doLogin() {
   const u = document.getElementById('username').value.trim();
   const p = document.getElementById('password').value;
@@ -2388,7 +2945,7 @@ async function doLogin() {
     if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
     // ترقية تلقائية للمديرين فقط (من يملكون صلاحية 'users') — لا نُغيِّر صلاحيات المستخدمين العاديين
-    const ADMIN_ALL_PERMS = ['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','audit','custody','custody_add','custody_edit','custody_approve','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
+    const ADMIN_ALL_PERMS = ['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','audit','custody','custody_add','custody_edit','custody_edit_pending','custody_approve','custody_close','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','complaints','complaints_add','complaints_convert','settings'];
     if (found.perms.includes('users') && ADMIN_ALL_PERMS.some(p=>!found.perms.includes(p))) {
       const upgraded = [...new Set([...found.perms, ...ADMIN_ALL_PERMS])];
       found.perms = upgraded;
@@ -2516,6 +3073,7 @@ function applyNavPermissions(perms) {
   show('nav-maintenance', p.includes('maintenance'));
   show('nav-dispose',     p.includes('dispose'));
   show('nav-custody',     p.some(x=>x==='custody'||x.startsWith('custody_')));
+  show('nav-complaints',   p.some(x=>x==='complaints'||x.startsWith('complaints_')));
   show('nav-dept-custody',p.some(x=>x==='dept_custody'||x.startsWith('dept_custody_')));
 
   // قسم الإدارة
@@ -2532,7 +3090,7 @@ function applyNavPermissions(perms) {
 function resetNav() {
   ['nav-dashboard','nav-assets','nav-inventory','nav-section-ops','nav-customers','nav-handover',
    'nav-returns','nav-maintenance','nav-dispose','nav-custody','nav-dept-custody',
-   'nav-section-admin','nav-types','nav-reports','nav-asset-history','nav-users','nav-audit','nav-settings'
+   'nav-section-admin','nav-types','nav-reports','nav-asset-history','nav-users','nav-audit','nav-settings','nav-complaints'
   ].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
 }
 
@@ -2569,7 +3127,7 @@ const PAGE_PERMS = {
   'handover': 'handover', 'returns': 'return', 'maintenance': 'maintenance',
   'dispose': 'dispose', 'custody': 'custody', 'dept-custody': 'dept_custody',
   'types': 'add', 'reports': 'view', 'asset-history': 'view',
-  'users': 'users', 'audit': 'audit', 'settings': 'settings'
+  'users': 'users', 'audit': 'audit', 'settings': 'settings', 'complaints': 'complaints'
 };
 
 // الانتقال لأول صفحة يملك المستخدم صلاحيتها
@@ -2656,6 +3214,7 @@ function renderAll() {
   try { renderReturns(); } catch(e) { console.warn('renderReturns:', e.message); }
   try { populateHistoryAssetSelect(); } catch(e) { console.warn('populateHistoryAssetSelect:', e.message); }
   try { renderDeptCustody(); } catch(e) { console.warn('renderDeptCustody:', e.message); }
+  try { renderComplaints(); } catch(e) { console.warn('renderComplaints:', e.message); }
   try { renderAuditLog(); } catch(e) { console.warn('renderAuditLog:', e.message); }
 }
 
@@ -2819,7 +3378,7 @@ function assetForm(a) {
       '<div class="field"><label>الكود</label><input id="f-code" value="'+(a.code||'')+'" placeholder="يُولَّد تلقائياً"></div>'+
     '</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
-      '<div class="field"><label>النوع الرئيسي</label><select id="f-type" onchange="updateSubTypeOptions()">'+typeOpts+'</select></div>'+
+      '<div class="field"><label>النوع الرئيسي</label><select id="f-type" onchange="updateSubTypeOptions();autoFillAssetCode()">'+typeOpts+'</select></div>'+
       '<div class="field"><label>النوع الفرعي</label><select id="f-subtype"><option value="">-- اختر --</option></select></div>'+
     '</div>'+
     '<div class="form-section">خصائص الأصل</div>'+
@@ -3144,6 +3703,13 @@ function customerFormHTML(c) {
     '</div>'+
     '<div class="form-row" style="margin-bottom:0">'+
       '<div class="field"><label>المدينة</label><input id="c-city" value="'+(c.city||'')+'" placeholder="الرياض"></div>'+
+      '<div class="form-section">الموقع الجغرافي (اختياري)</div>'+
+      '<div class="form-row" style="margin-bottom:8px"><div class="field"><label>رابط خرائط جوجل</label><input id="c-map-url" value="'+(c.mapUrl||'')+'" placeholder="https://maps.google.com/?q=..."></div></div>'+
+      '<div class="form-row" style="margin-bottom:4px">'+
+        '<div class="field"><label>خط العرض (Lat)</label><input id="c-lat" type="number" step="any" value="'+(c.lat||'')+'" placeholder="24.7136"></div>'+
+        '<div class="field"><label>خط الطول (Lng)</label><input id="c-lng" type="number" step="any" value="'+(c.lng||'')+'" placeholder="46.6753"></div>'+
+      '</div>'+
+      '<div style="margin-bottom:12px"><button type="button" onclick="openMapPicker()" class="map-link-btn"><i class="ti ti-map-pin"></i> فتح الخريطة لاختيار الموقع</button></div>'+
       '<div class="field"><label>ملاحظات</label><input id="c-notes" value="'+(c.notes||'')+'"></div>'+
     '</div>';
 }
@@ -3917,7 +4483,9 @@ const ALL_PERMS=[
   {key:'custody',label:'عهدة الأصول — اطلاع فقط'},
   {key:'custody_add',label:'عهدة الأصول — إضافة'},
   {key:'custody_edit',label:'عهدة الأصول — تعديل / حذف'},
+  {key:'custody_edit_pending',label:'عهدة الأصول — تعديل قيد المراجعة'},
   {key:'custody_approve',label:'عهدة الأصول — موافقة / رفض'},
+  {key:'custody_close',label:'عهدة الأصول — إقفال (مع الفواتير)'},
   {key:'custody_print',label:'عهدة الأصول — طباعة'},
   // عهدة الإدارات
   {key:'dept_custody',label:'عهدة الإدارات — اطلاع فقط'},
@@ -3925,13 +4493,20 @@ const ALL_PERMS=[
   {key:'dept_custody_edit',label:'عهدة الإدارات — تعديل / حذف'},
   {key:'dept_custody_approve',label:'عهدة الإدارات — موافقة / رفض'},
   {key:'dept_custody_print',label:'عهدة الإدارات — طباعة'},
+  // البلاغات
+  {key:'complaints',label:'البلاغات — اطلاع'},
+  {key:'complaints_add',label:'البلاغات — إضافة'},
+  {key:'complaints_convert',label:'البلاغات — تحويل لطلب'},
 ];
 const PERM_LABELS={
   dashboard:'لوحة التحكم',
   view:'عرض',add:'إضافة',edit:'تعديل',handover:'تسليم',maintenance:'صيانة',dispose:'إتلاف',
   users:'مستخدمون',return:'استرداد',customers:'العملاء',audit:'سجل النشاط',settings:'الإعدادات',
-  custody:'عهدة أصول-اطلاع',custody_add:'عهدة أصول-إضافة',custody_edit:'عهدة أصول-تعديل',custody_approve:'عهدة أصول-موافقة',custody_print:'عهدة أصول-طباعة',
+  custody:'عهدة أصول-اطلاع',custody_add:'عهدة أصول-إضافة',custody_edit:'عهدة أصول-تعديل',
+  custody_edit_pending:'عهدة-تعديل قيد مراجعة',custody_approve:'عهدة أصول-موافقة',
+  custody_close:'عهدة أصول-إقفال',custody_print:'عهدة أصول-طباعة',
   dept_custody:'عهدة إدارات-اطلاع',dept_custody_add:'عهدة إدارات-إضافة',dept_custody_edit:'عهدة إدارات-تعديل',dept_custody_approve:'عهدة إدارات-موافقة',dept_custody_print:'عهدة إدارات-طباعة',
+  complaints:'بلاغات-اطلاع',complaints_add:'بلاغات-إضافة',complaints_convert:'بلاغات-تحويل',
 };
 
 function renderUsers() {
@@ -4025,6 +4600,14 @@ function userFormHTML(u) {
       '<span style="font-size:13px;color:var(--teal)">'+p.label.replace('عهدة الإدارات — ','')+'</span></label>'
     ).join('')+
     '</div></div>'+
+    '<div style="background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--radius);padding:12px;margin-bottom:8px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:8px"><i class="ti ti-speakerphone"></i> صلاحيات البلاغات</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+
+    ALL_PERMS.filter(p=>p.key.startsWith('complaints')).map(p=>'<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:rgba(255,255,255,.6);cursor:pointer;border:1px solid #F6D860">'+
+      '<input type="checkbox" name="perm" value="'+p.key+'" '+(u&&(u.perms||[]).includes(p.key)?'checked':'')+' style="width:15px;height:15px;accent-color:var(--amber)">'+
+      '<span style="font-size:13px;color:var(--amber)">'+p.label.replace('البلاغات — ','')+'</span></label>'
+    ).join('')+
+    '</div></div>'+
     '<div style="display:flex;gap:6px">'+
     '<button type="button" onclick="setPresetPerms(\'admin\')" style="padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:11px;cursor:pointer;font-family:var(--font);background:var(--blue-bg);color:var(--blue)">كل الصلاحيات</button>'+
     '<button type="button" onclick="setPresetPerms(\'manager\')" style="padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:11px;cursor:pointer;font-family:var(--font);background:var(--amber-bg);color:var(--amber)">مشرف</button>'+
@@ -4042,7 +4625,7 @@ function setPresetPerms(p) {
              'custody','custody_add','custody_approve','custody_print',
              'dept_custody','dept_custody_add','dept_custody_approve','dept_custody_print'],
     // عرض فقط: audit مفعّل افتراضياً
-    viewer:['view','audit','custody','custody_print','dept_custody','dept_custody_print']
+    viewer:['view','audit','custody','custody_print','dept_custody','dept_custody_print','complaints']
   };
   document.querySelectorAll('input[name="perm"]').forEach(c=>c.checked=(pre[p]||[]).includes(c.value));
 }
@@ -4309,15 +4892,23 @@ function renderCustody() {
   const list=window.custodyRequests||[];
   const search=(document.getElementById('custody-search')?.value||'').toLowerCase();
   const statusF=document.getElementById('custody-filter-status')?.value||'';
-  const filtered=list.filter(c=>{
-    const ms=!search||(c.requesterName||'').toLowerCase().includes(search)||(c.assetName||'').toLowerCase().includes(search);
+  const filtered=[...list].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).filter(c=>{
+    const ms=!search||(c.requesterName||'').toLowerCase().includes(search)||(c.assetName||'').toLowerCase().includes(search)||(c.custodyNumber||'').toLowerCase().includes(search);
     const mst=!statusF||c.requestStatus===statusF;
     return ms&&mst;
   });
-  if (!filtered.length) { tbody.innerHTML='<tr><td colspan="9" class="empty-row">لا توجد طلبات عهدة</td></tr>'; return; }
+  if (!filtered.length) { tbody.innerHTML='<tr><td colspan="10" class="empty-row">لا توجد طلبات عهدة</td></tr>'; return; }
   tbody.innerHTML=filtered.map((c,i)=>{
-    const sb=c.requestStatus==='معتمد'?'<span class="custody-badge-approved">معتمد</span>':c.requestStatus==='مرفوض'?'<span class="custody-badge-rejected">مرفوض</span>':'<span class="custody-badge-pending">قيد المراجعة</span>';
-    const custNum = c.custodyNumber || ('CUS-'+c._id.slice(-6));
+    const isPending=c.requestStatus==='قيد المراجعة';
+    const isApproved=c.requestStatus==='معتمد';
+    const isClosed=c.requestStatus==='مُقفل';
+    let sb='';
+    if (isClosed) sb='<span class="custody-badge-closed">🔒 مُقفل</span>';
+    else if (c.requestStatus==='معتمد') sb='<span class="custody-badge-approved">✅ معتمد</span>';
+    else if (c.requestStatus==='مرفوض') sb='<span class="custody-badge-rejected">❌ مرفوض</span>';
+    else sb='<span class="custody-badge-pending">⏳ قيد المراجعة</span>';
+    const custNum=c.custodyNumber||('CUS-'+c._id.slice(-6));
+    const closeInfo=isClosed?'<div style="font-size:10px;color:var(--text3);margin-top:3px">📄 '+c.invoiceCount+' فاتورة | '+Number(c.invoiceTotal||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+' ريال</div>':'';
     return '<tr>'+
       '<td style="text-align:center"><code class="tag">'+custNum+'</code></td>'+
       '<td>'+(c.date||'-')+'</td>'+
@@ -4326,11 +4917,13 @@ function renderCustody() {
       '<td>'+statusBadge(c.assetStatus||'متاح',c.assetId)+'</td>'+
       '<td style="font-size:12px;max-width:160px">'+(c.purpose||'-')+'</td>'+
       '<td style="font-weight:700;color:var(--green);white-space:nowrap">'+(c.financialTotal>0?Number(c.financialTotal||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+' ريال':'-')+'</td>'+
-      '<td>'+sb+'</td>'+
+      '<td>'+sb+closeInfo+'</td>'+
       '<td style="white-space:nowrap">'+
         (can('custody_print')||can('custody')?'<button class="btn-action info" onclick="printCustodyForm(\''+c._id+'\')"><i class="ti ti-printer"></i></button>':'')+
-        (can('custody_approve')?'<button class="btn-action success" onclick="approveCustody(\''+c._id+'\',\'معتمد\')"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveCustody(\''+c._id+'\',\'مرفوض\')"><i class="ti ti-x"></i></button>':'')+
-        (can('custody_edit')?'<button class="btn-action danger" onclick="deleteCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>':'')+
+        (can('custody_edit_pending')&&isPending?'<button class="btn-action" onclick="editCustodyRequest(\''+c._id+'\');" title="تعديل" style="color:var(--amber);border-color:var(--amber)"><i class="ti ti-edit"></i></button>':'')+
+        (can('custody_approve')&&isPending?'<button class="btn-action success" onclick="approveCustody(\''+c._id+'\',\'معتمد\')"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveCustody(\''+c._id+'\',\'مرفوض\')"><i class="ti ti-x"></i></button>':'')+
+        (can('custody_close')&&isApproved?'<button class="btn-action" onclick="openCloseCustody(\''+c._id+'\')" style="color:var(--blue);border-color:var(--blue-light)"><i class="ti ti-lock"></i></button>':'')+
+        (can('custody_edit')&&!isClosed?'<button class="btn-action danger" onclick="deleteCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>':'')+
       '</td></tr>';
   }).join('');
 }
@@ -4354,6 +4947,7 @@ function openNewCustody() {
       '<div class="field"><label>الباركود</label><input type="text" id="cus-barcode" readonly style="background:var(--bg2)"></div>'+
       '<div class="field"><label>حالة الأصل</label><input type="text" id="cus-status" readonly style="background:var(--bg2)"></div>'+
     '</div>'+
+    '<div id="cus-client-info" style="display:none;padding:8px 12px;background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--radius);margin-bottom:10px;font-size:13px;color:var(--amber)"></div>'+
     '<div class="field" style="margin-bottom:12px"><label>الغرض *</label><textarea id="cus-purpose" placeholder="الغرض من طلب العهدة..."></textarea></div>'+
     financialItemsHTML([])+
     '<div class="field" style="margin-top:10px"><label>ملاحظات</label><textarea id="cus-notes"></textarea></div>'+
@@ -4366,8 +4960,20 @@ function openNewCustody() {
 function onCustodyAssetChange() {
   const sel=document.getElementById('cus-asset');
   const opt=sel.options[sel.selectedIndex];
+  const assetId=sel.value;
+  const status=opt.dataset.status||'';
   document.getElementById('cus-barcode').value=opt.dataset.barcode||'';
-  document.getElementById('cus-status').value=opt.dataset.status||'';
+  document.getElementById('cus-status').value=status;
+  const clientInfoEl=document.getElementById('cus-client-info');
+  if (clientInfoEl) {
+    if (status==='عند عميل') {
+      const activeH=getHandovers().find(h=>h.assetId===assetId&&h.status==='مُسلَّم');
+      if (activeH) {
+        clientInfoEl.style.display='';
+        clientInfoEl.innerHTML='<i class="ti ti-user" style="color:var(--amber)"></i> الأصل حالياً عند العميل: <strong>'+activeH.clientName+'</strong>';
+      } else { clientInfoEl.style.display='none'; }
+    } else { clientInfoEl.style.display='none'; }
+  }
 }
 async function saveCustodyRequest() {
   const date=document.getElementById('cus-date').value;
@@ -5283,6 +5889,27 @@ if(typeof clearAuditLog!=='undefined')window.clearAuditLog=clearAuditLog;
 if(typeof exportAuditExcel!=='undefined')window.exportAuditExcel=exportAuditExcel;
 if(typeof printAuditReport!=='undefined')window.printAuditReport=printAuditReport;
 if(typeof populateAuditUserFilter!=='undefined')window.populateAuditUserFilter=populateAuditUserFilter;
+if(typeof generateAssetCode!=='undefined')window.generateAssetCode=generateAssetCode;
+if(typeof autoFillAssetCode!=='undefined')window.autoFillAssetCode=autoFillAssetCode;
+if(typeof openMapPicker!=='undefined')window.openMapPicker=openMapPicker;
+if(typeof openCustomerMapLink!=='undefined')window.openCustomerMapLink=openCustomerMapLink;
+if(typeof editCustodyRequest!=='undefined')window.editCustodyRequest=editCustodyRequest;
+if(typeof saveEditCustodyRequest!=='undefined')window.saveEditCustodyRequest=saveEditCustodyRequest;
+if(typeof openCloseCustody!=='undefined')window.openCloseCustody=openCloseCustody;
+if(typeof saveCloseCustody!=='undefined')window.saveCloseCustody=saveCloseCustody;
+if(typeof openNewComplaint!=='undefined')window.openNewComplaint=openNewComplaint;
+if(typeof saveNewComplaint!=='undefined')window.saveNewComplaint=saveNewComplaint;
+if(typeof openConvertComplaint!=='undefined')window.openConvertComplaint=openConvertComplaint;
+if(typeof convertToMaintenance!=='undefined')window.convertToMaintenance=convertToMaintenance;
+if(typeof convertToCustody!=='undefined')window.convertToCustody=convertToCustody;
+if(typeof closeComplaint!=='undefined')window.closeComplaint=closeComplaint;
+if(typeof renderComplaints!=='undefined')window.renderComplaints=renderComplaints;
+if(typeof filterComplaints!=='undefined')window.filterComplaints=filterComplaints;
+if(typeof exportComplaintsExcel!=='undefined')window.exportComplaintsExcel=exportComplaintsExcel;
+if(typeof onComplaintAssetChange!=='undefined')window.onComplaintAssetChange=onComplaintAssetChange;
+if(typeof onComplaintCustomerChange!=='undefined')window.onComplaintCustomerChange=onComplaintCustomerChange;
+if(typeof onComplaintTypeChange!=='undefined')window.onComplaintTypeChange=onComplaintTypeChange;
+if(typeof onCustodyAssetChange!=='undefined')window.onCustodyAssetChange=onCustodyAssetChange;
 if(typeof exportTableExcel!=='undefined')window.exportTableExcel=exportTableExcel;
 if(typeof exportDashboardExcel!=='undefined')window.exportDashboardExcel=exportDashboardExcel;
 if(typeof showShortcutsModal!=='undefined')window.showShortcutsModal=showShortcutsModal;
