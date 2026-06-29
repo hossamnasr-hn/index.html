@@ -2666,25 +2666,24 @@ function openConvertComplaint(id) {
   const c=_complaints.find(x=>x._id===id);
   if (!c) return;
   if (c.status==='تم التحويل'||c.status==='مغلق') { showToast('هذا البلاغ محوّل أو مغلق بالفعل','error'); return; }
-  document.getElementById('modal-title').innerHTML='<i class="ti ti-git-pull-request" style="color:var(--purple)"></i> تحويل البلاغ '+c.complaintNumber;
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-git-pull-request" style="color:var(--purple)"></i> تحويل البلاغ إلى طلب عهدة';
   document.getElementById('modal-body').innerHTML=
-    '<div class="alert alert-info" style="margin-bottom:14px"><i class="ti ti-info-circle"></i> اختر نوع الطلب الذي سيُنشأ من هذا البلاغ</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'+
-      '<button onclick="convertToMaintenance(\''+id+'\')" style="padding:16px;border:2px solid var(--amber);border-radius:var(--radius);background:var(--amber-bg);cursor:pointer;font-family:var(--font);text-align:center">'+
-        '<i class="ti ti-tool" style="font-size:28px;color:var(--amber);display:block;margin-bottom:8px"></i>'+
-        '<div style="font-weight:700;color:var(--amber)">تحويل لطلب صيانة</div>'+
-        '<div style="font-size:11px;color:var(--text3);margin-top:4px">يُفتح نموذج الصيانة محمّلاً ببيانات البلاغ</div>'+
-      '</button>'+
-      '<button onclick="convertToCustody(\''+id+'\')" style="padding:16px;border:2px solid var(--purple);border-radius:var(--radius);background:var(--purple-bg);cursor:pointer;font-family:var(--font);text-align:center">'+
-        '<i class="ti ti-file-invoice" style="font-size:28px;color:var(--purple);display:block;margin-bottom:8px"></i>'+
-        '<div style="font-weight:700;color:var(--purple)">تحويل لطلب عهدة</div>'+
-        '<div style="font-size:11px;color:var(--text3);margin-top:4px">يُفتح نموذج العهدة محمّلاً ببيانات البلاغ</div>'+
-      '</button>'+
+    '<div class="alert alert-info" style="margin-bottom:14px"><i class="ti ti-info-circle"></i>'+
+    ' سيتم تحويل البلاغ <strong>'+c.complaintNumber+'</strong> إلى طلب عهدة جديد محمّل ببياناته</div>'+
+    '<div style="background:var(--purple-bg);border:2px solid var(--purple);border-radius:var(--radius-lg);padding:20px;text-align:center;margin-bottom:16px">'+
+      '<i class="ti ti-file-invoice" style="font-size:40px;color:var(--purple);display:block;margin-bottom:10px"></i>'+
+      '<div style="font-weight:800;color:var(--purple);font-size:15px;margin-bottom:6px">تحويل لطلب عهدة</div>'+
+      (c.assetName?'<div style="font-size:12px;color:var(--text2);margin-bottom:4px">الأصل: <strong>'+c.assetName+'</strong>'+(c.assetBarcode?' | <code style="background:var(--blue-bg);color:var(--blue);padding:1px 6px;border-radius:4px">'+c.assetBarcode+'</code>':'')+'</div>':'')+
+      (c.customerName?'<div style="font-size:12px;color:var(--text2)">العميل: <strong>'+c.customerName+'</strong></div>':'')+
     '</div>'+
-    '<div class="form-row" style="margin-bottom:0">'+
-      '<div class="field"><label>ملاحظة التحويل</label><input id="convert-note" placeholder="ملاحظة اختيارية"></div>'+
+    '<div class="field" style="margin-bottom:0">'+
+      '<label>ملاحظة التحويل (اختياري)</label>'+
+      '<input id="convert-note" placeholder="ملاحظة اختيارية...">'+
     '</div>';
-  document.getElementById('modal-save-btn').style.display='none';
+  document.getElementById('modal-save-btn').style.display='';
+  document.getElementById('modal-save-btn').className='btn-save';
+  document.getElementById('modal-save-btn').textContent='تأكيد التحويل لعهدة';
+  document.getElementById('modal-save-btn').onclick=()=>convertToCustody(id);
   document.getElementById('modal-box').className='modal';
   document.getElementById('modal-overlay').classList.add('show');
 }
