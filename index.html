@@ -311,7 +311,15 @@ html.dark .complaint-badge-converted{background:var(--green-bg);color:var(--gree
 .notif-btn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;transition:background .2s;position:relative;flex-shrink:0}
 .notif-btn:hover{background:rgba(255,255,255,.28)}
 .notif-badge{position:absolute;top:-4px;left:-4px;min-width:18px;height:18px;background:#EF4444;color:#fff;border-radius:100px;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #1C3F8A;line-height:1;animation:notif-pop .4s ease}
+.notif-badge.pulse{animation:notif-pop .4s ease, badge-pulse 1.8s ease-in-out 0.5s infinite}
 @keyframes notif-pop{0%{transform:scale(0)}70%{transform:scale(1.25)}100%{transform:scale(1)}}
+@keyframes badge-pulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(239,68,68,.7)}50%{transform:scale(1.15);box-shadow:0 0 0 5px rgba(239,68,68,0)}}
+.notif-btn.ringing{animation:bell-shake 2.5s ease-in-out infinite}
+.notif-btn.ringing i{display:inline-block;animation:bell-ring 2.5s ease-in-out infinite;transform-origin:50% 0}
+@keyframes bell-shake{0%,100%{transform:none}10%,30%,50%,70%{transform:rotate(-6deg)}20%,40%,60%{transform:rotate(6deg)}80%{transform:rotate(3deg)}}
+@keyframes bell-ring{0%,100%{transform:rotate(0deg)}10%,30%,50%,70%{transform:rotate(-18deg)}20%,40%,60%{transform:rotate(18deg)}80%{transform:rotate(8deg)}}
+.notif-item.unread.custody-alert{background:linear-gradient(90deg,rgba(139,92,246,.12) 0%,transparent 100%);border-right:3px solid var(--purple)}
+.notif-item.unread.custody-alert:hover{background:linear-gradient(90deg,rgba(139,92,246,.2) 0%,transparent 100%)}
 .notif-panel{position:absolute;top:calc(100% + 10px);left:0;width:360px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:300;overflow:hidden;display:none;animation:panel-slide .18s ease}
 @keyframes panel-slide{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 .notif-panel.open{display:block}
@@ -656,7 +664,7 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
       <!-- زر اختصارات لوحة المفاتيح -->
       <button class="btn-sm" onclick="showShortcutsModal()" title="اختصارات لوحة المفاتيح" style="padding:5px 8px"><i class="ti ti-keyboard"></i></button>
       <div class="notif-wrap" id="notif-wrap">
-        <button class="notif-btn" onclick="toggleNotifPanel(event)" title="الإشعارات">
+        <button class="notif-btn" id="notif-btn" onclick="toggleNotifPanel(event)" title="الإشعارات">
           <i class="ti ti-bell"></i>
           <span class="notif-badge" id="notif-badge" style="display:none">0</span>
         </button>
@@ -6561,24 +6569,51 @@ function renderNotifications() {
   const notifs = getNotifications();
   const unread = notifs.filter(n=>!_readNotifKeys.has(n.key));
   const badge = document.getElementById('notif-badge');
+  const btn   = document.getElementById('notif-btn');
+  const bellI = btn?.querySelector('i');
   const countEl = document.getElementById('notif-panel-count');
   const list = document.getElementById('notif-list');
   if (!badge||!list) return;
-  if (unread.length>0) { badge.textContent=unread.length>9?'9+':unread.length; badge.style.display='flex'; }
-  else badge.style.display='none';
-  if (countEl) countEl.textContent=notifs.length;
+
+  const hasCustodyUnread = unread.some(n=>n.type==='custody');
+  const hasAnyUnread = unread.length > 0;
+
+  if (hasAnyUnread) {
+    badge.textContent = unread.length>9?'9+':unread.length;
+    badge.style.display = 'flex';
+    if (hasCustodyUnread) {
+      badge.classList.add('pulse');
+      btn?.classList.add('ringing');
+      if (bellI) bellI.className = 'ti ti-bell-ringing';
+    } else {
+      badge.classList.remove('pulse');
+      btn?.classList.remove('ringing');
+      if (bellI) bellI.className = 'ti ti-bell';
+    }
+  } else {
+    badge.style.display = 'none';
+    badge.classList.remove('pulse');
+    btn?.classList.remove('ringing');
+    if (bellI) bellI.className = 'ti ti-bell';
+  }
+
+  if (countEl) countEl.textContent = notifs.length;
   if (!notifs.length) {
-    list.innerHTML='<div class="notif-empty"><i class="ti ti-bell-off"></i>لا توجد إشعارات<div style="font-size:12px;margin-top:4px;color:var(--text3)">جميع الطلبات تمت معالجتها</div></div>';
+    list.innerHTML='<div class="notif-empty"><i class="ti ti-bell-off"></i>\u0644\u0627 \u062a\u0648\u062c\u062f \u0625\u0634\u0639\u0627\u0631\u0627\u062a<div style="font-size:12px;margin-top:4px;color:var(--text3)">\u062c\u0645\u064a\u0639 \u0627\u0644\u0637\u0644\u0628\u0627\u062a \u062a\u0645\u062a \u0645\u0639\u0627\u0644\u062c\u062a\u0647\u0627</div></div>';
     return;
   }
   list.innerHTML=notifs.map(n=>{
     const isUnread=!_readNotifKeys.has(n.key);
-    return '<div class="notif-item '+(isUnread?'unread':'')+'" onclick="notifClick(\''+n.page+'\',\''+n.navId+'\',\''+n.key+'\')">' +
-      '<div class="notif-icon-wrap '+n.iconClass+'"><i class="ti '+n.icon+'"></i></div>' +
+    const isCustody = n.type==='custody';
+    const alertClass = (isUnread && isCustody) ? ' custody-alert' : '';
+    const iconAnim = (isUnread && isCustody) ? ' style="animation:badge-pulse 1.8s ease-in-out infinite"' : '';
+    const urgentBadge = (isUnread && isCustody) ? '<span style="font-size:10px;color:var(--purple);font-weight:800;margin-right:4px">\u26a1 \u064a\u062d\u062a\u0627\u062c \u0645\u0631\u0627\u062c\u0639\u0629</span>' : '';
+    return '<div class="notif-item '+(isUnread?'unread':'')+alertClass+'" onclick="notifClick(\''+n.page+'\',\''+n.navId+'\',\''+n.key+'\')">' +
+      '<div class="notif-icon-wrap '+n.iconClass+'"'+iconAnim+'><i class="ti '+n.icon+'"></i></div>' +
       '<div class="notif-content">' +
         '<div class="notif-title-row"><div class="notif-item-title">'+n.title+'</div>'+(isUnread?'<span class="notif-dot"></span>':'')+' </div>' +
         '<div class="notif-desc">'+n.desc+'</div>' +
-        '<div class="notif-meta"><span class="notif-tag '+n.tagClass+'">'+n.tag+'</span><span style="background:var(--red-bg);color:var(--red);padding:1px 7px;border-radius:100px;font-size:10px;font-weight:700">'+n.count+' معلق</span></div>' +
+        '<div class="notif-meta"><span class="notif-tag '+n.tagClass+'">'+n.tag+'</span><span style="background:var(--red-bg);color:var(--red);padding:1px 7px;border-radius:100px;font-size:10px;font-weight:700">'+n.count+' \u0645\u0639\u0644\u0642</span>'+urgentBadge+'</div>' +
       '</div></div>';
   }).join('');
 }
