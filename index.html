@@ -5606,7 +5606,7 @@ function closeModal() {
   const footer = document.querySelector('.modal-footer');
   footer.querySelectorAll('button:not(#modal-save-btn):not(.btn-cancel)').forEach(b=>b.remove());
 }
-document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
+// النوافذ لا تُغلق بالضغط على الخلفية — يجب الضغط على الغاء أو حفظ
 
 let toastTimer;
 function showToast(msg, type='') {
