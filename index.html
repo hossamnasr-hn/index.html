@@ -2310,11 +2310,23 @@ function openMapPicker() {
   const lngEl = document.getElementById('c-lng');
   const lat = parseFloat(latEl?.value) || 24.7136;
   const lng = parseFloat(lngEl?.value) || 46.6753;
-  const mapUrl = `https://maps.google.com/?q=${lat},${lng}`;
-  // فتح خريطة جوجل
-  window.open(mapUrl, '_blank');
-  // عرض تعليمات
-  showToast('انسخ الرابط من خرائط جوجل والصقه في حقل الرابط، أو أدخل الإحداثيات يدوياً', 'info', 6000);
+  window.open(`https://maps.google.com/?q=${lat},${lng}`, '_blank');
+  showToast('انسخ الرابط من المتصفح بعد تحديد الموقع ثم الصقه في حقل "رابط خرائط جوجل"', 'info', 6000);
+}
+
+function buildMapUrlFromCoords() {
+  const lat = document.getElementById('c-lat')?.value;
+  const lng = document.getElementById('c-lng')?.value;
+  const urlEl = document.getElementById('c-map-url');
+  if (lat && lng && urlEl && !urlEl.value) {
+    urlEl.value = `https://maps.google.com/?q=${lat},${lng}`;
+  }
+  previewMapUrl(document.getElementById('c-map-url')?.value||'');
+}
+
+function previewMapUrl(val) {
+  const preview = document.getElementById('map-url-preview');
+  if (preview) preview.style.display = val ? '' : 'none';
 }
 
 function openCustomerMapLink(mapUrl, lat, lng) {
@@ -3815,22 +3827,32 @@ function customerFormHTML(c) {
     '<div class="form-row full" style="margin-bottom:12px">'+
       '<div class="field"><label>العنوان الكامل</label><textarea id="c-address" rows="2" placeholder="المدينة - الحي - الشارع">'+(c.address||'')+'</textarea></div>'+
     '</div>'+
-    '<div class="form-row" style="margin-bottom:0">'+
+    '<div class="form-row" style="margin-bottom:12px">'+
       '<div class="field"><label>المدينة</label><input id="c-city" value="'+(c.city||'')+'" placeholder="الرياض"></div>'+
-      '<div class="form-section">الموقع الجغرافي (اختياري)</div>'+
-      '<div class="form-row" style="margin-bottom:8px"><div class="field"><label>رابط خرائط جوجل</label><input id="c-map-url" value="'+(c.mapUrl||'')+'" placeholder="https://maps.google.com/?q=..."></div></div>'+
-      '<div class="form-row" style="margin-bottom:4px">'+
-        '<div class="field"><label>خط العرض (Lat)</label><input id="c-lat" type="number" step="any" value="'+(c.lat||'')+'" placeholder="24.7136"></div>'+
-        '<div class="field"><label>خط الطول (Lng)</label><input id="c-lng" type="number" step="any" value="'+(c.lng||'')+'" placeholder="46.6753"></div>'+
-      '</div>'+
-      '<div style="margin-bottom:12px"><button type="button" onclick="openMapPicker()" class="map-link-btn"><i class="ti ti-map-pin"></i> فتح الخريطة لاختيار الموقع</button></div>'+
       '<div class="field"><label>ملاحظات</label><input id="c-notes" value="'+(c.notes||'')+'"></div>'+
+    '</div>'+
+    '<div class="form-section">الموقع الجغرافي (اختياري)</div>'+
+    '<div class="form-row" style="margin-bottom:8px">'+
+      '<div class="field" style="grid-column:1/-1"><label>رابط خرائط جوجل</label>'+
+        '<input id="c-map-url" value="'+(c.mapUrl||'')+'" placeholder="https://maps.google.com/?q=24.7136,46.6753" oninput="previewMapUrl(this.value)">'+
+      '</div>'+
+    '</div>'+
+    '<div class="form-row" style="margin-bottom:8px">'+
+      '<div class="field"><label>خط العرض (Lat)</label><input id="c-lat" type="number" step="any" value="'+(c.lat||'')+'" placeholder="24.7136" oninput="buildMapUrlFromCoords()"></div>'+
+      '<div class="field"><label>خط الطول (Lng)</label><input id="c-lng" type="number" step="any" value="'+(c.lng||'')+'" placeholder="46.6753" oninput="buildMapUrlFromCoords()"></div>'+
+    '</div>'+
+    '<div style="margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+      '<button type="button" onclick="openMapPicker()" class="map-link-btn"><i class="ti ti-map-pin"></i> فتح الخريطة لنسخ الرابط</button>'+
+      '<span id="map-url-preview" style="font-size:11px;color:var(--green);display:none"><i class="ti ti-check"></i> تم تسجيل الموقع</span>'+
     '</div>';
 }
 
 function getCustomerData() {
   const name = document.getElementById('c-name').value.trim();
   if (!name) { showToast('اسم العميل مطلوب','error'); return null; }
+  const latVal = parseFloat(document.getElementById('c-lat')?.value) || null;
+  const lngVal = parseFloat(document.getElementById('c-lng')?.value) || null;
+  const mapUrlVal = document.getElementById('c-map-url')?.value.trim() || '';
   return {
     name, crNumber:document.getElementById('c-cr').value.trim(),
     contactPerson:document.getElementById('c-contact').value.trim(),
@@ -3838,10 +3860,13 @@ function getCustomerData() {
     phone:document.getElementById('c-phone').value.trim(),
     phone2:document.getElementById('c-phone2').value.trim(),
     email:document.getElementById('c-email').value.trim(),
-    landline:document.getElementById('c-landline').value.trim(),
+    landline:document.getElementById('c-landline')?.value.trim()||'',
     address:document.getElementById('c-address').value.trim(),
     city:document.getElementById('c-city').value.trim(),
     notes:document.getElementById('c-notes').value.trim(),
+    mapUrl: mapUrlVal,
+    lat: latVal,
+    lng: lngVal,
     date:new Date().toISOString().split('T')[0]
   };
 }
@@ -5828,17 +5853,14 @@ function printCustomerCard(id) {
   // رابط الموقع الجغرافي
   const mapUrl = c.mapUrl || (c.lat&&c.lng ? `https://maps.google.com/?q=${c.lat},${c.lng}` : '');
   const mapHTML = mapUrl
-    ? `<div style="margin:12px 0;padding:10px 14px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:18px">📍</span>
-          <div>
-            <div style="font-size:10px;color:#2E7D32;font-weight:700;text-transform:uppercase;letter-spacing:.3px">الموقع الجغرافي</div>
-            <div style="font-size:12px;color:#1B5E20;margin-top:2px">${c.city||''}${c.city&&c.address?' — ':''}${c.address||''}</div>
-          </div>
-        </div>
-        <a href="${mapUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#2E7D32;color:#fff;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;font-family:'Cairo',sans-serif;white-space:nowrap">
-          🗺️ فتح الموقع
+    ? `<div style="margin:12px 0;padding:12px 16px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px">
+        <div style="font-size:10px;color:#2E7D32;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">📍 الموقع الجغرافي</div>
+        ${c.city||c.address?`<div style="font-size:12px;color:#1B5E20;margin-bottom:8px">${c.city||''}${c.city&&c.address?' — ':''}${c.address||''}</div>`:''}
+        <a href="${mapUrl}" target="_blank"
+           style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:#2E7D32;color:#fff;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;font-family:'Cairo',Arial,sans-serif">
+          🗺️ اضغط هنا لفتح الموقع في خرائط جوجل
         </a>
+        <div style="margin-top:6px;font-size:10px;color:#388E3C;word-break:break-all">${mapUrl}</div>
       </div>`
     : '';
 
@@ -6141,6 +6163,8 @@ if(typeof generateAssetCode!=='undefined')window.generateAssetCode=generateAsset
 if(typeof autoFillAssetCode!=='undefined')window.autoFillAssetCode=autoFillAssetCode;
 if(typeof openMapPicker!=='undefined')window.openMapPicker=openMapPicker;
 if(typeof openCustomerMapLink!=='undefined')window.openCustomerMapLink=openCustomerMapLink;
+if(typeof buildMapUrlFromCoords!=='undefined')window.buildMapUrlFromCoords=buildMapUrlFromCoords;
+if(typeof previewMapUrl!=='undefined')window.previewMapUrl=previewMapUrl;
 if(typeof editCustodyRequest!=='undefined')window.editCustodyRequest=editCustodyRequest;
 if(typeof saveEditCustodyRequest!=='undefined')window.saveEditCustodyRequest=saveEditCustodyRequest;
 if(typeof openCloseCustody!=='undefined')window.openCloseCustody=openCloseCustody;
