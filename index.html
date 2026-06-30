@@ -1093,6 +1093,7 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
                 <option value="قيد المراجعة">قيد المراجعة</option>
                 <option value="معتمد">معتمد</option>
                 <option value="مرفوض">مرفوض</option>
+                <option value="مُقفل">مُقفل</option>
               </select>
             </div>
           </div>
@@ -1332,7 +1333,7 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db,"users"));
   const existingUsers = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   
-  const ADMIN_FULL_PERMS = ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","audit","vehicle_delivery","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"];
+  const ADMIN_FULL_PERMS = ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","audit","vehicle_delivery","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"];
   if (usersSnap.empty || existingUsers.length === 0) {
     await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms: ADMIN_FULL_PERMS });
     console.log("Admin user created");
@@ -1464,7 +1465,7 @@ try {
         const nameEl = document.getElementById('header-name');
         if (nameEl) nameEl.textContent = fresh.name;
         document.getElementById('header-role').textContent = fresh.role;
-        const ALL_CUSTODY_PERMS_SR = ['dashboard','custody','custody_add','custody_edit','custody_edit_pending','custody_approve','custody_close','custody_unlock','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','settings'];
+        const ALL_CUSTODY_PERMS_SR = ['dashboard','custody','custody_add','custody_edit','custody_edit_pending','custody_approve','custody_close','custody_unlock','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_edit_pending','dept_custody_approve','dept_custody_close','dept_custody_unlock','dept_custody_print','settings'];
         if (fresh.perms.includes('users') && ALL_CUSTODY_PERMS_SR.some(p=>!fresh.perms.includes(p))) {
           const upgraded = [...new Set([...fresh.perms, ...ALL_CUSTODY_PERMS_SR])];
           fresh.perms = upgraded;
@@ -3257,7 +3258,7 @@ async function doLogin() {
     if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
     // ترقية تلقائية للمديرين فقط (من يملكون صلاحية 'users') — لا نُغيِّر صلاحيات المستخدمين العاديين
-    const ADMIN_ALL_PERMS = ['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','audit','vehicle_delivery','custody','custody_add','custody_edit','custody_edit_pending','custody_approve','custody_close','custody_unlock','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_approve','dept_custody_print','complaints','complaints_add','complaints_convert','settings'];
+    const ADMIN_ALL_PERMS = ['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','audit','vehicle_delivery','custody','custody_add','custody_edit','custody_edit_pending','custody_approve','custody_close','custody_unlock','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_edit_pending','dept_custody_approve','dept_custody_close','dept_custody_unlock','dept_custody_print','complaints','complaints_add','complaints_convert','settings'];
     if (found.perms.includes('users') && ADMIN_ALL_PERMS.some(p=>!found.perms.includes(p))) {
       const upgraded = [...new Set([...found.perms, ...ADMIN_ALL_PERMS])];
       found.perms = upgraded;
@@ -3327,7 +3328,7 @@ async function createAdminUser() {
             username: "admin",
             password: "admin123",
             role: data.role || "مدير",
-            perms: data.perms || ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","vehicle_delivery","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"]
+            perms: data.perms || ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","vehicle_delivery","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"]
           });
         }
       }
@@ -3338,7 +3339,7 @@ async function createAdminUser() {
         username: "admin",
         password: "admin123",
         role: "مدير",
-        perms: ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","vehicle_delivery","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_approve","dept_custody_print","settings"]
+        perms: ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","vehicle_delivery","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"]
       };
       await add(col(window.db, "users"), adminData);
     }
@@ -4988,7 +4989,10 @@ const ALL_PERMS=[
   {key:'dept_custody',label:'عهدة الإدارات — اطلاع فقط'},
   {key:'dept_custody_add',label:'عهدة الإدارات — إضافة'},
   {key:'dept_custody_edit',label:'عهدة الإدارات — تعديل / حذف'},
-  {key:'dept_custody_approve',label:'عهدة الإدارات — موافقة / رفض'},
+  {key:'dept_custody_edit_pending',label:'عهدة الإدارات — تعديل قيد المراجعة'},
+  {key:'dept_custody_approve',label:'عهدة الإدارات — اعتماد / رفض'},
+  {key:'dept_custody_close',label:'عهدة الإدارات — إقفال (مع الفواتير)'},
+  {key:'dept_custody_unlock',label:'عهدة الإدارات — فتح الإقفال'},
   {key:'dept_custody_print',label:'عهدة الإدارات — طباعة'},
   // البلاغات
   {key:'complaints',label:'البلاغات — اطلاع'},
@@ -5003,7 +5007,9 @@ const PERM_LABELS={
   custody:'عهدة أصول-اطلاع',custody_add:'عهدة أصول-إضافة',custody_edit:'عهدة أصول-تعديل',
   custody_edit_pending:'عهدة-تعديل قيد مراجعة',custody_approve:'عهدة أصول-موافقة',
   custody_close:'عهدة أصول-إقفال',custody_unlock:'عهدة أصول-فتح إقفال',custody_print:'عهدة أصول-طباعة',
-  dept_custody:'عهدة إدارات-اطلاع',dept_custody_add:'عهدة إدارات-إضافة',dept_custody_edit:'عهدة إدارات-تعديل',dept_custody_approve:'عهدة إدارات-موافقة',dept_custody_print:'عهدة إدارات-طباعة',
+  dept_custody:'عهدة إدارات-اطلاع',dept_custody_add:'عهدة إدارات-إضافة',dept_custody_edit:'عهدة إدارات-تعديل',
+  dept_custody_edit_pending:'عهدة إدارات-تعديل قيد مراجعة',dept_custody_approve:'عهدة إدارات-موافقة',
+  dept_custody_close:'عهدة إدارات-إقفال',dept_custody_unlock:'عهدة إدارات-فتح إقفال',dept_custody_print:'عهدة إدارات-طباعة',
   complaints:'بلاغات-اطلاع',complaints_add:'بلاغات-إضافة',complaints_convert:'بلاغات-تحويل',
 };
 
@@ -5128,7 +5134,7 @@ function setPresetPerms(p) {
     // المشرف: audit مفعّل افتراضياً
     manager:['dashboard','view','add','edit','handover','dispose','maintenance','return','customers','audit','vehicle_delivery',
              'custody','custody_add','custody_approve','custody_print',
-             'dept_custody','dept_custody_add','dept_custody_approve','dept_custody_print'],
+             'dept_custody','dept_custody_add','dept_custody_edit_pending','dept_custody_approve','dept_custody_close','dept_custody_print'],
     // عرض فقط: audit مفعّل افتراضياً
     viewer:['view','audit','custody','custody_print','dept_custody','dept_custody_print','complaints']
   };
@@ -5664,7 +5670,15 @@ function _renderDeptCustodyRows(list) {
   const tbody=document.getElementById('dept-custody-body'); if (!tbody) return;
   if (!list.length) { tbody.innerHTML='<tr><td colspan="10" class="empty-row">لا توجد طلبات عهدة إدارات</td></tr>'; return; }
   tbody.innerHTML=list.map((c,i)=>{
-    const sb=c.requestStatus==='معتمد'?'<span class="custody-badge-approved">معتمد</span>':c.requestStatus==='مرفوض'?'<span class="custody-badge-rejected">مرفوض</span>':'<span class="custody-badge-pending">قيد المراجعة</span>';
+    const isPending = c.requestStatus==='قيد المراجعة';
+    const isApproved = c.requestStatus==='معتمد';
+    const isClosed = c.requestStatus==='مُقفل';
+    const isRejected = c.requestStatus==='مرفوض';
+    let sb;
+    if (isApproved)  sb='<span class="custody-badge-approved">✅ معتمد</span>';
+    else if (isRejected) sb='<span class="custody-badge-rejected">❌ مرفوض</span>';
+    else if (isClosed)   sb='<span class="custody-badge-closed" style="background:var(--blue-bg);color:var(--blue);padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700">🔒 مُقفل</span>';
+    else sb='<span class="custody-badge-pending">⏳ قيد المراجعة</span>';
     return '<tr>'+
       '<td style="text-align:center"><code class="tag">'+c.seqNum+'</code></td>'+
       '<td style="font-size:12px">'+(c.date||'-')+'</td>'+
@@ -5674,11 +5688,15 @@ function _renderDeptCustodyRows(list) {
       '<td style="text-align:center;font-weight:700">'+(c.qty||'-')+'</td>'+
       '<td style="font-size:12px;max-width:140px">'+(c.purpose||'-')+'</td>'+
       '<td style="font-weight:700;color:var(--green);white-space:nowrap">'+(c.financialTotal>0?Number(c.financialTotal||0).toLocaleString('ar-SA',{minimumFractionDigits:2})+' ريال':'-')+'</td>'+
-      '<td>'+sb+'</td>'+
+      '<td>'+sb+(isClosed&&c.closedAt?'<div style="font-size:10px;color:var(--text3);margin-top:2px">'+c.closedAt+'</div>':'')+'</td>'+
       '<td style="white-space:nowrap">'+
-        (can('dept_custody_print')||can('dept_custody')?'<button class="btn-action info" onclick="printDeptCustodyForm(\''+c._id+'\')"><i class="ti ti-printer"></i></button>':'')+
-        (can('dept_custody_approve')?'<button class="btn-action success" onclick="approveDeptCustody(\''+c._id+'\',\'معتمد\')" title="اعتماد"><i class="ti ti-check"></i></button><button class="btn-action danger" onclick="approveDeptCustody(\''+c._id+'\',\'مرفوض\')" title="رفض"><i class="ti ti-x"></i></button>':'')+
-        (can('dept_custody_edit')?'<button class="btn-action danger" onclick="deleteDeptCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>':'')+
+        (can('dept_custody_print')||can('dept_custody')?'<button class="btn-action info" onclick="printDeptCustodyForm(\''+c._id+'\')" title="طباعة"><i class="ti ti-printer"></i></button>':'')+
+        (can('dept_custody_edit_pending')&&isPending?'<button class="btn-action" onclick="editDeptCustodyRequest(\''+c._id+'\')" title="تعديل" style="color:var(--amber);border-color:var(--amber)"><i class="ti ti-edit"></i></button>':'')+
+        (can('dept_custody_approve')&&(isPending)?'<button class="btn-action success" onclick="approveDeptCustody(\''+c._id+'\',\'معتمد\')" title="اعتماد"><i class="ti ti-check"></i></button>':'')+
+        (can('dept_custody_approve')&&(isPending)?'<button class="btn-action" onclick="approveDeptCustody(\''+c._id+'\',\'مرفوض\')" title="رفض" style="color:var(--red);border-color:var(--red)"><i class="ti ti-x"></i></button>':'')+
+        (can('dept_custody_close')&&isApproved?'<button class="btn-action" onclick="openCloseDeptCustody(\''+c._id+'\')" title="إقفال العهدة" style="color:var(--blue);border-color:var(--blue)"><i class="ti ti-lock"></i></button>':'')+
+        (can('dept_custody_unlock')&&isClosed?'<button class="btn-action" onclick="unlockDeptCustody(\''+c._id+'\')" title="فتح الإقفال" style="color:var(--amber);border-color:var(--amber)"><i class="ti ti-lock-open"></i></button>':'')+
+        (can('dept_custody_edit')&&!isClosed?'<button class="btn-action danger" onclick="deleteDeptCustody(\''+c._id+'\')"><i class="ti ti-trash"></i></button>':'')+
       '</td></tr>';
   }).join('');
 }
@@ -5763,6 +5781,163 @@ async function deleteDeptCustody(id) {
     await window.fsApi.deleteDoc(window.fsApi.doc(window.db,"deptCustodyRequests",id));
     window.deptCustodyRequests=(window.deptCustodyRequests||[]).filter(c=>c._id!==id);
     renderDeptCustody(); showToast('تم الحذف','success');
+  } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+/* ══ تعديل طلب عهدة الإدارات (قيد المراجعة فقط) ══ */
+function editDeptCustodyRequest(id) {
+  if (!can('dept_custody_edit_pending')) { showToast('ليس لديك صلاحية تعديل العهدة','error'); return; }
+  const c = (window.deptCustodyRequests||[]).find(x=>x._id===id);
+  if (!c) return;
+  if (c.requestStatus !== 'قيد المراجعة') { showToast('لا يمكن تعديل عهدة بعد اتخاذ قرار بشأنها','error'); return; }
+  const deptOptions = ['الإدارة المالية','المبيعات','الخدمات المساندة','الموارد البشرية','تقنية المعلومات','المشتريات','العمليات','أخرى']
+    .map(d=>'<option value="'+d+'"'+(d===c.dept?' selected':'')+'>'+d+'</option>').join('');
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-edit" style="color:var(--amber)"></i> تعديل طلب عهدة إدارة';
+  document.getElementById('modal-body').innerHTML=
+    '<div class="alert alert-warning" style="margin-bottom:12px"><i class="ti ti-info-circle"></i> تعديل مسموح فقط قبل اتخاذ القرار (قيد المراجعة)</div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>الإدارة *</label><select id="dc-dept">'+deptOptions+'</select></div>'+
+      '<div class="field"><label>التاريخ *</label><input type="date" id="dc-date" value="'+(c.date||'')+'"></div>'+
+    '</div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>اسم الطالب *</label><input type="text" id="dc-requester" value="'+(c.requesterName||'')+'"></div>'+
+      '<div class="field"><label>المنصب / الوظيفة</label><input type="text" id="dc-position" value="'+(c.position||'')+'"></div>'+
+    '</div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>الصنف / الوصف *</label><input type="text" id="dc-item" value="'+(c.itemDesc||'')+'"></div>'+
+      '<div class="field"><label>الكمية</label><input type="number" id="dc-qty" min="1" value="'+(c.qty||1)+'"></div>'+
+    '</div>'+
+    '<div class="field" style="margin-bottom:12px"><label>الغرض *</label><textarea id="dc-purpose">'+(c.purpose||'')+'</textarea></div>'+
+    financialItemsHTML(c.financialItems||[])+
+    '<div class="form-row" style="margin-bottom:12px;margin-top:10px">'+
+      '<div class="field"><label>المدة المتوقعة</label><input type="text" id="dc-duration" value="'+(c.duration||'')+'"></div>'+
+      '<div class="field"><label>الشخص المسؤول عن الاعتماد</label><input type="text" id="dc-approver" value="'+(c.approver||'')+'"></div>'+
+    '</div>'+
+    '<div class="field"><label>ملاحظات</label><textarea id="dc-notes">'+(c.notes||'')+'</textarea></div>';
+  document.getElementById('modal-save-btn').textContent='حفظ التعديلات';
+  document.getElementById('modal-save-btn').onclick=()=>saveEditDeptCustodyRequest(id);
+  document.getElementById('modal-box').className='modal wide';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+async function saveEditDeptCustodyRequest(id) {
+  const dept=document.getElementById('dc-dept').value;
+  const requesterName=document.getElementById('dc-requester').value.trim();
+  const itemDesc=document.getElementById('dc-item').value.trim();
+  const purpose=document.getElementById('dc-purpose').value.trim();
+  const date=document.getElementById('dc-date').value;
+  if (!dept||!requesterName||!itemDesc||!purpose) { showToast('يرجى ملء الحقول الإلزامية','error'); return; }
+  const financialItems=getFinancialItems();
+  const financialTotal=financialItems.reduce((s,i)=>s+(i.amount||0),0);
+  const updates={dept,date,requesterName,position:document.getElementById('dc-position').value.trim(),
+    itemDesc,qty:document.getElementById('dc-qty').value,purpose,
+    duration:document.getElementById('dc-duration').value.trim(),
+    approver:document.getElementById('dc-approver').value.trim(),
+    notes:document.getElementById('dc-notes').value,
+    financialItems,financialTotal,
+    updatedAt:new Date().toISOString(),updatedBy:currentUser?.name||''};
+  try {
+    await waitForFirebase();
+    await window.fsApi.updateDoc(window.fsApi.doc(window.db,"deptCustodyRequests",id),updates);
+    const idx=(window.deptCustodyRequests||[]).findIndex(c=>c._id===id);
+    if (idx>=0) window.deptCustodyRequests[idx]={...window.deptCustodyRequests[idx],...updates};
+    logAudit('edit','تعديل عهدة إدارة قيد المراجعة',`تم تعديل طلب: ${updates.itemDesc||''} — ${dept}`);
+    closeModal(); renderDeptCustody();
+    showToast('تم حفظ التعديلات','success');
+  } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+/* ══ إقفال عهدة الإدارات ══ */
+function openCloseDeptCustody(id) {
+  if (!can('dept_custody_close')) { showToast('ليس لديك صلاحية إقفال العهدة','error'); return; }
+  const c=(window.deptCustodyRequests||[]).find(x=>x._id===id);
+  if (!c) return;
+  if (c.requestStatus!=='معتمد') { showToast('يمكن إقفال العهدة المعتمدة فقط','error'); return; }
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-lock" style="color:var(--blue)"></i> إقفال عهدة الإدارة';
+  document.getElementById('modal-body').innerHTML=
+    '<div class="alert alert-info" style="margin-bottom:14px"><i class="ti ti-info-circle"></i>'+
+    ' إقفال العهدة يتم بعد صرف المبلغ وتسليم الفواتير. الرقم: <strong>'+(c.seqNum||'—')+'</strong></div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>عدد الفواتير *</label><input type="number" id="close-invoice-count" min="1" placeholder="عدد الفواتير المرفقة"></div>'+
+      '<div class="field"><label>إجمالي مبالغ الفواتير (ريال) *</label><input type="number" id="close-invoice-total" step="0.01" min="0" placeholder="0.00"></div>'+
+    '</div>'+
+    '<div class="field" style="margin-bottom:12px"><label>ملاحظات الإقفال</label><textarea id="close-notes" rows="3" placeholder="ملاحظات إضافية عند الإقفال..."></textarea></div>'+
+    '<div class="field" style="margin-bottom:12px"><label>تاريخ الإقفال</label><input type="date" id="close-date" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
+    '<div style="background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--radius);padding:10px;font-size:12px;color:var(--amber)">'+
+    '<i class="ti ti-alert-triangle"></i> بعد الإقفال لن يمكن تعديل هذا الطلب إلا بفتح الإقفال</div>';
+  document.getElementById('modal-save-btn').className='btn-save';
+  document.getElementById('modal-save-btn').textContent='تأكيد الإقفال';
+  document.getElementById('modal-save-btn').onclick=()=>saveCloseDeptCustody(id);
+  document.getElementById('modal-box').className='modal wide';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+async function saveCloseDeptCustody(id) {
+  const invoiceCount=parseInt(document.getElementById('close-invoice-count').value)||0;
+  const invoiceTotal=parseFloat(document.getElementById('close-invoice-total').value)||0;
+  const notes=document.getElementById('close-notes').value.trim();
+  const closeDate=document.getElementById('close-date').value;
+  if (!invoiceCount||invoiceCount<1) { showToast('يرجى إدخال عدد الفواتير','error'); return; }
+  if (invoiceTotal<0) { showToast('يرجى إدخال إجمالي مبالغ الفواتير','error'); return; }
+  const updates={requestStatus:'مُقفل',invoiceCount,invoiceTotal,closeNotes:notes,closedAt:closeDate,closedBy:currentUser?.name||''};
+  try {
+    await waitForFirebase();
+    await window.fsApi.updateDoc(window.fsApi.doc(window.db,"deptCustodyRequests",id),updates);
+    const idx=(window.deptCustodyRequests||[]).findIndex(c=>c._id===id);
+    if (idx>=0) window.deptCustodyRequests[idx]={...window.deptCustodyRequests[idx],...updates};
+    logAudit('custody','إقفال عهدة إدارة',`إقفال طلب — الفواتير: ${invoiceCount} — الإجمالي: ${invoiceTotal} ريال`);
+    closeModal(); renderDeptCustody();
+    showToast('تم إقفال العهدة بنجاح ✅','success');
+  } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+/* ══ فتح إقفال عهدة الإدارات ══ */
+async function unlockDeptCustody(id) {
+  if (!can('dept_custody_unlock')) { showToast('ليس لديك صلاحية فتح الإقفال','error'); return; }
+  const c=(window.deptCustodyRequests||[]).find(x=>x._id===id);
+  if (!c) return;
+  if (c.requestStatus!=='مُقفل') { showToast('هذه العهدة ليست مقفلة','error'); return; }
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-lock-open" style="color:var(--amber)"></i> فتح إقفال عهدة الإدارة';
+  document.getElementById('modal-body').innerHTML=`
+    <div class="alert alert-warning" style="margin-bottom:14px">
+      <i class="ti ti-alert-triangle"></i>
+      <div>سيتم إعادة حالة العهدة إلى <strong>"معتمد"</strong> وإمكانية تعديل بيانات الإقفال أو إعادة الإقفال.</div>
+    </div>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px">بيانات الإقفال الحالية</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
+        <div><span style="color:var(--text3)">رقم الطلب:</span> <strong>${c.seqNum||'—'}</strong></div>
+        <div><span style="color:var(--text3)">تاريخ الإقفال:</span> <strong>${c.closedAt||'—'}</strong></div>
+        <div><span style="color:var(--text3)">عدد الفواتير:</span> <strong>${c.invoiceCount||0}</strong></div>
+        <div><span style="color:var(--text3)">إجمالي المبالغ:</span> <strong>${Number(c.invoiceTotal||0).toLocaleString('ar-SA',{minimumFractionDigits:2})} ريال</strong></div>
+        <div><span style="color:var(--text3)">أُقفل بواسطة:</span> <strong>${c.closedBy||'—'}</strong></div>
+      </div>
+      ${c.closeNotes?`<div style="margin-top:8px;font-size:12px;color:var(--text2)"><span style="color:var(--text3)">ملاحظات:</span> ${c.closeNotes}</div>`:''}
+    </div>
+    <div class="field">
+      <label>سبب فتح الإقفال *</label>
+      <textarea id="unlock-reason" rows="2" placeholder="اذكر سبب فتح الإقفال..."></textarea>
+    </div>`;
+  document.getElementById('modal-save-btn').className='btn-save amber-btn';
+  document.getElementById('modal-save-btn').textContent='تأكيد فتح الإقفال';
+  document.getElementById('modal-save-btn').onclick=()=>confirmUnlockDeptCustody(id);
+  document.getElementById('modal-box').className='modal wide';
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+async function confirmUnlockDeptCustody(id) {
+  const reason=document.getElementById('unlock-reason')?.value.trim();
+  if (!reason) { showToast('يرجى إدخال سبب فتح الإقفال','error'); return; }
+  const updates={requestStatus:'معتمد',invoiceCount:null,invoiceTotal:null,closeNotes:null,closedAt:null,closedBy:null,
+    unlockedAt:new Date().toISOString().slice(0,10),unlockedBy:currentUser?.name||'',unlockReason:reason};
+  try {
+    await waitForFirebase();
+    await window.fsApi.updateDoc(window.fsApi.doc(window.db,'deptCustodyRequests',id),updates);
+    const idx=(window.deptCustodyRequests||[]).findIndex(c=>c._id===id);
+    if (idx>=0) window.deptCustodyRequests[idx]={...window.deptCustodyRequests[idx],...updates};
+    logAudit('custody','فتح إقفال عهدة إدارة',`فتح إقفال: ${window.deptCustodyRequests[idx]?.seqNum||id} — السبب: ${reason}`);
+    closeModal(); renderDeptCustody();
+    showToast('تم فتح الإقفال — العهدة أصبحت معتمدة ✅','success');
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
 
@@ -6934,6 +7109,12 @@ if(typeof filterDeptCustody!=='undefined')window.filterDeptCustody=filterDeptCus
 if(typeof openNewDeptCustody!=='undefined')window.openNewDeptCustody=openNewDeptCustody;
 if(typeof approveDeptCustody!=='undefined')window.approveDeptCustody=approveDeptCustody;
 if(typeof deleteDeptCustody!=='undefined')window.deleteDeptCustody=deleteDeptCustody;
+if(typeof editDeptCustodyRequest!=='undefined')window.editDeptCustodyRequest=editDeptCustodyRequest;
+if(typeof saveEditDeptCustodyRequest!=='undefined')window.saveEditDeptCustodyRequest=saveEditDeptCustodyRequest;
+if(typeof openCloseDeptCustody!=='undefined')window.openCloseDeptCustody=openCloseDeptCustody;
+if(typeof saveCloseDeptCustody!=='undefined')window.saveCloseDeptCustody=saveCloseDeptCustody;
+if(typeof unlockDeptCustody!=='undefined')window.unlockDeptCustody=unlockDeptCustody;
+if(typeof confirmUnlockDeptCustody!=='undefined')window.confirmUnlockDeptCustody=confirmUnlockDeptCustody;
 if(typeof printDeptCustodyForm!=='undefined')window.printDeptCustodyForm=printDeptCustodyForm;
 if(typeof populateHistoryAssetSelect!=='undefined')window.populateHistoryAssetSelect=populateHistoryAssetSelect;
 if(typeof searchAssetHistory!=='undefined')window.searchAssetHistory=searchAssetHistory;
