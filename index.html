@@ -1307,7 +1307,7 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
 window._firebaseInit = (async function() {
 const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
 const {
-  getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, setDoc
+  getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot
 } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
 
 const firebaseConfig = {
@@ -1322,7 +1322,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 window.db = db;
-window.fsApi = { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, setDoc };
+window.fsApi = { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot };
 window._firebaseReady = true;
 (window._firebaseReadyCallbacks||[]).forEach(fn=>fn());
 console.log("✅ Firebase connected");
@@ -1445,6 +1445,8 @@ try {
   await loadAllData();
   window._dataReady = true;
   console.log("✅ All data loaded. Users:", window.users?.length);
+  // تفعيل الاستماع اللحظي (Real-time) فور جاهزية البيانات حتى تصل الإشعارات لحظياً لكل مستخدم
+  try { setupNotificationRealtimeListeners(); } catch(e) { console.warn('realtime notif init:', e); }
 
   // Auto-restore session from localStorage
   try {
@@ -7199,19 +7201,48 @@ document.addEventListener('click',function(e){
   if(wrap&&!wrap.contains(e.target)) closeNotifPanel();
 });
 
-/* تحديث دوري للإشعارات حتى تبقى وامضة لكل مستخدم يملك الصلاحية المعنية،
-   ولا تختفي أو تهدأ إلا بنقر المستخدم على الإشعار أو "تعليم الكل كمقروء" */
+/* ════════════════════════════════════════
+   🔴 استماع لحظي (Real-time) لتحديث الإشعارات فور حدوثها
+   حتى تومض شارة الجرس بالأحمر لكل مستخدم يملك الصلاحية في نفس اللحظة،
+   دون الحاجة لفتح لوحة الإشعارات أو التنقل بين الصفحات أو انتظار التحديث الدوري
+════════════════════════════════════════ */
+window._notifUnsubscribers = window._notifUnsubscribers || [];
+async function setupNotificationRealtimeListeners() {
+  try {
+    await waitForFirebase();
+    const { collection: col, onSnapshot: onSnap } = window.fsApi || {};
+    if (!onSnap) { console.warn('onSnapshot غير متوفر — سيتم الاعتماد على التحديث الدوري فقط'); return; }
+    // إيقاف أي اشتراكات سابقة لتفادي التكرار (مثلاً عند إعادة تسجيل الدخول)
+    window._notifUnsubscribers.forEach(unsub=>{ try{ unsub(); }catch(e){} });
+    window._notifUnsubscribers = [];
+
+    function watch(collName, applyFn, rerenderPageId, rerenderFn) {
+      const unsub = onSnap(col(window.db, collName), (snap)=>{
+        applyFn(snap.docs.map(d=>({...d.data(),_id:d.id})));
+        // تحديث فوري لشارة الجرس ووميضها لحظة وصول أي تغيير، لكل مستخدم يملك صلاحية الاطلاع
+        try { renderNotifications(); } catch(e){}
+        // تحديث الصفحة المعنية مباشرة إن كانت مفتوحة حالياً
+        try {
+          if (rerenderFn && document.getElementById(rerenderPageId)?.classList.contains('active')) rerenderFn();
+        } catch(e){}
+      }, (err)=>{ console.warn('onSnapshot('+collName+') error:', err.message); });
+      window._notifUnsubscribers.push(unsub);
+    }
+
+    watch('custodyRequests', rows=>{ window.custodyRequests = rows; }, 'page-custody', ()=>filterCustody());
+    watch('deptCustodyRequests', rows=>{ window.deptCustodyRequests = rows; }, 'page-dept-custody', ()=>filterDeptCustody());
+    watch('complaints', rows=>{ _complaints = rows; try{ localStorage.setItem('_complaints', JSON.stringify(_complaints)); }catch(e){} }, 'page-complaints', ()=>filterComplaints());
+
+    console.log('✅ الاستماع اللحظي للإشعارات مُفعَّل');
+  } catch(e) { console.warn('setupNotificationRealtimeListeners error:', e); }
+}
+
+/* تحديث دوري احتياطي للإشعارات (تأثيره فقط على الوميض المحلي بدون أي اتصال بالشبكة)،
+   لضمان بقاء الجرس وامضاً باستمرار حتى لو فشل الاستماع اللحظي لأي سبب */
 if (window._notifPollTimer) clearInterval(window._notifPollTimer);
 window._notifPollTimer = setInterval(()=>{
   if (currentUser) { try { renderNotifications(); } catch(e){} }
-}, 12000);
-// جلب بيانات محدّثة من قاعدة البيانات بشكل دوري لاكتشاف إشعارات جديدة من مستخدمين آخرين
-if (window._notifDataPollTimer) clearInterval(window._notifDataPollTimer);
-window._notifDataPollTimer = setInterval(async ()=>{
-  if (currentUser && window._dataReady && typeof loadAllData === 'function') {
-    try { await loadAllData(); renderNotifications(); } catch(e){}
-  }
-}, 60000);
+}, 8000);
 
 // NOW start firebase after all functions are defined
 // Store the promise so login can wait for it
