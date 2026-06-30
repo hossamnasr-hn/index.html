@@ -911,6 +911,7 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
           <span><i class="ti ti-car"></i> تسليم المركبات</span>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="export-btn export-btn-excel" onclick="exportTableExcel('vd-body','تسليم_المركبات',['#','المركبة','رقم اللوحة','الموظف المستلم','القسم','الكيلومترات','الوقود','تاريخ التسليم','المسؤول','الحالة'])"><i class="ti ti-file-spreadsheet"></i> Excel</button>
+            <button class="report-page-btn" onclick="printVehicleDeliveryReport()"><i class="ti ti-file-analytics"></i> طباعة التقرير</button>
             <button class="add-btn" style="background:var(--purple)" onclick="openNewVehicleDelivery()"><i class="ti ti-car"></i> تسليم مركبة جديد</button>
           </div>
         </div>
@@ -1337,7 +1338,7 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db,"users"));
   const existingUsers = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   
-  const ADMIN_FULL_PERMS = ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","audit","vehicle_delivery","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"];
+  const ADMIN_FULL_PERMS = ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","audit","vehicle_delivery","vehicle_return","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"];
   if (usersSnap.empty || existingUsers.length === 0) {
     await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms: ADMIN_FULL_PERMS });
     console.log("Admin user created");
@@ -3262,7 +3263,7 @@ async function doLogin() {
     if (nameEl) nameEl.textContent = found.name;
     document.getElementById('header-role').textContent = found.role;
     // ترقية تلقائية للمديرين فقط (من يملكون صلاحية 'users') — لا نُغيِّر صلاحيات المستخدمين العاديين
-    const ADMIN_ALL_PERMS = ['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','audit','vehicle_delivery','custody','custody_add','custody_edit','custody_edit_pending','custody_approve','custody_close','custody_unlock','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_edit_pending','dept_custody_approve','dept_custody_close','dept_custody_unlock','dept_custody_print','complaints','complaints_add','complaints_convert','settings'];
+    const ADMIN_ALL_PERMS = ['dashboard','view','add','edit','handover','dispose','maintenance','users','return','customers','audit','vehicle_delivery','vehicle_return','custody','custody_add','custody_edit','custody_edit_pending','custody_approve','custody_close','custody_unlock','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_edit_pending','dept_custody_approve','dept_custody_close','dept_custody_unlock','dept_custody_print','complaints','complaints_add','complaints_convert','settings'];
     if (found.perms.includes('users') && ADMIN_ALL_PERMS.some(p=>!found.perms.includes(p))) {
       const upgraded = [...new Set([...found.perms, ...ADMIN_ALL_PERMS])];
       found.perms = upgraded;
@@ -3332,7 +3333,7 @@ async function createAdminUser() {
             username: "admin",
             password: "admin123",
             role: data.role || "مدير",
-            perms: data.perms || ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","vehicle_delivery","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"]
+            perms: data.perms || ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","vehicle_delivery","vehicle_return","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"]
           });
         }
       }
@@ -3343,7 +3344,7 @@ async function createAdminUser() {
         username: "admin",
         password: "admin123",
         role: "مدير",
-        perms: ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","vehicle_delivery","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"]
+        perms: ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","vehicle_delivery","vehicle_return","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"]
       };
       await add(col(window.db, "users"), adminData);
     }
@@ -5088,6 +5089,7 @@ const ALL_PERMS=[
   {key:'view',label:'عرض الأصول'},{key:'add',label:'إضافة أصول'},{key:'edit',label:'تعديل أصول'},
   {key:'handover',label:'تسليم أصل'},{key:'maintenance',label:'صيانة'},{key:'dispose',label:'إتلاف'},
   {key:'vehicle_delivery',label:'تسليم المركبات'},
+  {key:'vehicle_return',label:'استرجاع المركبات'},
   {key:'users',label:'إدارة المستخدمين'},{key:'return',label:'استرداد أصل'},{key:'customers',label:'العملاء'},
   {key:'audit',label:'سجل النشاط'},
   {key:'settings',label:'الإعدادات'},
@@ -5118,6 +5120,7 @@ const PERM_LABELS={
   dashboard:'لوحة التحكم',
   view:'عرض',add:'إضافة',edit:'تعديل',handover:'تسليم',maintenance:'صيانة',dispose:'إتلاف',
   vehicle_delivery:'تسليم مركبات',
+  vehicle_return:'استرجاع مركبات',
   users:'مستخدمون',return:'استرداد',customers:'العملاء',audit:'سجل النشاط',settings:'الإعدادات',
   custody:'عهدة أصول-اطلاع',custody_add:'عهدة أصول-إضافة',custody_edit:'عهدة أصول-تعديل',
   custody_edit_pending:'عهدة-تعديل قيد مراجعة',custody_approve:'عهدة أصول-موافقة',
@@ -5220,11 +5223,16 @@ function userFormHTML(u) {
     ).join('')+
     '</div></div>'+
     '<div style="background:rgba(124,58,237,.07);border:1px solid var(--purple);border-radius:var(--radius);padding:12px;margin-bottom:8px">'+
-    '<div style="font-size:12px;font-weight:700;color:var(--purple);margin-bottom:4px"><i class="ti ti-car"></i> صلاحية تسليم المركبات</div>'+
-    '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">تتيح إضافة وطباعة نماذج تسليم المركبات للموظفين بعد إضافتها كأصل</div>'+
-    '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:rgba(255,255,255,.6);cursor:pointer;border:1px solid var(--purple)">'+
-    '<input type="checkbox" name="perm" value="vehicle_delivery" '+(u&&(u.perms||[]).includes('vehicle_delivery')?'checked':'')+' style="width:15px;height:15px;accent-color:var(--purple)">'+
-    '<span style="font-size:13px;color:var(--purple);font-weight:600">السماح بتسليم المركبات وطباعة نموذج التسليم</span></label>'+
+    '<div style="font-size:12px;font-weight:700;color:var(--purple);margin-bottom:4px"><i class="ti ti-car"></i> صلاحيات المركبات</div>'+
+    '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">تسليم المركبات للموظفين واستراجاعها وطباعة الوثائق</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+
+    ['vehicle_delivery','vehicle_return'].map(key=>{
+      const labels={'vehicle_delivery':'تسليم مركبة لموظف وطباعة وثيقة التسليم','vehicle_return':'استرجاع مركبة من موظف وطباعة وثيقة الاسترجاع'};
+      return '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--radius);background:rgba(255,255,255,.6);cursor:pointer;border:1px solid var(--purple)">'+
+        '<input type="checkbox" name="perm" value="'+key+'" '+(u&&(u.perms||[]).includes(key)?'checked':'')+' style="width:15px;height:15px;accent-color:var(--purple)">'+
+        '<span style="font-size:13px;color:var(--purple);font-weight:600">'+labels[key]+'</span></label>';
+    }).join('')+
+    '</div>'+
     '</div>'+
     '<div style="background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--radius);padding:12px;margin-bottom:8px">'+
     '<div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:8px"><i class="ti ti-speakerphone"></i> صلاحيات البلاغات</div>'+
@@ -6632,31 +6640,293 @@ async function saveVehicleDelivery() {
 }
 
 /* استرجاع المركبة من الموظف وإعادتها متاحة في المخزون */
+/* ═══════════════════════════════════════
+   ↩ نموذج استرجاع المركبة الشامل
+═══════════════════════════════════════ */
+
 async function returnVehicleDelivery(id) {
-  if(!can('vehicle_delivery')) { showToast('ليس لديك صلاحية تسليم المركبات','error'); return; }
+  if(!can('vehicle_return')) { showToast('ليس لديك صلاحية استرجاع المركبات','error'); return; }
   const v = getVehicleDeliveries().find(x=>x._id===id);
   if(!v) return;
   if(v.status==='مُرتجعة'){ showToast('تم استرجاع هذه المركبة مسبقاً','error'); return; }
-  if(!confirm('هل تم استرجاع المركبة ['+(v.assetName||'')+'] من الموظف '+(v.employeeName||'')+'؟\nستصبح المركبة متاحة مجدداً في المخزون.')) return;
+  const asset = getAssets().find(a=>a._id===v.assetId)||{};
+  const now = new Date();
+  const todayDate = now.toISOString().slice(0,10);
+  const nowTime = now.toTimeString().slice(0,5);
+  const kmDiff = v.odometer ? `<div style="font-size:11px;color:var(--text3);margin-top:3px">عداد التسليم: <strong>${Number(v.odometer).toLocaleString('ar-SA')} كم</strong></div>` : '';
+
+  document.getElementById('modal-title').innerHTML='<i class="ti ti-corner-up-left" style="color:var(--teal)"></i> نموذج استرجاع مركبة';
+  document.getElementById('modal-body').innerHTML=
+    // بطاقة معلومات المركبة والموظف
+    `<div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:14px;display:flex;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:2px"><i class="ti ti-car"></i> المركبة</div>
+        <div style="font-weight:700;font-size:14px">${v.assetName||'—'}</div>
+        <div style="font-size:11px;color:var(--purple);margin-top:2px"><i class="ti ti-id"></i> لوحة: <strong>${v.plate||'—'}</strong></div>
+        ${asset.vinNumber?`<div style="font-size:10px;color:var(--text3);font-family:monospace">هيكل: ${asset.vinNumber}</div>`:''}
+      </div>
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:2px"><i class="ti ti-user"></i> الموظف المُسلِّم</div>
+        <div style="font-weight:700;font-size:14px">${v.employeeName||'—'}</div>
+        <div style="font-size:11px;color:var(--text3)">${v.department||''} ${v.employeeJobId?'| '+v.employeeJobId:''}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">تاريخ التسليم: ${v.date||'—'} ${v.time||''}</div>
+      </div>
+    </div>`+
+
+    '<div class="form-section">بيانات الاسترجاع</div>'+
+    `<div class="form-row" style="margin-bottom:12px">
+      <div class="field"><label>تاريخ الاسترجاع *</label><div style="display:flex;gap:6px"><input id="ret-date" type="date" value="${todayDate}" style="flex:1"><input id="ret-time" type="time" value="${nowTime}" style="flex:1"></div></div>
+      <div class="field"><label>المستلم من الموظف *</label><input id="ret-receiver" value="${currentUser?.name||''}" placeholder="اسم مستلم المركبة"></div>
+    </div>`+
+    `<div class="form-row" style="margin-bottom:12px">
+      <div class="field"><label>عداد الكيلومترات عند الاسترجاع *</label><input id="ret-odometer" type="number" min="0" placeholder="عداد الكم الحالي">${kmDiff}</div>
+      <div class="field"><label>مستوى الوقود عند الاسترجاع</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <i class="ti ti-gas-station" style="color:var(--amber);font-size:16px"></i>
+          <input id="ret-fuel" type="range" min="0" max="4" step="1" value="4" oninput="updateRetFuelLabel(this.value)" style="flex:1;accent-color:var(--teal)">
+          <span id="ret-fuel-label" style="font-size:12px;font-weight:700;color:var(--teal);min-width:60px;text-align:center">ممتلئ</span>
+        </div>
+      </div>
+    </div>`+
+
+    '<div class="form-section">حالة المركبة عند الاسترجاع</div>'+
+    `<div class="form-row" style="margin-bottom:12px">
+      <div class="field"><label>الحالة العامة للمركبة</label>
+        <select id="ret-condition">
+          <option value="ممتازة — بدون ملاحظات">ممتازة — بدون ملاحظات</option>
+          <option value="جيدة — استخدام عادي">جيدة — استخدام عادي</option>
+          <option value="بها خدوش / آثار جديدة">بها خدوش / آثار جديدة</option>
+          <option value="تحتاج صيانة">تحتاج صيانة</option>
+          <option value="بها أضرار تستوجب التقرير">بها أضرار تستوجب التقرير</option>
+        </select>
+      </div>
+      <div class="field"><label>غرامة أو تجاوز مسجل</label>
+        <select id="ret-violation">
+          <option value="لا يوجد">لا يوجد</option>
+          <option value="مخالفة مرورية">مخالفة مرورية</option>
+          <option value="حادث مسجل">حادث مسجل</option>
+          <option value="تجاوز المسافة المسموحة">تجاوز المسافة المسموحة</option>
+          <option value="أخرى">أخرى</option>
+        </select>
+      </div>
+    </div>`+
+
+    '<div class="form-section">التحقق من الملحقات</div>'+
+    `<div style="font-size:11px;color:var(--text3);margin-bottom:8px">علّم الملحقات التي تم استرجاعها مع المركبة</div>`+
+    `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px">`+
+    VD_ACCESSORIES.map(([key,label])=>{
+      const wasDelivered = v.accessories&&v.accessories.includes(label);
+      return `<label style="display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid ${wasDelivered?'var(--green)':'var(--border)'};border-radius:var(--radius);background:${wasDelivered?'var(--green-bg)':'var(--bg2)'};cursor:pointer;font-size:12px">
+        <input type="checkbox" id="ret-acc-${key}" ${wasDelivered?'checked':''} style="width:14px;height:14px;accent-color:var(--teal)">
+        <span>${label}${wasDelivered?' <i class="ti ti-check" style="color:var(--green);font-size:10px"></i>':''}</span>
+      </label>`;
+    }).join('')+
+    `</div>`+
+
+    `<div class="form-row full" style="margin-bottom:14px"><div class="field"><label>ملاحظات / وصف الأضرار أو التجاوزات</label><textarea id="ret-notes" rows="2" placeholder="اذكر أي ملاحظات على حالة المركبة أو ملحقاتها عند الاسترجاع..."></textarea></div></div>`+
+
+    '<div class="form-section">توقيع الموظف عند التسليم</div>'+
+    `<div style="border:1.5px dashed var(--border);border-radius:var(--radius);padding:8px;background:var(--bg);margin-bottom:6px">
+      <canvas id="ret-sign-canvas" width="500" height="120" style="width:100%;height:120px;background:#fff;border-radius:6px;cursor:crosshair;touch-action:none;display:block"></canvas>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+      <span style="font-size:11px;color:var(--text3)"><i class="ti ti-signature"></i> توقيع الموظف على إتمام استرجاع المركبة</span>
+      <button type="button" onclick="clearRetSignature()" style="font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);cursor:pointer;font-family:var(--font)"><i class="ti ti-eraser"></i> مسح</button>
+    </div>`;
+
+  document.getElementById('modal-save-btn').className='btn-save';
+  document.getElementById('modal-save-btn').style.background='var(--teal)';
+  document.getElementById('modal-save-btn').textContent='تأكيد الاسترجاع';
+  document.getElementById('modal-save-btn').onclick=()=>saveVehicleReturn(id,v,asset);
+  document.getElementById('modal-box').className='modal wide';
+  document.getElementById('modal-overlay').classList.add('show');
+  setTimeout(()=>initRetSignaturePad(),100);
+}
+
+function updateRetFuelLabel(val){
+  const labels=['فارغ','ربع','نصف','ثلاثة أرباع','ممتلئ'];
+  const el=document.getElementById('ret-fuel-label');
+  if(el) el.textContent=labels[parseInt(val)]||'ممتلئ';
+}
+
+let _retSignCtx=null,_retSignDrawing=false,_retSignHasContent=false;
+function initRetSignaturePad(){
+  const canvas=document.getElementById('ret-sign-canvas');
+  if(!canvas) return;
+  const ratio=window.devicePixelRatio||1;
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=(rect.width||500)*ratio; canvas.height=120*ratio;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(ratio,ratio);
+  ctx.lineWidth=2; ctx.lineCap='round'; ctx.strokeStyle='#0E1D3A';
+  _retSignCtx=ctx; _retSignHasContent=false;
+  let last=null;
+  const pos=e=>{const r=canvas.getBoundingClientRect();return{x:(e.touches?e.touches[0].clientX:e.clientX)-r.left,y:(e.touches?e.touches[0].clientY:e.clientY)-r.top}};
+  canvas.onmousedown=e=>{e.preventDefault();_retSignDrawing=true;last=pos(e)};
+  canvas.onmousemove=e=>{if(!_retSignDrawing)return;e.preventDefault();const p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;_retSignHasContent=true};
+  window.addEventListener('mouseup',()=>_retSignDrawing=false);
+  canvas.ontouchstart=e=>{e.preventDefault();_retSignDrawing=true;last=pos(e)};
+  canvas.ontouchmove=e=>{if(!_retSignDrawing)return;e.preventDefault();const p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;_retSignHasContent=true};
+  canvas.ontouchend=()=>_retSignDrawing=false;
+}
+function clearRetSignature(){if(!_retSignCtx)return;const c=document.getElementById('ret-sign-canvas');if(c)_retSignCtx.clearRect(0,0,c.width,c.height);_retSignHasContent=false;}
+function getRetSignatureData(){const c=document.getElementById('ret-sign-canvas');if(!c||!_retSignHasContent)return '';try{return c.toDataURL('image/png');}catch(e){return '';}}
+
+async function saveVehicleReturn(id,v,asset){
+  const retOdometer=document.getElementById('ret-odometer').value;
+  const retReceiver=document.getElementById('ret-receiver').value.trim();
+  const retDate=document.getElementById('ret-date').value;
+  const retTime=document.getElementById('ret-time').value;
+  if(!retDate){showToast('يرجى إدخال تاريخ الاسترجاع','error');return;}
+  if(!retReceiver){showToast('يرجى إدخال اسم المستلم','error');return;}
+  if(retOdometer===''||isNaN(parseFloat(retOdometer))||parseFloat(retOdometer)<0){showToast('يرجى إدخال عداد الكيلومترات','error');return;}
+  const fuelLabels=['فارغ','ربع','نصف','ثلاثة أرباع','ممتلئ'];
+  const retAccs=[];
+  VD_ACCESSORIES.forEach(([key,label])=>{const cb=document.getElementById('ret-acc-'+key);if(cb&&cb.checked)retAccs.push(label);});
+  const retSignature=getRetSignatureData();
+  const retOdoNum=parseFloat(retOdometer);
+  const kmUsed=v.odometer!=null?(retOdoNum-Number(v.odometer)):null;
+  const updates={
+    status:'مُرتجعة',
+    returnedAt:retDate+'T'+retTime,
+    returnedBy:retReceiver,
+    returnOdometer:retOdoNum,
+    returnFuelLevel:fuelLabels[parseInt(document.getElementById('ret-fuel').value)]||'ممتلئ',
+    returnCondition:document.getElementById('ret-condition').value,
+    returnViolation:document.getElementById('ret-violation').value,
+    returnNotes:document.getElementById('ret-notes').value.trim(),
+    returnAccessories:retAccs,
+    returnSignature:retSignature,
+    kmUsed:kmUsed!=null&&kmUsed>=0?kmUsed:null,
+  };
   try{
     await waitForFirebase();
-    const {doc:docRef, updateDoc:upd} = window.fsApi;
-    const a = getAssets().find(x=>x._id===v.assetId);
-    if (a) {
-      const newAvail = (a.availableQty||0) + 1;
-      const newClient = Math.max(0,(a.clientQty||0) - 1);
-      await upd(docRef(window.db,"assets",a._id), {
-        availableQty:newAvail, clientQty:newClient,
-        status: newAvail>0 ? 'متاح' : a.status
-      });
+    const {doc:docRef,updateDoc:upd}=window.fsApi;
+    const a=getAssets().find(x=>x._id===v.assetId);
+    if(a){
+      const newAvail=(a.availableQty||0)+1;
+      const newClient=Math.max(0,(a.clientQty||0)-1);
+      await upd(docRef(window.db,'assets',a._id),{availableQty:newAvail,clientQty:newClient,status:newAvail>0?'متاح':a.status});
     }
-    await upd(docRef(window.db,"vehicleDeliveries",id), {
-      status:'مُرتجعة', returnedAt:new Date().toISOString(), returnedBy:currentUser?.name||''
-    });
-    logAudit('handover','استرجاع مركبة',`${v.assetName||''} [${v.assetCode||''}] — من الموظف: ${v.employeeName||''} — بواسطة ${currentUser?.name||''}`);
-    showToast('تم استرجاع المركبة وإعادتها متاحة في المخزون','success');
+    await upd(docRef(window.db,'vehicleDeliveries',id),updates);
+    logAudit('handover','استرجاع مركبة',`${v.assetName||''} [${v.assetCode||''}] — من: ${v.employeeName||''} — عداد: ${retOdoNum} كم${kmUsed!=null?' ('+kmUsed+' كم مُقطوعة)':''} — بواسطة: ${retReceiver}`);
+    showToast('تم استرجاع المركبة وتحديث سجل المخزون ✅','success');
+    closeModal();
     await window.reloadData();
-  }catch(e){ showToast('خطأ: '+e.message,'error'); }
+    // طباعة وثيقة الاسترجاع تلقائياً بعد الحفظ
+    setTimeout(()=>printVehicleReturnForm({...v,...updates,_id:id,asset}),500);
+  }catch(e){showToast('خطأ: '+e.message,'error');}
+}
+
+function printVehicleReturnForm(v){
+  const asset=v.asset||getAssets().find(a=>a._id===v.assetId)||{};
+  const cn=window._settings?.companyName||'نظام إدارة الأصول';
+  const logoUrl=window._settings?.logoUrl||'';
+  const logoHTML=logoUrl?`<img src="${logoUrl}" style="height:46px;max-width:90px;object-fit:contain;border-radius:5px">`:'';
+  const docNum=`VR-${v._id?v._id.slice(-6).toUpperCase():Date.now().toString().slice(-6)}`;
+  const retDate=v.returnedAt?(v.returnedAt.slice(0,10)+' '+(v.returnedAt.slice(11,16)||'')):'—';
+  const missingAccs=VD_ACCESSORIES.filter(([key,label])=>v.accessories&&v.accessories.includes(label)&&!(v.returnAccessories||[]).includes(label)).map(([,l])=>l);
+  const retAccHTML=(v.returnAccessories&&v.returnAccessories.length)?v.returnAccessories.map(x=>`<span style="display:inline-block;background:#D1FAE5;color:#065F46;padding:1px 7px;border-radius:100px;font-size:10px;font-weight:700;margin:2px">✓ ${x}</span>`).join(''):
+    '<span style="color:#9CA3AF;font-size:10px">لا يوجد</span>';
+  const missingHTML=missingAccs.length?missingAccs.map(x=>`<span style="display:inline-block;background:#FEE2E2;color:#991B1B;padding:1px 7px;border-radius:100px;font-size:10px;font-weight:700;margin:2px">✗ ${x}</span>`).join(''):'<span style="color:#065F46;font-size:10px;font-weight:700">✓ جميع الملحقات مستوفاة</span>';
+  const retSignHTML=v.returnSignature?`<img src="${v.returnSignature}" style="max-width:100%;max-height:50px">`:`<div style="border-top:1.5px dashed #9CA3AF;margin-top:24px;text-align:center;font-size:9px;color:#9CA3AF;padding-top:3px">التوقيع</div>`;
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+<title>وثيقة استرجاع مركبة — ${docNum}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Cairo',Arial,sans-serif;font-size:11px;direction:rtl;color:#0E1D3A;background:#fff}
+.page{width:210mm;min-height:297mm;margin:0 auto;padding:8mm 10mm;display:flex;flex-direction:column}
+.hdr{background:linear-gradient(135deg,#065F46,#10B981);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.hdr-co{color:#fff;font-size:15px;font-weight:800}
+.hdr-sub{color:rgba(255,255,255,.75);font-size:10px;margin-top:2px}
+.hdr-r{text-align:left;font-size:10px;color:rgba(255,255,255,.85);line-height:1.8}
+.hdr-r strong{color:#fff}
+.doc-title{text-align:center;font-size:13px;font-weight:800;color:#065F46;background:#D1FAE5;padding:6px;border-radius:5px;margin-bottom:8px}
+.sec{font-size:10px;font-weight:800;color:#065F46;border-right:3px solid #10B981;padding:3px 8px;background:#ECFDF5;border-radius:0 4px 4px 0;margin:7px 0 5px}
+table{width:100%;border-collapse:collapse;margin-bottom:6px}
+td{border:1px solid #A7F3D0;padding:5px 8px;font-size:11px}
+.lbl{background:#ECFDF5;font-weight:700;color:#065F46;width:22%}
+.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px}
+.sbox{border:1.5px solid #A7F3D0;border-radius:6px;padding:8px;min-height:80px}
+.stitle{font-weight:700;color:#065F46;font-size:10px;margin-bottom:4px}
+.km-box{background:#F0FDF4;border:2px solid #10B981;border-radius:8px;padding:10px;text-align:center;margin-bottom:6px}
+.footer{text-align:center;font-size:9px;color:#6B7280;border-top:1px solid #A7F3D0;padding:5px;margin-top:auto}
+@media print{.noprint{display:none!important}.page{padding:6mm 8mm}@page{size:A4 portrait;margin:0}}
+</style></head><body>
+<div class="page">
+  <div class="hdr">
+    <div style="display:flex;align-items:center;gap:10px">${logoHTML}<div><div class="hdr-co">${cn}</div><div class="hdr-sub">↩ وثيقة استرجاع مركبة</div></div></div>
+    <div class="hdr-r">
+      <div>رقم الوثيقة: <strong>${docNum}</strong></div>
+      <div>تاريخ الاسترجاع: <strong>${retDate}</strong></div>
+      <div>مرتبطة بتسليم: <strong>VD-${v._id?v._id.slice(-6).toUpperCase():'—'}</strong></div>
+    </div>
+  </div>
+  <div class="doc-title">↩ وثيقة استرجاع مركبة</div>
+
+  <div class="sec">🚘 بيانات المركبة</div>
+  <table>
+    <tr><td class="lbl">اسم المركبة</td><td style="font-weight:700">${v.assetName||asset.name||'—'}</td><td class="lbl">النوع / الفئة</td><td>${[asset.type,asset.subType].filter(Boolean).join(' — ')||'—'}</td></tr>
+    <tr><td class="lbl">رقم اللوحة</td><td style="font-weight:800;font-size:14px;color:#065F46">${v.plate||'—'}</td><td class="lbl">الشركة المصنعة</td><td>${asset.manufacturer||'—'}</td></tr>
+    ${asset.vinNumber?`<tr><td class="lbl">رقم الهيكل VIN</td><td colspan="3" style="font-family:monospace;font-weight:700;letter-spacing:1px">${asset.vinNumber}</td></tr>`:''}
+  </table>
+
+  <div class="sec">👤 بيانات الموظف المُسلِّم</div>
+  <table>
+    <tr><td class="lbl">الاسم</td><td style="font-weight:700">${v.employeeName||'—'}</td><td class="lbl">الرقم الوظيفي</td><td>${v.employeeJobId||'—'}</td></tr>
+    <tr><td class="lbl">القسم</td><td>${v.department||'—'}</td><td class="lbl">تاريخ التسليم</td><td>${v.date||'—'} ${v.time||''}</td></tr>
+  </table>
+
+  <div class="km-box">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div><div style="font-size:9px;color:#6B7280;margin-bottom:2px">عداد وقت التسليم</div><div style="font-size:16px;font-weight:800;color:#065F46">${v.odometer!=null?Number(v.odometer).toLocaleString('ar-SA'):'—'} <span style="font-size:10px">كم</span></div></div>
+      <div><div style="font-size:9px;color:#6B7280;margin-bottom:2px">عداد وقت الاسترجاع</div><div style="font-size:16px;font-weight:800;color:#065F46">${v.returnOdometer!=null?Number(v.returnOdometer).toLocaleString('ar-SA'):'—'} <span style="font-size:10px">كم</span></div></div>
+      <div><div style="font-size:9px;color:#6B7280;margin-bottom:2px">إجمالي المسافة المقطوعة</div><div style="font-size:16px;font-weight:800;color:${v.kmUsed!=null&&v.kmUsed>500?'#DC2626':'#065F46'}">${v.kmUsed!=null?Number(v.kmUsed).toLocaleString('ar-SA'):'—'} <span style="font-size:10px">كم</span></div></div>
+    </div>
+  </div>
+
+  <div class="sec">📋 تفاصيل الاسترجاع</div>
+  <table>
+    <tr><td class="lbl">حالة المركبة</td><td>${v.returnCondition||'—'}</td><td class="lbl">مستوى الوقود</td><td>${v.returnFuelLevel||'—'}</td></tr>
+    <tr><td class="lbl">مخالفات / تجاوزات</td><td style="color:${v.returnViolation&&v.returnViolation!=='لا يوجد'?'#DC2626':'inherit'};font-weight:${v.returnViolation&&v.returnViolation!=='لا يوجد'?'700':'400'}">${v.returnViolation||'لا يوجد'}</td><td class="lbl">المستلم</td><td>${v.returnedBy||'—'}</td></tr>
+    ${v.returnNotes?`<tr><td class="lbl">ملاحظات</td><td colspan="3">${v.returnNotes}</td></tr>`:''}
+  </table>
+
+  <div class="sec">🧰 التحقق من الملحقات</div>
+  <div style="padding:5px 4px;margin-bottom:6px">
+    <div style="margin-bottom:4px"><strong style="font-size:10px;color:#065F46">مُستُرجع:</strong> ${retAccHTML}</div>
+    <div><strong style="font-size:10px;color:#991B1B">مفقود / غير مُعاد:</strong> ${missingHTML}</div>
+  </div>
+
+  <div class="sec">✍️ التوقيعات</div>
+  <div class="sign-grid">
+    <div class="sbox">
+      <div class="stitle">✍ توقيع الموظف المُسلِّم</div>
+      <div style="font-size:9px;color:#6B7280;margin-bottom:3px">الاسم: ${v.employeeName||'—'}</div>
+      ${retSignHTML}
+    </div>
+    <div class="sbox">
+      <div class="stitle">✍ مستلم المركبة</div>
+      <div style="font-size:9px;color:#6B7280;margin-bottom:3px">الاسم: ${v.returnedBy||'—'}</div>
+      <div style="border-top:1.5px dashed #A7F3D0;margin-top:24px;text-align:center;font-size:9px;color:#6B7280;padding-top:3px">التوقيع / الختم</div>
+    </div>
+    <div class="sbox">
+      <div class="stitle">✍ مدير القسم</div>
+      <div style="font-size:9px;color:#6B7280;margin-bottom:3px">القسم: ${v.department||'—'}</div>
+      <div style="border-top:1.5px dashed #A7F3D0;margin-top:24px;text-align:center;font-size:9px;color:#6B7280;padding-top:3px">التوقيع / الختم</div>
+    </div>
+  </div>
+
+  <div class="footer">${cn} | وثيقة استرجاع مركبة | ${retDate} | ${docNum}</div>
+</div>
+<div class="noprint" style="text-align:center;padding:16px;display:flex;gap:10px;justify-content:center">
+  <button onclick="window.print()" style="padding:9px 28px;background:linear-gradient(135deg,#065F46,#10B981);color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700">🖨️ طباعة</button>
+  <button onclick="window.close()" style="padding:9px 18px;background:#6B7280;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px">✕ إغلاق</button>
+</div>
+</body></html>`);
+  win.document.close();
 }
 
 function filterVehicleDeliveries() {
@@ -6693,7 +6963,7 @@ function renderVehicleDeliveryRows(list) {
     '<td>'+(isActive?'<span class="badge" style="background:var(--blue-bg);color:var(--blue)"><i class="ti ti-car"></i> مع الموظف</span>':'<span class="badge badge-gray"><i class="ti ti-corner-up-left"></i> مُرتجعة</span>')+'</td>'+
     '<td style="white-space:nowrap">'+
       '<button class="btn-action info" onclick="printVehicleDeliveryForm(\''+v._id+'\')" title="طباعة نموذج التسليم"><i class="ti ti-printer"></i></button>'+
-      (isActive&&can('vehicle_delivery')?'<button class="btn-action success" onclick="returnVehicleDelivery(\''+v._id+'\')" title="استرجاع المركبة وإعادتها متاحة"><i class="ti ti-corner-up-left"></i></button>':'')+
+      (isActive&&can('vehicle_return')?'<button class="btn-action success" onclick="returnVehicleDelivery(\''+v._id+'\')" title="استرجاع المركبة"><i class="ti ti-corner-up-left"></i></button>':'')+
       (can('vehicle_delivery')?'<button class="btn-action danger" onclick="deleteVehicleDelivery(\''+v._id+'\')" title="حذف"><i class="ti ti-trash"></i></button>':'')+
     '</td></tr>';
   }).join('');
@@ -6717,120 +6987,285 @@ function printVehicleDeliveryForm(vid) {
   const asset=getAssets().find(a=>a._id===v.assetId)||{};
   const cn=window._settings?.companyName||'شركة ثمار القمة المحدودة';
   const logoUrl=window._settings?.logoUrl||'';
-  const logoHTML=logoUrl?'<img src="'+logoUrl+'" style="height:56px;max-width:110px;object-fit:contain;border-radius:6px" alt="logo">':'';
+  const logoHTML=logoUrl?`<img src="${logoUrl}" style="height:46px;max-width:90px;object-fit:contain;border-radius:5px">`:'';
   const assetCode=asset.code||v.assetCode||'';
-  const barcodeHTML=makeBarcodeHTML(assetCode,160,52);
+  const barcodeHTML=makeBarcodeHTML(assetCode,130,40);
+  const docNum=`VD-${v._id?v._id.slice(-6).toUpperCase():Date.now().toString().slice(-6)}`;
+  const accessoriesHTML=(v.accessories&&v.accessories.length)
+    ?v.accessories.map(x=>`<span style="display:inline-block;background:#D1FAE5;color:#065F46;padding:1px 7px;border-radius:100px;font-size:10px;font-weight:700;margin:2px">✓ ${x}</span>`).join('')
+    :'<span style="color:#9CA3AF;font-size:11px">لا توجد ملحقات مسجلة</span>';
+  const signHTML=v.signature?`<img src="${v.signature}" style="max-width:100%;max-height:55px">`:`<div style="border-top:1.5px dashed #C0A0E0;margin-top:28px;text-align:center;font-size:10px;color:#8B6FB5;padding-top:4px">التوقيع</div>`;
+  const isReturned=v.status==='مُرتجعة';
 
-  const accessoriesHTML = (v.accessories&&v.accessories.length)
-    ? v.accessories.map(x=>'<span class="badge" style="background:#D1FAE5;color:#065F46;margin:2px;display:inline-block">✓ '+x+'</span>').join('')
-    : '<span style="color:#999">لا توجد ملحقات مسجلة</span>';
-
-  const signatureHTML = v.signature
-    ? '<img src="'+v.signature+'" style="max-width:100%;max-height:70px">'
-    : '<div class="sline">التوقيع</div>';
-
-  const win=window.open('', '_blank');
+  const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
-<title>نموذج تسليم مركبة - ${v.assetName}</title>
+<title>وثيقة تسليم مركبة — ${docNum}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Cairo',Arial,sans-serif;font-size:13px;direction:rtl;color:#0E1D3A;background:#F4F1FB;padding:20px}
-  .doc{background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(124,58,237,.12);overflow:hidden;max-width:820px;margin:0 auto}
-  .hdr{background:linear-gradient(135deg,#5B21B6 0%,#7C3AED 100%);padding:18px 24px;display:flex;justify-content:space-between;align-items:center}
-  .hdr-co{color:#fff;font-size:18px;font-weight:800}
-  .hdr-sub{color:rgba(255,255,255,.75);font-size:12px;margin-top:3px}
-  .hdr-meta{text-align:left;font-size:12px;color:rgba(255,255,255,.85);line-height:1.9}
-  .hdr-meta strong{color:#fff}
-  .doc-title{text-align:center;font-size:15px;font-weight:800;color:#5B21B6;background:#EDE4FB;padding:10px;border-top:3px solid #C0A0E0}
-  .body{padding:20px 24px}
-  .section{font-size:12px;font-weight:800;color:#5B21B6;border-right:4px solid #5B21B6;padding:4px 10px;margin:16px 0 10px;background:#F4F1FB;border-radius:0 4px 4px 0;display:flex;align-items:center;gap:6px}
-  table{width:100%;border-collapse:collapse}
-  .lbl{background:#F4F1FB;font-weight:700;color:#5B21B6;width:25%;font-size:12px}
-  td{border:1px solid #DCC8F0;padding:8px 12px}
-  .asset-bar{display:flex;gap:20px;align-items:flex-start;background:#FAF8FE;border:1px solid #EDE4FB;border-radius:8px;padding:14px;margin-bottom:16px}
-  .asset-bar-info{flex:1}
-  .asset-bar-code{border-right:2px solid #EDE4FB;padding-right:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
-  .sign{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}
-  .sbox{border:1.5px solid #DCC8F0;border-radius:8px;padding:14px;min-height:110px}
-  .stitle{font-weight:700;color:#5B21B6;margin-bottom:8px;font-size:13px;display:flex;align-items:center;gap:6px}
-  .sline{border-top:2px dashed #C0A0E0;margin-top:36px;padding-top:5px;font-size:11px;color:#8B6FB5;text-align:center}
-  .footer{text-align:center;font-size:11px;color:#8B6FB5;border-top:1px solid #DCC8F0;padding:12px;background:#FAF8FE;margin-top:20px}
-  .badge{display:inline-block;padding:2px 10px;border-radius:100px;font-size:11px;font-weight:700}
-  @media print{.noprint{display:none!important}body{background:#fff;padding:0}.doc{box-shadow:none;border-radius:0}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Cairo',Arial,sans-serif;font-size:11px;direction:rtl;color:#0E1D3A;background:#fff}
+.page{width:210mm;min-height:297mm;margin:0 auto;padding:8mm 10mm;display:flex;flex-direction:column}
+.hdr{background:linear-gradient(135deg,#5B21B6,#7C3AED);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.hdr-co{color:#fff;font-size:15px;font-weight:800}
+.hdr-sub{color:rgba(255,255,255,.75);font-size:10px;margin-top:2px}
+.hdr-r{text-align:left;font-size:10px;color:rgba(255,255,255,.85);line-height:1.8}
+.hdr-r strong{color:#fff}
+.doc-title{text-align:center;font-size:13px;font-weight:800;color:#5B21B6;background:#EDE4FB;padding:6px;border-radius:5px;margin-bottom:8px;letter-spacing:.5px}
+.sec{font-size:10px;font-weight:800;color:#5B21B6;border-right:3px solid #7C3AED;padding:3px 8px;background:#F5F3FF;border-radius:0 4px 4px 0;margin:7px 0 5px;display:flex;align-items:center;gap:5px}
+table{width:100%;border-collapse:collapse;margin-bottom:6px}
+td{border:1px solid #DDD6FE;padding:5px 8px;font-size:11px}
+.lbl{background:#F5F3FF;font-weight:700;color:#5B21B6;width:22%}
+.asset-bar{display:flex;gap:12px;background:#FAF8FE;border:1px solid #EDE9FE;border-radius:6px;padding:8px;margin-bottom:6px}
+.bc-wrap{border-right:1.5px solid #EDE9FE;padding-right:12px;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:140px}
+.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px;flex:1}
+.sbox{border:1.5px solid #DDD6FE;border-radius:6px;padding:8px;min-height:80px}
+.stitle{font-weight:700;color:#5B21B6;font-size:10px;margin-bottom:4px}
+.badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:700}
+.footer{text-align:center;font-size:9px;color:#8B6FB5;border-top:1px solid #EDE9FE;padding:5px;margin-top:auto}
+@media print{
+  body{background:#fff}
+  .noprint{display:none!important}
+  .page{padding:6mm 8mm}
+  @page{size:A4 portrait;margin:0}
+}
 </style></head><body>
-<div class="doc">
+<div class="page">
+  <!-- الترويسة -->
   <div class="hdr">
-    <div style="display:flex;align-items:center;gap:14px">${logoHTML}<div><div class="hdr-co">${cn}</div><div class="hdr-sub">نموذج تسليم مركبة لموظف</div></div></div>
-    <div class="hdr-meta">
-      <div>رقم: <strong>VD-${v._id?v._id.slice(-6).toUpperCase():Date.now().toString().slice(-6)}</strong></div>
-      <div>التاريخ: <strong>${v.date||new Date().toISOString().slice(0,10)}</strong> ${v.time?'— '+v.time:''}</div>
+    <div style="display:flex;align-items:center;gap:10px">${logoHTML}<div><div class="hdr-co">${cn}</div><div class="hdr-sub">وثيقة تسليم مركبة لموظف</div></div></div>
+    <div class="hdr-r">
+      <div>رقم الوثيقة: <strong>${docNum}</strong></div>
+      <div>تاريخ التسليم: <strong>${v.date||'—'} ${v.time||''}</strong></div>
+      <div>الحالة: <strong>${isReturned?'↩ مُرتجعة':'🚗 مع الموظف'}</strong></div>
     </div>
   </div>
   <div class="doc-title">🚗 وثيقة تسليم مركبة</div>
-  <div class="body">
 
-    <div class="section">🚘 بيانات المركبة</div>
-    <div class="asset-bar">
-      <div class="asset-bar-code">
-        ${barcodeHTML || '<div style="color:#aaa;font-size:12px">لا يوجد كود</div>'}
-        <div style="font-size:10px;color:#8B6FB5;margin-top:4px">باركود المركبة</div>
-      </div>
-      <div class="asset-bar-info">
-        <table>
-          <tr><td class="lbl">اسم المركبة</td><td style="font-weight:700">${v.assetName||asset.name||'—'}</td><td class="lbl">النوع</td><td>${asset.type||v.assetType||'—'}</td></tr>
-          <tr><td class="lbl">رقم اللوحة</td><td style="font-weight:800;font-size:15px;color:#5B21B6">${v.plate||'—'}</td><td class="lbl">الموديل/الفئة</td><td>${asset.subType||v.assetSubType||'—'}</td></tr>
-          ${(v.vinNumber||asset.vinNumber)?'<tr><td class="lbl">رقم الهيكل / VIN</td><td colspan="3" style="font-family:monospace;font-weight:700;letter-spacing:1px">'+(v.vinNumber||asset.vinNumber||'—')+'</td></tr>':''}
-        </table>
-      </div>
+  <!-- بيانات المركبة -->
+  <div class="sec">🚘 بيانات المركبة</div>
+  <div class="asset-bar">
+    <div class="bc-wrap">
+      ${barcodeHTML||'<div style="color:#aaa;font-size:10px;padding:10px">لا يوجد كود</div>'}
+      <div style="font-size:9px;color:#8B6FB5">باركود المركبة</div>
     </div>
-
-    <div class="section">👤 بيانات الموظف المستلم</div>
-    <table style="margin-bottom:16px">
-      <tr><td class="lbl">الاسم</td><td style="font-weight:700;font-size:14px">${v.employeeName}</td><td class="lbl">الرقم الوظيفي</td><td>${v.employeeJobId||'—'}</td></tr>
-      <tr><td class="lbl">القسم / الإدارة</td><td>${v.department||'—'}</td><td class="lbl">رقم الجوال</td><td>${v.phone||'—'}</td></tr>
-    </table>
-
-    <div class="section">📋 تفاصيل التسليم</div>
-    <table style="margin-bottom:16px">
-      <tr>
-        <td class="lbl">عداد الكيلومترات</td><td style="font-weight:800;font-size:15px">${v.odometer!=null?Number(v.odometer).toLocaleString('ar-SA'):'—'} كم</td>
-        <td class="lbl">مستوى الوقود</td><td>${v.fuelLevel||'—'}</td>
-      </tr>
-      <tr>
-        <td class="lbl">حالة المركبة</td><td>${v.condition||'—'}</td>
-        <td class="lbl">المسؤول عن التسليم</td><td>${v.responsible||'—'}</td>
-      </tr>
-      <tr>
-        <td class="lbl">حالة التسليم الحالية</td><td colspan="3">${(v.status&&v.status!=='مُرتجعة') ? '<span style="background:#DBEAFE;color:#1C3F8A;padding:2px 10px;border-radius:100px;font-weight:700">🚗 المركبة حالياً مع الموظف</span>' : '<span style="background:#E5E7EB;color:#374151;padding:2px 10px;border-radius:100px;font-weight:700">↩ تم استرجاع المركبة'+(v.returnedAt?' بتاريخ '+v.returnedAt.slice(0,10):'')+'</span>'}</td>
-      </tr>
-      ${v.notes ? '<tr><td class="lbl">ملاحظات</td><td colspan="3">'+v.notes+'</td></tr>' : ''}
-    </table>
-
-    <div class="section">🧰 الملحقات المرفقة</div>
-    <div style="margin-bottom:16px">${accessoriesHTML}</div>
-
-    <div class="section">✍️ التوقيعات</div>
-    <div class="sign">
-      <div class="sbox">
-        <div class="stitle">✍ توقيع المُسلِّم</div>
-        <div style="font-size:12px;color:#8B6FB5">الاسم: ${v.responsible||'—'}</div>
-        <div class="sline">التوقيع / الختم</div>
-      </div>
-      <div class="sbox">
-        <div class="stitle">✍ توقيع الموظف المستلم</div>
-        <div style="font-size:12px;color:#8B6FB5;margin-bottom:6px">الاسم: ${v.employeeName}</div>
-        ${signatureHTML}
-      </div>
+    <div style="flex:1">
+      <table>
+        <tr><td class="lbl">اسم المركبة</td><td style="font-weight:700">${v.assetName||asset.name||'—'}</td><td class="lbl">النوع / الفئة</td><td>${[asset.type,asset.subType].filter(Boolean).join(' — ')||'—'}</td></tr>
+        <tr><td class="lbl">رقم اللوحة</td><td style="font-weight:800;font-size:14px;color:#5B21B6">${v.plate||'—'}</td><td class="lbl">الشركة المصنعة</td><td>${asset.manufacturer||v.assetSubType||'—'}</td></tr>
+        ${(v.vinNumber||asset.vinNumber)?`<tr><td class="lbl">رقم الهيكل VIN</td><td colspan="3" style="font-family:monospace;font-weight:700;font-size:11px;letter-spacing:1px">${v.vinNumber||asset.vinNumber}</td></tr>`:''}
+      </table>
     </div>
-
   </div>
-  <div class="footer">${cn} | نظام إدارة الأصول | ${new Date().toLocaleDateString('ar-SA')}</div>
+
+  <!-- بيانات الموظف -->
+  <div class="sec">👤 بيانات الموظف المستلم</div>
+  <table>
+    <tr><td class="lbl">الاسم الكامل</td><td style="font-weight:700;font-size:13px">${v.employeeName||'—'}</td><td class="lbl">الرقم الوظيفي</td><td>${v.employeeJobId||'—'}</td></tr>
+    <tr><td class="lbl">القسم / الإدارة</td><td>${v.department||'—'}</td><td class="lbl">رقم الجوال</td><td>${v.phone||'—'}</td></tr>
+  </table>
+
+  <!-- تفاصيل التسليم -->
+  <div class="sec">📋 تفاصيل التسليم</div>
+  <table>
+    <tr>
+      <td class="lbl">عداد الكيلومترات</td><td style="font-weight:800;font-size:13px">${v.odometer!=null?Number(v.odometer).toLocaleString('ar-SA'):'—'} كم</td>
+      <td class="lbl">مستوى الوقود</td><td>${v.fuelLevel||'—'}</td>
+    </tr>
+    <tr>
+      <td class="lbl">حالة المركبة</td><td>${v.condition||'—'}</td>
+      <td class="lbl">المسؤول</td><td>${v.responsible||'—'}</td>
+    </tr>
+    ${isReturned?`<tr><td class="lbl">تاريخ الاسترجاع</td><td>${v.returnedAt?v.returnedAt.slice(0,10):'—'}</td><td class="lbl">استُرجعت بواسطة</td><td>${v.returnedBy||'—'}</td></tr>`:''}
+    ${v.notes?`<tr><td class="lbl">ملاحظات</td><td colspan="3">${v.notes}</td></tr>`:''}
+  </table>
+
+  <!-- الملحقات -->
+  <div class="sec">🧰 الملحقات</div>
+  <div style="padding:6px 4px;margin-bottom:6px">${accessoriesHTML}</div>
+
+  <!-- التوقيعات -->
+  <div class="sec">✍️ التوقيعات والإقرار</div>
+  <div style="font-size:10px;color:#6B7280;margin-bottom:6px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:4px;padding:5px 8px">
+    أقرّ الموظف المستلم باستلام المركبة المذكورة أعلاه بالحالة الموصوفة وبجميع ملحقاتها، وأنه مسؤول عنها حتى إعادتها.
+  </div>
+  <div class="sign-grid">
+    <div class="sbox">
+      <div class="stitle">✍ مسؤول التسليم</div>
+      <div style="font-size:10px;color:#8B6FB5;margin-bottom:4px">الاسم: ${v.responsible||'—'}</div>
+      <div style="border-top:1.5px dashed #C0A0E0;margin-top:24px;text-align:center;font-size:9px;color:#8B6FB5;padding-top:3px">التوقيع / الختم</div>
+    </div>
+    <div class="sbox">
+      <div class="stitle">✍ الموظف المستلم</div>
+      <div style="font-size:10px;color:#8B6FB5;margin-bottom:4px">الاسم: ${v.employeeName||'—'}</div>
+      ${signHTML}
+    </div>
+    <div class="sbox">
+      <div class="stitle">✍ مدير القسم / الإدارة</div>
+      <div style="font-size:10px;color:#8B6FB5;margin-bottom:4px">القسم: ${v.department||'—'}</div>
+      <div style="border-top:1.5px dashed #C0A0E0;margin-top:24px;text-align:center;font-size:9px;color:#8B6FB5;padding-top:3px">التوقيع / الختم</div>
+    </div>
+  </div>
+
+  <div class="footer">${cn} | نظام إدارة الأصول | ${new Date().toLocaleDateString('ar-SA')} | ${docNum}</div>
 </div>
-<div class="noprint" style="text-align:center;margin:20px 0">
-  <button onclick="window.print()" style="padding:10px 32px;background:#5B21B6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;margin-left:10px">🖨️ طباعة</button>
+<div class="noprint" style="text-align:center;padding:16px;display:flex;gap:10px;justify-content:center">
+  <button onclick="window.print()" style="padding:9px 28px;background:#5B21B6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700">🖨️ طباعة</button>
+  <button onclick="window.close()" style="padding:9px 18px;background:#6B7280;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px">✕ إغلاق</button>
+</div>
+</body></html>`);
+  win.document.close();
+}
+
+/* ═══════════════════════════════════════════════════
+   🚗 تقرير تسليم المركبات الشامل — صفحة واحدة
+═══════════════════════════════════════════════════ */
+function printVehicleDeliveryReport() {
+  const all = getVehicleDeliveries().slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const cn = window._settings?.companyName || 'نظام إدارة الأصول';
+  const logoUrl = window._settings?.logoUrl || '';
+  const logoHTML = logoUrl ? `<img src="${logoUrl}" style="height:52px;max-width:100px;object-fit:contain;border-radius:6px">` : '';
+  const today = new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
+
+  // إحصائيات سريعة
+  const totalDeliveries = all.length;
+  const active   = all.filter(v=>v.status!=='مُرتجعة').length;
+  const returned = all.filter(v=>v.status==='مُرتجعة').length;
+  const vehicles = [...new Set(all.map(v=>v.assetId))].length;
+  const employees= [...new Set(all.map(v=>v.employeeName).filter(Boolean))].length;
+
+  // جدول المركبات النشطة (حالياً مع موظف)
+  const activeRows = all.filter(v=>v.status!=='مُرتجعة');
+  const returnedRows = all.filter(v=>v.status==='مُرتجعة');
+
+  const rowStyle = 'border-bottom:1px solid #E5E7EF;font-size:11px';
+  const tdStyle = 'padding:7px 8px;vertical-align:middle';
+
+  function buildRows(rows) {
+    if (!rows.length) return '<tr><td colspan="9" style="text-align:center;color:#9CA3AF;padding:14px;font-size:12px">لا توجد سجلات</td></tr>';
+    return rows.map((v,i) => {
+      const asset = getAssets().find(a=>a._id===v.assetId)||{};
+      return `<tr style="${rowStyle}${i%2===0?';background:#FAFBFF':''}">
+        <td style="${tdStyle};text-align:center;color:#6B7280">${i+1}</td>
+        <td style="${tdStyle};font-weight:700">${v.assetName||'—'}<div style="font-size:9px;color:#9CA3AF;font-family:monospace">${v.assetCode||''}</div></td>
+        <td style="${tdStyle};text-align:center"><span style="background:#EDE9FE;color:#5B21B6;padding:2px 8px;border-radius:100px;font-weight:700;font-size:11px">${v.plate||'—'}</span></td>
+        <td style="${tdStyle}">${v.employeeName||'—'}<div style="font-size:9px;color:#9CA3AF">${v.employeeJobId||''}</div></td>
+        <td style="${tdStyle}">${v.department||'—'}</td>
+        <td style="${tdStyle};text-align:center;font-weight:700">${v.odometer!=null?Number(v.odometer).toLocaleString('ar-SA'):'—'}</td>
+        <td style="${tdStyle}">${v.fuelLevel||'—'}</td>
+        <td style="${tdStyle};text-align:center">${v.date||'—'}${v.time?'<div style="font-size:9px;color:#9CA3AF">'+v.time+'</div>':''}</td>
+        <td style="${tdStyle}">${v.responsible||'—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ملخص كل مركبة
+  const vehicleSummary = [...new Set(all.map(v=>v.assetId))].map(aid=>{
+    const asset = getAssets().find(a=>a._id===aid)||{};
+    const vRows = all.filter(v=>v.assetId===aid);
+    const act = vRows.filter(v=>v.status!=='مُرتجعة');
+    return `<tr style="${rowStyle}">
+      <td style="${tdStyle};font-weight:700">${asset.name||vRows[0]?.assetName||'—'}</td>
+      <td style="${tdStyle};text-align:center"><span style="background:#EDE9FE;color:#5B21B6;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:700">${asset.plateNumber||vRows[0]?.plate||'—'}</span></td>
+      <td style="${tdStyle};font-family:monospace;font-size:10px">${asset.vinNumber||'—'}</td>
+      <td style="${tdStyle};text-align:center;font-weight:700">${vRows.length}</td>
+      <td style="${tdStyle};text-align:center"><span style="background:${act.length?'#DBEAFE':'#D1FAE5'};color:${act.length?'#1D4ED8':'#065F46'};padding:2px 10px;border-radius:100px;font-size:11px;font-weight:700">${act.length?'مع موظف: '+act[0]?.employeeName:'متاحة'}</span></td>
+    </tr>`;
+  }).join('');
+
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head>
+<meta charset="UTF-8"><title>تقرير تسليم المركبات — ${cn}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Cairo',Arial,sans-serif;font-size:12px;direction:rtl;color:#0E1D3A;background:#fff;padding:18px}
+.hdr{background:linear-gradient(135deg,#3730A3 0%,#5B21B6 60%,#7C3AED 100%);border-radius:10px;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.hdr-co{color:#fff;font-size:19px;font-weight:800;letter-spacing:.3px}
+.hdr-sub{color:rgba(255,255,255,.75);font-size:11px;margin-top:3px}
+.hdr-right{text-align:left;color:rgba(255,255,255,.85);font-size:11px;line-height:2}
+.hdr-right strong{color:#fff}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.stat{background:#F5F3FF;border:1.5px solid #DDD6FE;border-radius:8px;padding:12px;text-align:center}
+.stat-val{font-size:22px;font-weight:800;color:#5B21B6}
+.stat-lbl{font-size:10px;color:#6B7280;margin-top:2px}
+.section{margin-bottom:16px}
+.sec-title{font-size:13px;font-weight:800;color:#5B21B6;border-right:4px solid #5B21B6;padding:5px 10px;background:#F5F3FF;border-radius:0 6px 6px 0;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+table{width:100%;border-collapse:collapse}
+th{background:linear-gradient(135deg,#5B21B6,#7C3AED);color:#fff;padding:8px;font-size:11px;font-weight:700;text-align:center}
+th:first-child{border-radius:0 6px 0 0}
+th:last-child{border-radius:6px 0 0 0}
+.badge-active{background:#DBEAFE;color:#1D4ED8;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:700}
+.badge-ret{background:#E5E7EB;color:#4B5563;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:700}
+.footer{text-align:center;font-size:10px;color:#9CA3AF;border-top:1px solid #E5E7EF;padding-top:10px;margin-top:16px}
+@media print{
+  body{padding:8px;font-size:10px}
+  .hdr{padding:12px 16px}
+  .stat-val{font-size:18px}
+  .noprint{display:none!important}
+  @page{size:A4 landscape;margin:10mm}
+}
+</style></head><body>
+
+<!-- الترويسة -->
+<div class="hdr">
+  <div style="display:flex;align-items:center;gap:14px">
+    ${logoHTML}
+    <div>
+      <div class="hdr-co">${cn}</div>
+      <div class="hdr-sub"><i>🚗</i> تقرير تسليم المركبات الشامل</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div>تاريخ التقرير: <strong>${today}</strong></div>
+    <div>أُعدَّ بواسطة: <strong>${window.currentUser?.name||'النظام'}</strong></div>
+    <div>إجمالي السجلات: <strong>${totalDeliveries}</strong></div>
+  </div>
+</div>
+
+<!-- الإحصائيات -->
+<div class="stats">
+  <div class="stat"><div class="stat-val">${totalDeliveries}</div><div class="stat-lbl">إجمالي عمليات التسليم</div></div>
+  <div class="stat"><div class="stat-val" style="color:#1D4ED8">${active}</div><div class="stat-lbl">مركبات مع موظفين حالياً</div></div>
+  <div class="stat"><div class="stat-val" style="color:#065F46">${returned}</div><div class="stat-lbl">تم استرجاعها</div></div>
+  <div class="stat"><div class="stat-val" style="color:#92400E">${vehicles}</div><div class="stat-lbl">عدد المركبات</div></div>
+  <div class="stat"><div class="stat-val" style="color:#6B21A8">${employees}</div><div class="stat-lbl">موظفون استلموا مركبة</div></div>
+</div>
+
+<!-- ملخص حالة كل مركبة -->
+<div class="section">
+  <div class="sec-title">🚘 ملخص حالة المركبات</div>
+  <table>
+    <thead><tr><th>اسم المركبة</th><th>رقم اللوحة</th><th>رقم الهيكل VIN</th><th>عدد التسليمات</th><th>الحالة الحالية</th></tr></thead>
+    <tbody>${vehicleSummary}</tbody>
+  </table>
+</div>
+
+<!-- المركبات النشطة -->
+<div class="section">
+  <div class="sec-title">🔵 المركبات حالياً مع موظفين (${activeRows.length})</div>
+  <table>
+    <thead><tr><th>#</th><th>المركبة</th><th>رقم اللوحة</th><th>الموظف المستلم</th><th>القسم</th><th>عداد الكم</th><th>الوقود</th><th>تاريخ التسليم</th><th>المسؤول</th></tr></thead>
+    <tbody>${buildRows(activeRows)}</tbody>
+  </table>
+</div>
+
+<!-- المركبات المسترجعة -->
+${returnedRows.length ? `
+<div class="section">
+  <div class="sec-title">✅ المركبات المسترجعة (${returnedRows.length})</div>
+  <table>
+    <thead><tr><th>#</th><th>المركبة</th><th>رقم اللوحة</th><th>الموظف المستلم</th><th>القسم</th><th>عداد الكم</th><th>الوقود</th><th>تاريخ التسليم</th><th>المسؤول</th></tr></thead>
+    <tbody>${buildRows(returnedRows)}</tbody>
+  </table>
+</div>` : ''}
+
+<div class="footer">${cn} | تقرير تسليم المركبات | ${today}</div>
+
+<div class="noprint" style="text-align:center;margin:20px 0;display:flex;gap:10px;justify-content:center">
+  <button onclick="window.print()" style="padding:10px 32px;background:linear-gradient(135deg,#5B21B6,#7C3AED);color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700">🖨️ طباعة التقرير</button>
   <button onclick="window.close()" style="padding:10px 20px;background:#6B7280;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:14px">✕ إغلاق</button>
 </div>
+
 </body></html>`);
   win.document.close();
 }
@@ -7447,6 +7882,11 @@ if(typeof filterVehicleDeliveries!=='undefined')window.filterVehicleDeliveries=f
 if(typeof renderVehicleDeliveries!=='undefined')window.renderVehicleDeliveries=renderVehicleDeliveries;
 if(typeof deleteVehicleDelivery!=='undefined')window.deleteVehicleDelivery=deleteVehicleDelivery;
 if(typeof printVehicleDeliveryForm!=='undefined')window.printVehicleDeliveryForm=printVehicleDeliveryForm;
+if(typeof printVehicleDeliveryReport!=='undefined')window.printVehicleDeliveryReport=printVehicleDeliveryReport;
+if(typeof printVehicleReturnForm!=='undefined')window.printVehicleReturnForm=printVehicleReturnForm;
+if(typeof saveVehicleReturn!=='undefined')window.saveVehicleReturn=saveVehicleReturn;
+if(typeof updateRetFuelLabel!=='undefined')window.updateRetFuelLabel=updateRetFuelLabel;
+if(typeof clearRetSignature!=='undefined')window.clearRetSignature=clearRetSignature;
 if(typeof getVehicleDeliveries!=='undefined')window.getVehicleDeliveries=getVehicleDeliveries;
 if(typeof refreshNotificationSourceData!=='undefined')window.refreshNotificationSourceData=refreshNotificationSourceData;
 if(typeof toggleVehiclePlateField!=='undefined')window.toggleVehiclePlateField=toggleVehiclePlateField;
