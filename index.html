@@ -1445,8 +1445,9 @@ try {
   await loadAllData();
   window._dataReady = true;
   console.log("✅ All data loaded. Users:", window.users?.length);
-  // تفعيل الاستماع اللحظي (Real-time) فور جاهزية البيانات حتى تصل الإشعارات لحظياً لكل مستخدم
-  try { setupNotificationRealtimeListeners(); } catch(e) { console.warn('realtime notif init:', e); }
+  // ملاحظة: تم الاستغناء عن الاستماع اللحظي onSnapshot لأنه يتعارض زمنياً مع نمط
+  // الإضافة المحلية الفورية المستخدم في دوال الحفظ (يسبب ظهور صف مكرر للحظات) — نعتمد بدلاً
+  // من ذلك على التحديث الدوري الآمن أدناه (refreshNotificationSourceData) كل 8 ثوانٍ
   try { refreshNotificationSourceData(); } catch(e) { console.warn('initial notif refresh:', e); }
 
   // Auto-restore session from localStorage
@@ -7068,7 +7069,6 @@ if(typeof deleteVehicleDelivery!=='undefined')window.deleteVehicleDelivery=delet
 if(typeof printVehicleDeliveryForm!=='undefined')window.printVehicleDeliveryForm=printVehicleDeliveryForm;
 if(typeof getVehicleDeliveries!=='undefined')window.getVehicleDeliveries=getVehicleDeliveries;
 if(typeof refreshNotificationSourceData!=='undefined')window.refreshNotificationSourceData=refreshNotificationSourceData;
-if(typeof setupNotificationRealtimeListeners!=='undefined')window.setupNotificationRealtimeListeners=setupNotificationRealtimeListeners;
 if(typeof toggleVehiclePlateField!=='undefined')window.toggleVehiclePlateField=toggleVehiclePlateField;
 if(typeof isValidPlateNumber!=='undefined')window.isValidPlateNumber=isValidPlateNumber;
 if(typeof checkPlateValidity!=='undefined')window.checkPlateValidity=checkPlateValidity;
@@ -7212,40 +7212,14 @@ document.addEventListener('click',function(e){
 });
 
 /* ════════════════════════════════════════
-   🔴 استماع لحظي (Real-time) لتحديث الإشعارات فور حدوثها
-   حتى تومض شارة الجرس بالأحمر لكل مستخدم يملك الصلاحية في نفس اللحظة،
-   دون الحاجة لفتح لوحة الإشعارات أو التنقل بين الصفحات أو انتظار التحديث الدوري
+   ملاحظة: تم الاستغناء عمداً عن آلية onSnapshot اللحظية هنا، لأنها كانت تتعارض
+   زمنياً مع نمط "الإضافة المحلية الفورية" المستخدم في دوال الحفظ بكل أنحاء النظام
+   (مثل: window.custodyRequests.push(rec) بعد كل حفظ) — حيث يصل تحديث onSnapshot
+   أحياناً في نفس اللحظة فيستبدل المصفوفة بنسخة من الخادم، ثم يضيف الحفظ المحلي
+   نسخة أخرى فوقها، فيظهر صف مكرر للحظات قبل أن يُصحَّح تلقائياً. الاعتماد الآن على
+   التحديث الدوري الآمن (refreshNotificationSourceData) أدناه فقط، وهو أبطأ قليلاً
+   لكنه لا يتعارض مع نفس اللحظة التي يتم فيها الحفظ المحلي
 ════════════════════════════════════════ */
-window._notifUnsubscribers = window._notifUnsubscribers || [];
-async function setupNotificationRealtimeListeners() {
-  try {
-    await waitForFirebase();
-    const { collection: col, onSnapshot: onSnap } = window.fsApi || {};
-    if (!onSnap) { console.warn('onSnapshot غير متوفر — سيتم الاعتماد على التحديث الدوري فقط'); return; }
-    // إيقاف أي اشتراكات سابقة لتفادي التكرار (مثلاً عند إعادة تسجيل الدخول)
-    window._notifUnsubscribers.forEach(unsub=>{ try{ unsub(); }catch(e){} });
-    window._notifUnsubscribers = [];
-
-    function watch(collName, applyFn, rerenderPageId, rerenderFn) {
-      const unsub = onSnap(col(window.db, collName), (snap)=>{
-        applyFn(snap.docs.map(d=>({...d.data(),_id:d.id})));
-        // تحديث فوري لشارة الجرس ووميضها لحظة وصول أي تغيير، لكل مستخدم يملك صلاحية الاطلاع
-        try { renderNotifications(); } catch(e){}
-        // تحديث الصفحة المعنية مباشرة إن كانت مفتوحة حالياً
-        try {
-          if (rerenderFn && document.getElementById(rerenderPageId)?.classList.contains('active')) rerenderFn();
-        } catch(e){}
-      }, (err)=>{ console.warn('onSnapshot('+collName+') error:', err.message); });
-      window._notifUnsubscribers.push(unsub);
-    }
-
-    watch('custodyRequests', rows=>{ window.custodyRequests = rows; }, 'page-custody', ()=>filterCustody());
-    watch('deptCustodyRequests', rows=>{ window.deptCustodyRequests = rows; }, 'page-dept-custody', ()=>filterDeptCustody());
-    watch('complaints', rows=>{ _complaints = rows; try{ localStorage.setItem('_complaints', JSON.stringify(_complaints)); }catch(e){} }, 'page-complaints', ()=>filterComplaints());
-
-    console.log('✅ الاستماع اللحظي للإشعارات مُفعَّل');
-  } catch(e) { console.warn('setupNotificationRealtimeListeners error:', e); }
-}
 
 /* جلب فعلي ومباشر لبيانات الإشعارات الثلاث من قاعدة البيانات (وليس مجرد إعادة رسم محلية) —
    هذه هي الضمانة الأكيدة لتحديث الإشعارات تلقائياً حتى لو تعذّر الاستماع اللحظي onSnapshot لأي سبب
