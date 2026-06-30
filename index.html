@@ -910,7 +910,7 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
         <div class="page-title">
           <span><i class="ti ti-car"></i> تسليم المركبات</span>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="export-btn export-btn-excel" onclick="exportTableExcel('vd-body','تسليم_المركبات',['#','المركبة','رقم اللوحة','الموظف المستلم','القسم','الكيلومترات','الوقود','تاريخ التسليم','المسؤول'])"><i class="ti ti-file-spreadsheet"></i> Excel</button>
+            <button class="export-btn export-btn-excel" onclick="exportTableExcel('vd-body','تسليم_المركبات',['#','المركبة','رقم اللوحة','الموظف المستلم','القسم','الكيلومترات','الوقود','تاريخ التسليم','المسؤول','الحالة'])"><i class="ti ti-file-spreadsheet"></i> Excel</button>
             <button class="add-btn" style="background:var(--purple)" onclick="openNewVehicleDelivery()"><i class="ti ti-car"></i> تسليم مركبة جديد</button>
           </div>
         </div>
@@ -925,7 +925,7 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
             </div>
           </div>
           <table>
-            <thead><tr><th>#</th><th>المركبة</th><th>رقم اللوحة</th><th>الموظف المستلم</th><th>القسم</th><th>عداد الكيلومترات</th><th>الوقود</th><th>تاريخ التسليم</th><th>المسؤول</th><th>إجراءات</th></tr></thead>
+            <thead><tr><th>#</th><th>المركبة</th><th>رقم اللوحة</th><th>الموظف المستلم</th><th>القسم</th><th>عداد الكيلومترات</th><th>الوقود</th><th>تاريخ التسليم</th><th>المسؤول</th><th>الحالة</th><th>إجراءات</th></tr></thead>
             <tbody id="vd-body"></tbody>
           </table>
         </div>
@@ -3609,7 +3609,7 @@ function renderAssetRows(list) {
     '<tr>'+
     '<td>'+(a.imageUrl?'<img src="'+a.imageUrl+'" class="asset-img" onclick="viewAssetImage(\''+a._id+'\')">':'<div class="asset-img-placeholder"><i class="ti ti-photo"></i></div>')+'</td>'+
     '<td><code class="tag">'+a.code+'</code></td>'+
-    '<td style="font-weight:600">'+a.name+(a.manufacturer?'<div style="font-size:10px;color:var(--text3)">'+a.manufacturer+'</div>':'')+'<div style="font-size:10px;color:var(--text3);margin-top:2px"><i class="ti ti-barcode" style="font-size:9px"></i> '+a.code+'</div></td>'+
+    '<td style="font-weight:600">'+a.name+(a.manufacturer?'<div style="font-size:10px;color:var(--text3)">'+a.manufacturer+'</div>':'')+(a.plateNumber?'<div style="font-size:10px;color:var(--purple);margin-top:2px"><i class="ti ti-id" style="font-size:9px"></i> لوحة: '+a.plateNumber+'</div>':'')+'<div style="font-size:10px;color:var(--text3);margin-top:2px"><i class="ti ti-barcode" style="font-size:9px"></i> '+a.code+'</div></td>'+
     '<td><span class="badge badge-blue">'+a.type+'</span></td>'+
     '<td>'+(a.subType?'<span class="badge badge-gray">'+a.subType+'</span>':'-')+(a.capacity?'<div style="font-size:10px;color:var(--text3)">'+a.capacity+'</div>':'')+'</td>'+
     '<td style="font-weight:700;text-align:center">'+a.totalQty+'</td>'+
@@ -3622,7 +3622,7 @@ function renderAssetRows(list) {
       (can('edit')?'<button class="btn-action" onclick="openEdit(\''+a._id+'\')" title="تعديل"><i class="ti ti-edit"></i></button>':'')+
       '<button class="btn-action" onclick="printAssetBarcode({_id:\''+a._id+'\',name:\''+a.name.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\',code:\''+a.code+'\',type:\''+a.type+'\',subType:\''+a.subType+'\'})" title="طباعة الباركود" style="color:var(--blue);border-color:var(--blue-light)"><i class="ti ti-barcode"></i></button>'+
       (can('handover')&&a.availableQty>0?'<button class="btn-action success" onclick="openHandoverFromAsset(\''+a._id+'\')" title="تسليم"><i class="ti ti-transfer"></i></button>':'')+
-      (can('vehicle_delivery')&&isVehicleAssetType(a.type)?'<button class="btn-action purple" onclick="openVehicleDeliveryFromAsset(\''+a._id+'\')" title="تسليم مركبة لموظف"><i class="ti ti-car"></i></button>':'')+
+      (can('vehicle_delivery')&&isVehicleAssetType(a.type)&&a.availableQty>0?'<button class="btn-action purple" onclick="openVehicleDeliveryFromAsset(\''+a._id+'\')" title="تسليم مركبة لموظف"><i class="ti ti-car"></i></button>':'')+
       (can('maintenance')&&a.availableQty>0?'<button class="btn-action purple" onclick="openMaintenanceFromAsset(\''+a._id+'\')" title="صيانة"><i class="ti ti-tool"></i></button>':'')+
       (can('dispose')&&a.totalQty>0?'<button class="btn-action danger" onclick="openDisposeFromAsset(\''+a._id+'\')" title="إتلاف"><i class="ti ti-trash"></i></button>':'')+
     '</td></tr>'
@@ -3653,7 +3653,7 @@ function openAddAsset() {
     document.getElementById('modal-save-btn').onclick = saveAsset;
     document.getElementById('modal-box').className = 'modal wide';
     document.getElementById('modal-overlay').classList.add('show');
-    setTimeout(()=>{ updateSubTypeOptions(); },100);
+    setTimeout(()=>{ updateSubTypeOptions(); toggleVehiclePlateField(); },100);
   } catch(e) {
     alert('خطأ في فتح نموذج إضافة أصل: ' + e.message);
     console.error('openAddAsset error:', e);
@@ -3671,7 +3671,7 @@ function openEdit(id) {
   document.getElementById('modal-save-btn').onclick = saveAsset;
   document.getElementById('modal-box').className = 'modal wide';
   document.getElementById('modal-overlay').classList.add('show');
-  setTimeout(()=>{ updateSubTypeOptions(a.subType); },100);
+  setTimeout(()=>{ updateSubTypeOptions(a.subType); toggleVehiclePlateField(); },100);
 }
 
 function assetForm(a) {
@@ -3690,8 +3690,15 @@ function assetForm(a) {
       '<div class="field"><label>الكود</label><input id="f-code" value="'+(a.code||'')+'" placeholder="يُولَّد تلقائياً"></div>'+
     '</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
-      '<div class="field"><label>النوع الرئيسي</label><select id="f-type" onchange="updateSubTypeOptions();autoFillAssetCode()">'+typeOpts+'</select></div>'+
+      '<div class="field"><label>النوع الرئيسي</label><select id="f-type" onchange="updateSubTypeOptions();autoFillAssetCode();toggleVehiclePlateField()">'+typeOpts+'</select></div>'+
       '<div class="field"><label>النوع الفرعي</label><select id="f-subtype"><option value="">-- اختر --</option></select></div>'+
+    '</div>'+
+    '<div class="form-row full" id="f-plate-wrap" style="display:none;margin-bottom:12px">'+
+      '<div class="field">'+
+        '<label><i class="ti ti-id"></i> رقم لوحة المركبة (3 أحرف + 3 أرقام)</label>'+
+        '<input id="f-plate" value="'+(a.plateNumber||'')+'" placeholder="مثال: أ ب ج 123" maxlength="20" oninput="checkPlateValidity(this)" style="text-align:center;font-weight:700;letter-spacing:1px">'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:4px">أدخل ثلاثة أحرف وثلاثة أرقام — سيُستخدم هذا الرقم تلقائياً عند تسليم المركبة لأحد الموظفين</div>'+
+      '</div>'+
     '</div>'+
     '<div class="form-section">خصائص الأصل</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
@@ -3753,6 +3760,13 @@ function previewAssetImage(input) {
 async function saveAsset() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { showToast('يرجى إدخال اسم الأصل','error'); return; }
+  const typeVal = document.getElementById('f-type').value;
+  let plateNumber = '';
+  if (isVehicleAssetType(typeVal)) {
+    plateNumber = (document.getElementById('f-plate')?.value||'').trim();
+    if (!plateNumber) { showToast('يرجى إدخال رقم لوحة المركبة','error'); return; }
+    if (!isValidPlateNumber(plateNumber)) { showToast('رقم اللوحة يجب أن يتكون من 3 أحرف و3 أرقام','error'); return; }
+  }
   const count = parseInt(document.getElementById('f-count').value)||1;
   const initStatus = document.getElementById('f-init-status').value||'متاح';
   let manufacturer = document.getElementById('f-manufacturer').value;
@@ -3769,9 +3783,10 @@ async function saveAsset() {
   const codeVal = document.getElementById('f-code').value || 'FR-'+Date.now().toString().slice(-6);
   const obj = {
     name, code:codeVal,
-    type: document.getElementById('f-type').value,
+    type: typeVal,
     subType: document.getElementById('f-subtype').value||'',
     manufacturer, capacity,
+    plateNumber,
     totalQty, availableQty, clientQty, maintenanceQty, damagedQty, disposedQty,
     status: initStatus,
     notes: document.getElementById('f-notes').value,
@@ -3829,6 +3844,29 @@ function promptPrintBarcode(asset) {
 /* ────────── VEHICLE TYPE DETECTION ────────── */
 function isVehicleAssetType(typeName) {
   return /مركب|سيار|شاحن/.test(typeName||'');
+}
+
+/* إظهار/إخفاء حقل رقم اللوحة في نموذج الأصل حسب النوع المختار */
+function toggleVehiclePlateField() {
+  const tp = document.getElementById('f-type')?.value;
+  const wrap = document.getElementById('f-plate-wrap');
+  if (!wrap) return;
+  wrap.style.display = isVehicleAssetType(tp) ? '' : 'none';
+}
+
+/* تحقق من صيغة رقم اللوحة: ثلاثة أحرف + ثلاثة أرقام */
+function isValidPlateNumber(str) {
+  const cleaned = (str||'').replace(/[\s\-]/g,'');
+  const letters = cleaned.match(/[A-Za-zأ-ي]/g)||[];
+  const digits = cleaned.match(/[0-9]/g)||[];
+  return letters.length===3 && digits.length===3 && (letters.length+digits.length)===cleaned.length;
+}
+
+/* تغذية راجعة بصرية فورية أثناء كتابة رقم اللوحة */
+function checkPlateValidity(input) {
+  if (!input) return;
+  if (!input.value.trim()) { input.style.borderColor=''; return; }
+  input.style.borderColor = isValidPlateNumber(input.value) ? 'var(--green)' : 'var(--red)';
 }
 
 function printAssetBarcode(asset) {
@@ -5987,11 +6025,11 @@ function openNewVehicleDelivery() { if (!can('vehicle_delivery')) { showToast('�
 function openVehicleDeliveryFromAsset(id) { if (!can('vehicle_delivery')) { showToast('ليس لديك صلاحية تسليم المركبات','error'); return; } openVehicleDeliveryModal(id); }
 
 function buildVehicleAssetOptions(preAssetId) {
-  const vehicles = getAssets().filter(a=>isVehicleAssetType(a.type));
+  const vehicles = getAssets().filter(a=>isVehicleAssetType(a.type) && (a.availableQty>0 || a._id===preAssetId));
   if (!vehicles.length) return '';
   return vehicles.map(a=>
-    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+' data-code="'+(a.code||'')+'" data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'">'+
-    a.name+' ['+(a.code||'')+']'+(a.subType?' - '+a.subType:'')+'</option>'
+    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+' data-code="'+(a.code||'')+'" data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-plate="'+(a.plateNumber||'')+'" data-avail="'+(a.availableQty||0)+'">'+
+    a.name+' ['+(a.code||'')+']'+(a.subType?' - '+a.subType:'')+(a.plateNumber?' — لوحة: '+a.plateNumber:'')+'</option>'
   ).join('');
 }
 
@@ -6008,7 +6046,7 @@ const VD_ACCESSORIES = [
 
 function openVehicleDeliveryModal(preAssetId) {
   const vehicleOpts = buildVehicleAssetOptions(preAssetId);
-  if (!vehicleOpts) { showToast('لا توجد أصول من نوع مركبات — أضف مركبة أولاً من سجل الأصول','error'); return; }
+  if (!vehicleOpts) { showToast('لا توجد مركبات متاحة للتسليم حالياً — إما لا توجد مركبات مسجلة أو جميعها مُسلَّمة بالفعل','error'); return; }
   const now = new Date();
   const todayDate = now.toISOString().slice(0,10);
   const nowTime = now.toTimeString().slice(0,5);
@@ -6017,7 +6055,7 @@ function openVehicleDeliveryModal(preAssetId) {
     '<div class="form-section" style="margin-top:0">بيانات المركبة</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
       '<div class="field"><label>المركبة *</label><select id="vd-asset" onchange="onVehicleDeliveryAssetChange()"><option value="">-- اختر المركبة --</option>'+vehicleOpts+'</select></div>'+
-      '<div class="field"><label>رقم اللوحة (حروف وأرقام) *</label><input id="vd-plate" placeholder="مثال: أ ب ج 1234"></div>'+
+      '<div class="field"><label>رقم اللوحة (مرتبط بالمركبة) *</label><input id="vd-plate" placeholder="مثال: أ ب ج 123" oninput="checkPlateValidity(this)"></div>'+
     '</div>'+
     '<div id="vd-asset-details" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-bottom:12px;font-size:12px;display:none"></div>'+
 
@@ -6085,17 +6123,41 @@ function updateVdFuelLabel(val) {
   if (el) el.textContent = labels[parseInt(val)] || 'ممتلئ';
 }
 
+/* ربط رقم اللوحة وبيانات المركبة تلقائياً من سجل الأصل عند اختيار المركبة */
 function onVehicleDeliveryAssetChange() {
   const sel=document.getElementById('vd-asset');
   if(!sel) return;
   const opt=sel.options[sel.selectedIndex];
   const det=document.getElementById('vd-asset-details');
+  const plateInput=document.getElementById('vd-plate');
   if(det && opt && opt.value){
     const subs=[opt.dataset.subtype,opt.dataset.mfg].filter(Boolean);
     const code=opt.dataset.code||'';
-    det.innerHTML=(code?'<span class="badge badge-blue" style="margin:2px"><i class="ti ti-barcode"></i> '+code+'</span>':'')+subs.map(s=>'<span class="badge badge-gray" style="margin:2px">'+s+'</span>').join('');
-    det.style.display=(subs.length||code)?'block':'none';
-  } else if (det) { det.style.display='none'; }
+    const avail=opt.dataset.avail||'0';
+    det.innerHTML=(code?'<span class="badge badge-blue" style="margin:2px"><i class="ti ti-barcode"></i> '+code+'</span>':'')+
+      subs.map(s=>'<span class="badge badge-gray" style="margin:2px">'+s+'</span>').join('')+
+      '<span class="badge" style="background:var(--green-bg);color:var(--green);margin:2px"><i class="ti ti-check"></i> متاحة في المخزون (الكمية المتاحة: '+avail+')</span>';
+    det.style.display='block';
+    if (plateInput) {
+      const plate = opt.dataset.plate||'';
+      if (plate) {
+        plateInput.value = plate;
+        plateInput.readOnly = true;
+        plateInput.style.background = 'var(--bg2)';
+        plateInput.style.borderColor = 'var(--green)';
+        plateInput.title = 'رقم اللوحة مرتبط تلقائياً برقم لوحة هذه المركبة المسجل في سجل الأصول';
+      } else {
+        plateInput.value = '';
+        plateInput.readOnly = false;
+        plateInput.style.background = '';
+        plateInput.style.borderColor = 'var(--amber)';
+        plateInput.title = 'لم يتم تسجيل رقم لوحة لهذه المركبة بعد — أدخله الآن وسيتم حفظه تلقائياً في سجل المركبة';
+      }
+    }
+  } else if (det) {
+    det.style.display='none';
+    if (plateInput) { plateInput.value=''; plateInput.readOnly=false; plateInput.style.background=''; plateInput.style.borderColor=''; }
+  }
 }
 
 /* ── لوحة التوقيع التفاعلية ── */
@@ -6148,10 +6210,12 @@ async function saveVehicleDelivery() {
   const odometer=document.getElementById('vd-odometer').value;
   if(!assetId){ showToast('يرجى اختيار المركبة','error'); return; }
   if(!plate){ showToast('يرجى إدخال رقم اللوحة','error'); return; }
+  if(!isValidPlateNumber(plate)){ showToast('رقم اللوحة يجب أن يتكون من 3 أحرف و3 أرقام','error'); return; }
   if(!empName){ showToast('يرجى إدخال اسم الموظف المستلم','error'); return; }
   if(odometer===''||isNaN(parseFloat(odometer))||parseFloat(odometer)<0){ showToast('يرجى إدخال عدد كيلومترات صحيح','error'); return; }
   const a=getAssets().find(x=>x._id===assetId);
   if(!a){ showToast('تعذر إيجاد بيانات المركبة','error'); return; }
+  if(!(a.availableQty>0)){ showToast('هذه المركبة غير متاحة حالياً — قد تكون مُسلَّمة لموظف آخر بالفعل','error'); return; }
   const accessories=[];
   VD_ACCESSORIES.forEach(([key,label])=>{ const cb=document.getElementById('vd-acc-'+key); if(cb&&cb.checked) accessories.push(label); });
   const fuelLabels=['فارغ','ربع','نصف','ثلاثة أرباع','ممتلئ'];
@@ -6159,7 +6223,16 @@ async function saveVehicleDelivery() {
   const signature=getVdSignatureData();
   try{
     await waitForFirebase();
-    const {collection:col, addDoc:add}=window.fsApi;
+    const {collection:col, doc:docRef, addDoc:add, updateDoc:upd} = window.fsApi;
+    // ربط نموذج التسليم بالأصل: تحديث المخزون والحالة مباشرة (نفس آلية تسليم الأصول للعملاء)
+    const newAvail = a.availableQty - 1;
+    const newClient = (a.clientQty||0) + 1;
+    const assetUpdate = {
+      availableQty:newAvail, clientQty:newClient,
+      status: newAvail===0 && newClient>0 ? 'عند عميل' : a.status
+    };
+    if (!a.plateNumber && plate) assetUpdate.plateNumber = plate; // مزامنة رقم اللوحة المُدخل مع سجل الأصل إن لم يكن مسجلاً من قبل
+    await upd(docRef(window.db,"assets",a._id), assetUpdate);
     await add(col(window.db,"vehicleDeliveries"),{
       assetId, assetName:a.name, assetCode:a.code||'', assetType:a.type||'', assetSubType:a.subType||'',
       plate, employeeName:empName,
@@ -6175,11 +6248,40 @@ async function saveVehicleDelivery() {
       accessories,
       notes:document.getElementById('vd-notes').value.trim(),
       signature,
+      status:'مُسلَّمة',
       createdAt:new Date().toISOString()
     });
     logAudit('handover','تسليم مركبة',`${a.name} [${a.code||''}] — اللوحة: ${plate} — إلى الموظف: ${empName} — الكيلومترات: ${odometer}`);
-    showToast('تم تسجيل تسليم المركبة بنجاح','success');
+    showToast('تم تسجيل تسليم المركبة وربطها بالمخزون بنجاح','success');
     closeModal();
+    await window.reloadData();
+  }catch(e){ showToast('خطأ: '+e.message,'error'); }
+}
+
+/* استرجاع المركبة من الموظف وإعادتها متاحة في المخزون */
+async function returnVehicleDelivery(id) {
+  if(!can('vehicle_delivery')) { showToast('ليس لديك صلاحية تسليم المركبات','error'); return; }
+  const v = getVehicleDeliveries().find(x=>x._id===id);
+  if(!v) return;
+  if(v.status==='مُرتجعة'){ showToast('تم استرجاع هذه المركبة مسبقاً','error'); return; }
+  if(!confirm('هل تم استرجاع المركبة ['+(v.assetName||'')+'] من الموظف '+(v.employeeName||'')+'؟\nستصبح المركبة متاحة مجدداً في المخزون.')) return;
+  try{
+    await waitForFirebase();
+    const {doc:docRef, updateDoc:upd} = window.fsApi;
+    const a = getAssets().find(x=>x._id===v.assetId);
+    if (a) {
+      const newAvail = (a.availableQty||0) + 1;
+      const newClient = Math.max(0,(a.clientQty||0) - 1);
+      await upd(docRef(window.db,"assets",a._id), {
+        availableQty:newAvail, clientQty:newClient,
+        status: newAvail>0 ? 'متاح' : a.status
+      });
+    }
+    await upd(docRef(window.db,"vehicleDeliveries",id), {
+      status:'مُرتجعة', returnedAt:new Date().toISOString(), returnedBy:currentUser?.name||''
+    });
+    logAudit('handover','استرجاع مركبة',`${v.assetName||''} [${v.assetCode||''}] — من الموظف: ${v.employeeName||''} — بواسطة ${currentUser?.name||''}`);
+    showToast('تم استرجاع المركبة وإعادتها متاحة في المخزون','success');
     await window.reloadData();
   }catch(e){ showToast('خطأ: '+e.message,'error'); }
 }
@@ -6201,9 +6303,11 @@ function renderVehicleDeliveries() { filterVehicleDeliveries(); }
 function renderVehicleDeliveryRows(list) {
   const body=document.getElementById('vd-body');
   if(!body) return;
-  if(!list.length){ body.innerHTML='<tr><td colspan="10" class="empty-row">لا توجد عمليات تسليم مركبات بعد</td></tr>'; return; }
-  body.innerHTML=list.map((v,i)=>
-    '<tr>'+
+  if(!list.length){ body.innerHTML='<tr><td colspan="11" class="empty-row">لا توجد عمليات تسليم مركبات بعد</td></tr>'; return; }
+  body.innerHTML=list.map((v,i)=>{
+    const status = v.status||'مُسلَّمة';
+    const isActive = status!=='مُرتجعة';
+    return '<tr>'+
     '<td>'+(i+1)+'</td>'+
     '<td style="font-weight:600">'+(v.assetName||'')+(v.assetCode?'<div style="font-size:10px;color:var(--text3)">'+v.assetCode+'</div>':'')+'</td>'+
     '<td><code class="tag">'+(v.plate||'—')+'</code></td>'+
@@ -6213,16 +6317,18 @@ function renderVehicleDeliveryRows(list) {
     '<td><span class="badge badge-gray">'+(v.fuelLevel||'—')+'</span></td>'+
     '<td>'+(v.date||'—')+(v.time?' '+v.time:'')+'</td>'+
     '<td>'+(v.responsible||'—')+'</td>'+
+    '<td>'+(isActive?'<span class="badge" style="background:var(--blue-bg);color:var(--blue)"><i class="ti ti-car"></i> مع الموظف</span>':'<span class="badge badge-gray"><i class="ti ti-corner-up-left"></i> مُرتجعة</span>')+'</td>'+
     '<td style="white-space:nowrap">'+
       '<button class="btn-action info" onclick="printVehicleDeliveryForm(\''+v._id+'\')" title="طباعة نموذج التسليم"><i class="ti ti-printer"></i></button>'+
+      (isActive&&can('vehicle_delivery')?'<button class="btn-action success" onclick="returnVehicleDelivery(\''+v._id+'\')" title="استرجاع المركبة وإعادتها متاحة"><i class="ti ti-corner-up-left"></i></button>':'')+
       (can('vehicle_delivery')?'<button class="btn-action danger" onclick="deleteVehicleDelivery(\''+v._id+'\')" title="حذف"><i class="ti ti-trash"></i></button>':'')+
-    '</td></tr>'
-  ).join('');
+    '</td></tr>';
+  }).join('');
 }
 
 async function deleteVehicleDelivery(id) {
   if(!can('vehicle_delivery')) return;
-  if(!confirm('هل أنت متأكد من حذف سجل تسليم هذه المركبة؟')) return;
+  if(!confirm('هل أنت متأكد من حذف سجل تسليم هذه المركبة؟ (لن يؤثر هذا على حالة المركبة الحالية في المخزون)')) return;
   try{
     await waitForFirebase();
     await window.fsApi.deleteDoc(window.fsApi.doc(window.db,"vehicleDeliveries",id));
@@ -6320,6 +6426,9 @@ function printVehicleDeliveryForm(vid) {
       <tr>
         <td class="lbl">حالة المركبة</td><td>${v.condition||'—'}</td>
         <td class="lbl">المسؤول عن التسليم</td><td>${v.responsible||'—'}</td>
+      </tr>
+      <tr>
+        <td class="lbl">حالة التسليم الحالية</td><td colspan="3">${(v.status&&v.status!=='مُرتجعة') ? '<span style="background:#DBEAFE;color:#1C3F8A;padding:2px 10px;border-radius:100px;font-weight:700">🚗 المركبة حالياً مع الموظف</span>' : '<span style="background:#E5E7EB;color:#374151;padding:2px 10px;border-radius:100px;font-weight:700">↩ تم استرجاع المركبة'+(v.returnedAt?' بتاريخ '+v.returnedAt.slice(0,10):'')+'</span>'}</td>
       </tr>
       ${v.notes ? '<tr><td class="lbl">ملاحظات</td><td colspan="3">'+v.notes+'</td></tr>' : ''}
     </table>
@@ -6953,6 +7062,10 @@ if(typeof renderVehicleDeliveries!=='undefined')window.renderVehicleDeliveries=r
 if(typeof deleteVehicleDelivery!=='undefined')window.deleteVehicleDelivery=deleteVehicleDelivery;
 if(typeof printVehicleDeliveryForm!=='undefined')window.printVehicleDeliveryForm=printVehicleDeliveryForm;
 if(typeof getVehicleDeliveries!=='undefined')window.getVehicleDeliveries=getVehicleDeliveries;
+if(typeof toggleVehiclePlateField!=='undefined')window.toggleVehiclePlateField=toggleVehiclePlateField;
+if(typeof isValidPlateNumber!=='undefined')window.isValidPlateNumber=isValidPlateNumber;
+if(typeof checkPlateValidity!=='undefined')window.checkPlateValidity=checkPlateValidity;
+if(typeof returnVehicleDelivery!=='undefined')window.returnVehicleDelivery=returnVehicleDelivery;
 
 /* ────────── NOTIFICATIONS SYSTEM ────────── */
 let _readNotifKeys = new Set();
