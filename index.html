@@ -1447,6 +1447,7 @@ try {
   console.log("✅ All data loaded. Users:", window.users?.length);
   // تفعيل الاستماع اللحظي (Real-time) فور جاهزية البيانات حتى تصل الإشعارات لحظياً لكل مستخدم
   try { setupNotificationRealtimeListeners(); } catch(e) { console.warn('realtime notif init:', e); }
+  try { refreshNotificationSourceData(); } catch(e) { console.warn('initial notif refresh:', e); }
 
   // Auto-restore session from localStorage
   try {
@@ -1486,6 +1487,7 @@ try {
         populateTypeFilters();
         renderAll();
         try { if(window.showDangerZoneIfAdmin) window.showDangerZoneIfAdmin(); } catch(e){}
+        try { if (typeof refreshNotificationSourceData === 'function') refreshNotificationSourceData(); } catch(e){}
         console.log("✅ Session restored for:", fresh.name);
       } else {
         localStorage.removeItem('_assetSession');
@@ -3279,6 +3281,7 @@ async function doLogin() {
     }
     populateTypeFilters();
     renderAll();
+    try { refreshNotificationSourceData(); } catch(e) { console.warn('login notif refresh:', e); }
   } catch(e) {
     document.getElementById('login-error').textContent='خطأ: '+e.message;
     document.getElementById('login-error').style.display='block';
@@ -7064,6 +7067,8 @@ if(typeof renderVehicleDeliveries!=='undefined')window.renderVehicleDeliveries=r
 if(typeof deleteVehicleDelivery!=='undefined')window.deleteVehicleDelivery=deleteVehicleDelivery;
 if(typeof printVehicleDeliveryForm!=='undefined')window.printVehicleDeliveryForm=printVehicleDeliveryForm;
 if(typeof getVehicleDeliveries!=='undefined')window.getVehicleDeliveries=getVehicleDeliveries;
+if(typeof refreshNotificationSourceData!=='undefined')window.refreshNotificationSourceData=refreshNotificationSourceData;
+if(typeof setupNotificationRealtimeListeners!=='undefined')window.setupNotificationRealtimeListeners=setupNotificationRealtimeListeners;
 if(typeof toggleVehiclePlateField!=='undefined')window.toggleVehiclePlateField=toggleVehiclePlateField;
 if(typeof isValidPlateNumber!=='undefined')window.isValidPlateNumber=isValidPlateNumber;
 if(typeof checkPlateValidity!=='undefined')window.checkPlateValidity=checkPlateValidity;
@@ -7237,11 +7242,34 @@ async function setupNotificationRealtimeListeners() {
   } catch(e) { console.warn('setupNotificationRealtimeListeners error:', e); }
 }
 
-/* تحديث دوري احتياطي للإشعارات (تأثيره فقط على الوميض المحلي بدون أي اتصال بالشبكة)،
-   لضمان بقاء الجرس وامضاً باستمرار حتى لو فشل الاستماع اللحظي لأي سبب */
+/* جلب فعلي ومباشر لبيانات الإشعارات الثلاث من قاعدة البيانات (وليس مجرد إعادة رسم محلية) —
+   هذه هي الضمانة الأكيدة لتحديث الإشعارات تلقائياً حتى لو تعذّر الاستماع اللحظي onSnapshot لأي سبب
+   (قواعد أمان، شبكة، توافق إصدار)، فلا يحتاج أي مستخدم لفتح لوحة الإشعارات يدوياً ليكتشف وجود جديد */
+async function refreshNotificationSourceData() {
+  try {
+    await waitForFirebase();
+    const { collection: col, getDocs: gDocs } = window.fsApi || {};
+    if (!gDocs) return;
+    const [custodySnap, deptSnap, complaintsSnap] = await Promise.all([
+      gDocs(col(window.db,"custodyRequests")),
+      gDocs(col(window.db,"deptCustodyRequests")),
+      gDocs(col(window.db,"complaints")),
+    ]);
+    window.custodyRequests = custodySnap.docs.map(d=>({...d.data(),_id:d.id}));
+    window.deptCustodyRequests = deptSnap.docs.map(d=>({...d.data(),_id:d.id}));
+    _complaints = complaintsSnap.docs.map(d=>({...d.data(),_id:d.id}));
+    try { localStorage.setItem('_complaints', JSON.stringify(_complaints)); } catch(e){}
+    renderNotifications();
+    // تحديث الصفحات المعنية مباشرة إن كانت مفتوحة حالياً حتى تكون متسقة مع الإشعارات
+    try { if (document.getElementById('page-custody')?.classList.contains('active')) filterCustody(); } catch(e){}
+    try { if (document.getElementById('page-dept-custody')?.classList.contains('active')) filterDeptCustody(); } catch(e){}
+    try { if (document.getElementById('page-complaints')?.classList.contains('active')) filterComplaints(); } catch(e){}
+  } catch(e) { console.warn('refreshNotificationSourceData error:', e); }
+}
+
 if (window._notifPollTimer) clearInterval(window._notifPollTimer);
 window._notifPollTimer = setInterval(()=>{
-  if (currentUser) { try { renderNotifications(); } catch(e){} }
+  if (currentUser) { refreshNotificationSourceData(); }
 }, 8000);
 
 // NOW start firebase after all functions are defined
