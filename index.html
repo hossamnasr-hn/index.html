@@ -7086,10 +7086,13 @@ function getNotifications() {
   const hasCustodyApprove = perms.includes('custody_approve') || isAdmin;
   const hasDeptApprove = perms.includes('dept_custody_approve') || isAdmin;
   if (hasCustodyApprove) {
-    const pending = (window.custodyRequests||[]).filter(c=>c.status==='معلق'||c.status==='pending'||!c.status);
+    const pending = (window.custodyRequests||[]).filter(c=>c.requestStatus==='قيد المراجعة'||!c.requestStatus);
     if (pending.length > 0) {
+      // المفتاح مبني على معرّفات الطلبات الفعلية وليس العدد فقط — حتى يُعتبر إشعاراً جديداً
+      // عند أي تغيير في الطلبات المعلقة (إضافة/إزالة) ولو ظل العدد الإجمالي كما هو
+      const ids = pending.map(c=>c._id).sort().join(',');
       notifs.push({
-        key:'custody_pending_'+pending.length, type:'custody',
+        key:'custody_pending_'+ids, type:'custody',
         icon:'ti-file-invoice', iconClass:'notif-icon-custody',
         title:'طلبات عهدة أصول بانتظار الاعتماد',
         desc:'يوجد '+pending.length+' طلب'+(pending.length>1?' عهدة أصول':' عهدة أصل')+' بانتظار مراجعتك واعتمادك',
@@ -7099,10 +7102,11 @@ function getNotifications() {
     }
   }
   if (hasDeptApprove) {
-    const deptPending = (window.deptCustodyRequests||[]).filter(c=>c.status==='معلق'||c.status==='pending'||!c.status);
+    const deptPending = (window.deptCustodyRequests||[]).filter(c=>c.requestStatus==='قيد المراجعة'||!c.requestStatus);
     if (deptPending.length > 0) {
+      const ids = deptPending.map(c=>c._id).sort().join(',');
       notifs.push({
-        key:'dept_custody_pending_'+deptPending.length, type:'dept',
+        key:'dept_custody_pending_'+ids, type:'dept',
         icon:'ti-building', iconClass:'notif-icon-dept',
         title:'طلبات عهدة الإدارات بانتظار الاعتماد',
         desc:'يوجد '+deptPending.length+' طلب'+(deptPending.length>1?' عهدة إدارات':' عهدة إدارة')+' يستلزم اتخاذ الإجراء المناسب',
@@ -7117,8 +7121,9 @@ function getNotifications() {
     const newComplaints = (_complaints||[]).filter(c=>c.status==='جديد');
     if (newComplaints.length > 0) {
       const urgentCount = newComplaints.filter(c=>c.priority==='عاجل').length;
+      const ids = newComplaints.map(c=>c._id).sort().join(',');
       notifs.push({
-        key:'complaints_new_'+newComplaints.length+'_'+urgentCount, type:'complaint',
+        key:'complaints_new_'+ids, type:'complaint',
         icon:'ti-speakerphone', iconClass:'notif-icon-complaint',
         title:'بلاغات جديدة بانتظار التحويل',
         desc:'يوجد '+newComplaints.length+' بلاغ جديد'+(urgentCount>0?' (منها '+urgentCount+' عاجل 🔴)':'')+' يحتاج إلى مراجعة وتحويل',
