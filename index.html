@@ -3695,8 +3695,8 @@ function assetForm(a) {
     '</div>'+
     '<div class="form-row full" id="f-plate-wrap" style="display:none;margin-bottom:12px">'+
       '<div class="field">'+
-        '<label><i class="ti ti-id"></i> رقم لوحة المركبة (3 أحرف + 3 أرقام)</label>'+
-        '<input id="f-plate" value="'+(a.plateNumber||'')+'" placeholder="مثال: أ ب ج 123" maxlength="20" oninput="checkPlateValidity(this)" style="text-align:center;font-weight:700;letter-spacing:1px">'+
+        '<label><i class="ti ti-id"></i> رقم لوحة المركبة (3 أحرف + 4 أرقام)</label>'+
+        '<input id="f-plate" value="'+(a.plateNumber||'')+'" placeholder="مثال: أ ب ج 1234" maxlength="20" oninput="checkPlateValidity(this)" style="text-align:center;font-weight:700;letter-spacing:1px">'+
         '<div style="font-size:11px;color:var(--text3);margin-top:4px">أدخل ثلاثة أحرف وثلاثة أرقام — سيُستخدم هذا الرقم تلقائياً عند تسليم المركبة لأحد الموظفين</div>'+
       '</div>'+
     '</div>'+
@@ -3765,7 +3765,7 @@ async function saveAsset() {
   if (isVehicleAssetType(typeVal)) {
     plateNumber = (document.getElementById('f-plate')?.value||'').trim();
     if (!plateNumber) { showToast('يرجى إدخال رقم لوحة المركبة','error'); return; }
-    if (!isValidPlateNumber(plateNumber)) { showToast('رقم اللوحة يجب أن يتكون من 3 أحرف و3 أرقام','error'); return; }
+    if (!isValidPlateNumber(plateNumber)) { showToast('رقم اللوحة يجب أن يتكون من 3 أحرف و4 أرقام','error'); return; }
   }
   const count = parseInt(document.getElementById('f-count').value)||1;
   const initStatus = document.getElementById('f-init-status').value||'متاح';
@@ -3854,12 +3854,12 @@ function toggleVehiclePlateField() {
   wrap.style.display = isVehicleAssetType(tp) ? '' : 'none';
 }
 
-/* تحقق من صيغة رقم اللوحة: ثلاثة أحرف + ثلاثة أرقام */
+/* تحقق من صيغة رقم اللوحة: ثلاثة أحرف + أربعة أرقام (الصيغة المفتوحة للوحات المركبات) */
 function isValidPlateNumber(str) {
   const cleaned = (str||'').replace(/[\s\-]/g,'');
   const letters = cleaned.match(/[A-Za-zأ-ي]/g)||[];
   const digits = cleaned.match(/[0-9]/g)||[];
-  return letters.length===3 && digits.length===3 && (letters.length+digits.length)===cleaned.length;
+  return letters.length===3 && digits.length===4 && (letters.length+digits.length)===cleaned.length;
 }
 
 /* تغذية راجعة بصرية فورية أثناء كتابة رقم اللوحة */
@@ -6055,7 +6055,7 @@ function openVehicleDeliveryModal(preAssetId) {
     '<div class="form-section" style="margin-top:0">بيانات المركبة</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
       '<div class="field"><label>المركبة *</label><select id="vd-asset" onchange="onVehicleDeliveryAssetChange()"><option value="">-- اختر المركبة --</option>'+vehicleOpts+'</select></div>'+
-      '<div class="field"><label>رقم اللوحة (مرتبط بالمركبة) *</label><input id="vd-plate" placeholder="مثال: أ ب ج 123" oninput="checkPlateValidity(this)"></div>'+
+      '<div class="field"><label>رقم اللوحة (مرتبط بالمركبة) *</label><input id="vd-plate" placeholder="مثال: أ ب ج 1234" oninput="checkPlateValidity(this)"></div>'+
     '</div>'+
     '<div id="vd-asset-details" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-bottom:12px;font-size:12px;display:none"></div>'+
 
@@ -6210,7 +6210,7 @@ async function saveVehicleDelivery() {
   const odometer=document.getElementById('vd-odometer').value;
   if(!assetId){ showToast('يرجى اختيار المركبة','error'); return; }
   if(!plate){ showToast('يرجى إدخال رقم اللوحة','error'); return; }
-  if(!isValidPlateNumber(plate)){ showToast('رقم اللوحة يجب أن يتكون من 3 أحرف و3 أرقام','error'); return; }
+  if(!isValidPlateNumber(plate)){ showToast('رقم اللوحة يجب أن يتكون من 3 أحرف و4 أرقام','error'); return; }
   if(!empName){ showToast('يرجى إدخال اسم الموظف المستلم','error'); return; }
   if(odometer===''||isNaN(parseFloat(odometer))||parseFloat(odometer)<0){ showToast('يرجى إدخال عدد كيلومترات صحيح','error'); return; }
   const a=getAssets().find(x=>x._id===assetId);
