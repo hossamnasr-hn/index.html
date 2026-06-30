@@ -753,11 +753,13 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
         <div class="page-title">
           <span><i class="ti ti-package"></i> سجل الأصول</span>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="export-btn export-btn-excel" onclick="exportTableExcel('assets-body','سجل_الأصول',['الصورة','الكود','الاسم','النوع','النوع الفرعي','الإجمالي','متاح','عند عميل','صيانة','تالف','الحالة'])"><i class="ti ti-file-spreadsheet"></i> Excel</button>
+            <button class="export-btn export-btn-excel" onclick="exportTableExcel('assets-body','سجل_الأصول',['الصورة','الكود','الاسم','النوع','النوع الفرعي','الإجمالي','متاح','مُسلَّم','صيانة','تالف','الحالة'])"><i class="ti ti-file-spreadsheet"></i> Excel</button>
             <button class="add-btn" id="add-asset-btn" onclick="openAddAsset()"><i class="ti ti-plus"></i> إضافة أصل</button>
             <button class="report-page-btn" onclick="printReport('assets')"><i class="ti ti-printer"></i> تقرير</button>
           </div>
         </div>
+        <!-- فلتر نوع الأصل الرئيسي — يتصدر الصفحة -->
+        <div id="assets-type-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:0 2px"></div>
         <div class="table-card">
           <div class="table-toolbar">
             <div class="toolbar-left">
@@ -765,21 +767,19 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
               <select class="filter-select" id="filter-status" onchange="filterAssets()">
                 <option value="">جميع الحالات</option>
                 <option value="متاح">متاح</option>
-                <option value="عند عميل">عند عميل</option>
+                <option value="عند عميل">مُسلَّم / عند عميل</option>
                 <option value="صيانة">صيانة</option>
                 <option value="تالف">تالف</option>
                 <option value="متلف">متلف</option>
-              </select>
-              <select class="filter-select" id="filter-type" onchange="filterAssets()">
-                <option value="">جميع الأنواع</option>
               </select>
               <select class="filter-select" id="filter-subtype" onchange="filterAssets()">
                 <option value="">جميع الأنواع الفرعية</option>
               </select>
             </div>
           </div>
+          <!-- رأس الجدول يتغير حسب النوع المختار -->
           <table>
-            <thead><tr><th>الصورة</th><th>الكود</th><th>الاسم</th><th>النوع</th><th>النوع الفرعي</th><th>العدد الكلي</th><th>متاح</th><th>عند عميل</th><th>صيانة</th><th>تالف</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+            <thead id="assets-thead"><tr><th>الصورة</th><th>الكود</th><th>الاسم</th><th>النوع الفرعي</th><th>الإجمالي</th><th>متاح</th><th>مُسلَّم</th><th>صيانة</th><th>تالف</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
             <tbody id="assets-body"></tbody>
           </table>
         </div>
@@ -3538,13 +3538,32 @@ function renderAll() {
 
 /* ────────── STATUS BADGE ────────── */
 function statusBadge(s, assetId) {
-  const m = {متاح:'badge-green','عند عميل':'badge-blue',صيانة:'badge-amber',تالف:'badge-amber',متلف:'badge-red','مُسلَّم':'badge-blue','قيد الصيانة':'badge-amber','مكتمل':'badge-green','مُرتجع':'badge-gray'};
+  const m = {متاح:'badge-green','عند عميل':'badge-blue',صيانة:'badge-amber',تالف:'badge-amber',متلف:'badge-red','مُسلَّم':'badge-blue','قيد الصيانة':'badge-amber','مكتمل':'badge-green','مُرتجع':'badge-gray','تم التسليم':'badge-blue','قيد التشغيل':'badge-blue','مخصص':'badge-blue','مستخدَم':'badge-blue'};
   let label = s;
   if (s==='عند عميل' && assetId) {
+    const asset = getAssets().find(a=>a._id===assetId);
+    const terms = getAssetTerms(asset?.type||'');
+    // المركبات: نعرض "تم التسليم" + اسم الموظف المستلم من سجل تسليم المركبات
+    if (asset && isVehicleAssetType(asset.type)) {
+      const vd = getVehicleDeliveries().filter(v=>v.assetId===assetId && v.status==='مُسلَّمة');
+      if (vd.length) {
+        const last = vd[vd.length-1];
+        const empName = last.employeeName||null;
+        return '<span class="badge badge-blue" title="'+(empName?'مُسلَّمة إلى: '+empName:terms.status)+'">'+
+          '<i class="ti ti-car" style="font-size:10px"></i> '+terms.status+
+          (empName?'<div style="font-size:9px;font-weight:600;margin-top:1px;opacity:.85">'+empName+'</div>':'')+
+          '</span>';
+      }
+    }
+    // باقي الأنواع: نستخدم حالة ومسمى مخصص حسب النوع + اسم العميل الفعلي
+    label = terms.status;
     const hh = getHandovers().filter(h=>h.assetId===assetId&&h.status==='مُسلَّم');
-    if (hh.length) { const ln=hh[hh.length-1]; if (ln.clientName) label='عند: '+ln.clientName; }
+    if (hh.length) {
+      const ln = hh[hh.length-1];
+      if (ln.clientName) label = 'عند: '+ln.clientName;
+    }
   }
-  return '<span class="badge '+(m[s]||'badge-gray')+'" title="'+label+'">'+label+'</span>';
+  return '<span class="badge '+(m[s]||m[label]||'badge-blue')+'" title="'+label+'">'+label+'</span>';
 }
 
 /* ────────── STATS ────────── */
@@ -3578,46 +3597,104 @@ function renderRecent() {
 
 /* ────────── TYPE FILTERS ────────── */
 function populateTypeFilters() {
-  const opts = '<option value="">جميع الأنواع</option>' + getAssetTypes().map(t=>'<option value="'+t+'">'+t+'</option>').join('');
+  const types = getAssetTypes();
+  const opts = '<option value="">جميع الأنواع</option>' + types.map(t=>'<option value="'+t+'">'+t+'</option>').join('');
   ['filter-type','report-type-filter','inv-filter-type'].forEach(id => {
     const el=document.getElementById(id); if(el) el.innerHTML=opts;
   });
   const sp = document.getElementById('subtype-parent');
-  if (sp) sp.innerHTML = '<option value="">-- اختر النوع الرئيسي --</option>' + getAssetTypes().map(t=>'<option value="'+t+'">'+t+'</option>').join('');
+  if (sp) sp.innerHTML = '<option value="">-- اختر النوع الرئيسي --</option>' + types.map(t=>'<option value="'+t+'">'+t+'</option>').join('');
+  // تبويبات نوع الأصل
+  renderAssetTypeTabs();
+}
+
+/* تبويبات نوع الأصل فوق الجدول — اختيار نوع أولاً ثم عرض أصوله */
+let _activeAssetTypeTab = '';
+function renderAssetTypeTabs() {
+  const wrap = document.getElementById('assets-type-tabs');
+  if (!wrap) return;
+  const types = getAssetTypes();
+  const tabStyle = (active) => `padding:6px 16px;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid;font-family:var(--font);transition:all .2s;${active?'background:var(--blue);color:#fff;border-color:var(--blue)':'background:var(--card);color:var(--text2);border-color:var(--border)'}`;
+  wrap.innerHTML =
+    `<button style="${tabStyle(_activeAssetTypeTab==='')} " onclick="setAssetTypeTab('')">
+      <i class="ti ti-layout-grid" style="font-size:12px"></i> الكل
+    </button>` +
+    types.map(t => {
+      const isVeh = isVehicleAssetType(t);
+      const icon = isVeh ? 'ti-car' : /ثلاج|عرض|تبريد/.test(t) ? 'ti-snowflake' : /معد|آل|مولد/.test(t) ? 'ti-tool' : /حاسب|جهاز|لابتوب/.test(t) ? 'ti-device-laptop' : 'ti-package';
+      const cnt = getAssets().filter(a=>a.type===t).length;
+      return `<button style="${tabStyle(_activeAssetTypeTab===t)}" onclick="setAssetTypeTab('${t.replace(/'/g,"\\'")}')">
+        <i class="ti ${icon}" style="font-size:12px"></i> ${t} <span style="font-size:10px;opacity:.7">(${cnt})</span>
+      </button>`;
+    }).join('');
+}
+
+function setAssetTypeTab(type) {
+  _activeAssetTypeTab = type;
+  renderAssetTypeTabs();
+  filterAssets();
 }
 
 /* ────────── ASSETS ────────── */
 function filterAssets() {
   const q = (document.getElementById('asset-search')||{}).value?.toLowerCase()||'';
   const st = (document.getElementById('filter-status')||{}).value||'';
-  const tp = (document.getElementById('filter-type')||{}).value||'';
+  const tp = _activeAssetTypeTab || '';
   const stp = (document.getElementById('filter-subtype')||{}).value||'';
   const filtered = getAssets().filter(a=>
-    (!q||a.name.toLowerCase().includes(q)||a.code.toLowerCase().includes(q))&&
+    (!q||(a.name||'').toLowerCase().includes(q)||(a.code||'').toLowerCase().includes(q)||(a.plateNumber||'').toLowerCase().includes(q)||(a.vinNumber||'').toLowerCase().includes(q))&&
     (!st||a.status===st)&&(!tp||a.type===tp)&&(!stp||a.subType===stp)
   );
-  renderAssetRows(filtered);
+  // رأس الجدول الديناميكي حسب النوع المختار
+  const terms = getAssetTerms(tp);
+  const isVeh = tp && isVehicleAssetType(tp);
+  const thead = document.getElementById('assets-thead');
+  if (thead) {
+    thead.innerHTML = '<tr><th>الصورة</th><th>الكود</th><th>الاسم</th>'+(tp?'':'<th>النوع</th>')+'<th>النوع الفرعي</th><th>الإجمالي</th><th>متاح</th><th>'+terms.status+'</th><th>صيانة</th><th>تالف</th><th>الحالة</th><th>الإجراءات</th></tr>';
+  }
+  // تحديث الأنواع الفرعية
   const stpEl = document.getElementById('filter-subtype');
   if (stpEl && tp) {
     const subs = getAssetSubTypes(tp);
-    stpEl.innerHTML = '<option value="">جميع الأنواع الفرعية</option>' + subs.map(s=>'<option value="'+s.name+'">'+s.name+'</option>').join('');
+    stpEl.innerHTML = '<option value="">جميع الأنواع الفرعية</option>' + subs.map(s=>'<option value="'+s.name+'"'+(stp===s.name?' selected':'')+'>'+s.name+'</option>').join('');
   } else if (stpEl) {
     stpEl.innerHTML = '<option value="">جميع الأنواع الفرعية</option>';
   }
+  renderAssetRows(filtered, tp);
 }
 function renderAssets() { filterAssets(); }
 
-function renderAssetRows(list) {
-  if (!list.length) {
-    document.getElementById('assets-body').innerHTML = '<tr><td colspan="12" class="empty-row">لا توجد أصول مطابقة</td></tr>';
-    return;
-  }
-  document.getElementById('assets-body').innerHTML = list.map(a=>
-    '<tr>'+
-    '<td>'+(a.imageUrl?'<img src="'+a.imageUrl+'" class="asset-img" onclick="viewAssetImage(\''+a._id+'\')">':'<div class="asset-img-placeholder"><i class="ti ti-photo"></i></div>')+'</td>'+
+function renderAssetRows(list, activeType) {
+  const body = document.getElementById('assets-body');
+  if (!list.length) { body.innerHTML = '<tr><td colspan="12" class="empty-row">لا توجد أصول مطابقة</td></tr>'; return; }
+  const showTypeCol = !activeType;
+  body.innerHTML = list.map(a=>{
+    const isVeh = isVehicleAssetType(a.type);
+    const terms = getAssetTerms(a.type);
+    // حركات المركبة الأخيرة (تسليم/استرجاع)
+    let vehicleHistory = '';
+    if (isVeh) {
+      const deliveries = getVehicleDeliveries().filter(v=>v.assetId===a._id).slice(-3).reverse();
+      if (deliveries.length) {
+        vehicleHistory = '<div style="margin-top:4px">'+deliveries.map(v=>{
+          const isActive = v.status!=='مُرتجعة';
+          return '<div style="font-size:9px;padding:1px 0;color:'+(isActive?'var(--blue)':'var(--text3)')+'">'+
+            (isActive?'🚗':'↩')+' '+(v.date||'')+(v.employeeName?' — '+v.employeeName:'')+
+            (v.plate?' <code style="font-size:8px;background:var(--bg2);padding:0 3px;border-radius:2px">'+v.plate+'</code>':'')+
+          '</div>';
+        }).join('')+'</div>';
+      }
+    }
+    return '<tr>'+
+    '<td>'+(a.imageUrl?'<img src="'+a.imageUrl+'" class="asset-img" onclick="viewAssetImage(\''+a._id+'\')">':'<div class="asset-img-placeholder"><i class="ti '+(isVeh?'ti-car':a.type&&/ثلاج/.test(a.type)?'ti-snowflake':'ti-package')+'"></i></div>')+'</td>'+
     '<td><code class="tag">'+a.code+'</code></td>'+
-    '<td style="font-weight:600">'+a.name+(a.manufacturer?'<div style="font-size:10px;color:var(--text3)">'+a.manufacturer+'</div>':'')+(a.plateNumber?'<div style="font-size:10px;color:var(--purple);margin-top:2px"><i class="ti ti-id" style="font-size:9px"></i> لوحة: '+a.plateNumber+'</div>':'')+'<div style="font-size:10px;color:var(--text3);margin-top:2px"><i class="ti ti-barcode" style="font-size:9px"></i> '+a.code+'</div></td>'+
-    '<td><span class="badge badge-blue">'+a.type+'</span></td>'+
+    '<td style="font-weight:600;min-width:140px">'+a.name+
+      (a.manufacturer?'<div style="font-size:10px;color:var(--text3)">'+a.manufacturer+'</div>':'')+
+      (a.plateNumber?'<div style="font-size:10px;color:var(--purple);margin-top:1px"><i class="ti ti-id" style="font-size:9px"></i> '+a.plateNumber+'</div>':'')+
+      (a.vinNumber?'<div style="font-size:9px;color:var(--text3);font-family:monospace"><i class="ti ti-hash" style="font-size:8px"></i> '+a.vinNumber+'</div>':'')+
+      vehicleHistory+
+    '</td>'+
+    (showTypeCol?'<td><span class="badge badge-blue">'+a.type+'</span></td>':'')+
     '<td>'+(a.subType?'<span class="badge badge-gray">'+a.subType+'</span>':'-')+(a.capacity?'<div style="font-size:10px;color:var(--text3)">'+a.capacity+'</div>':'')+'</td>'+
     '<td style="font-weight:700;text-align:center">'+a.totalQty+'</td>'+
     '<td style="text-align:center"><span style="color:var(--green);font-weight:700">'+a.availableQty+'</span></td>'+
@@ -3628,12 +3705,12 @@ function renderAssetRows(list) {
     '<td style="white-space:nowrap">'+
       (can('edit')?'<button class="btn-action" onclick="openEdit(\''+a._id+'\')" title="تعديل"><i class="ti ti-edit"></i></button>':'')+
       '<button class="btn-action" onclick="printAssetBarcode({_id:\''+a._id+'\',name:\''+a.name.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\',code:\''+a.code+'\',type:\''+a.type+'\',subType:\''+a.subType+'\'})" title="طباعة الباركود" style="color:var(--blue);border-color:var(--blue-light)"><i class="ti ti-barcode"></i></button>'+
-      (can('handover')&&a.availableQty>0?'<button class="btn-action success" onclick="openHandoverFromAsset(\''+a._id+'\')" title="تسليم"><i class="ti ti-transfer"></i></button>':'')+
-      (can('vehicle_delivery')&&isVehicleAssetType(a.type)&&a.availableQty>0?'<button class="btn-action purple" onclick="openVehicleDeliveryFromAsset(\''+a._id+'\')" title="تسليم مركبة لموظف"><i class="ti ti-car"></i></button>':'')+
-      (can('maintenance')&&a.availableQty>0?'<button class="btn-action purple" onclick="openMaintenanceFromAsset(\''+a._id+'\')" title="صيانة"><i class="ti ti-tool"></i></button>':'')+
+      (can('handover')&&a.availableQty>0&&!isVeh?'<button class="btn-action success" onclick="openHandoverFromAsset(\''+a._id+'\')" title="'+terms.handoverLabel+'"><i class="ti ti-transfer"></i></button>':'')+
+      (can('vehicle_delivery')&&isVeh&&a.availableQty>0?'<button class="btn-action purple" onclick="openVehicleDeliveryFromAsset(\''+a._id+'\')" title="'+terms.handoverLabel+'"><i class="ti ti-car"></i></button>':'')+
+      (can('maintenance')&&a.availableQty>0?'<button class="btn-action" onclick="openMaintenanceFromAsset(\''+a._id+'\')" title="صيانة" style="color:var(--amber);border-color:var(--amber)"><i class="ti ti-tool"></i></button>':'')+
       (can('dispose')&&a.totalQty>0?'<button class="btn-action danger" onclick="openDisposeFromAsset(\''+a._id+'\')" title="إتلاف"><i class="ti ti-trash"></i></button>':'')+
-    '</td></tr>'
-  ).join('');
+    '</td></tr>';
+  }).join('');
 }
 
 function viewAssetImage(id) {
@@ -3705,6 +3782,11 @@ function assetForm(a) {
         '<label><i class="ti ti-id"></i> رقم لوحة المركبة (3 أحرف + 4 أرقام)</label>'+
         '<input id="f-plate" value="'+(a.plateNumber||'')+'" placeholder="مثال: أ ب ج 1234" maxlength="20" oninput="checkPlateValidity(this)" style="text-align:center;font-weight:700;letter-spacing:1px">'+
         '<div style="font-size:11px;color:var(--text3);margin-top:4px">أدخل ثلاثة أحرف وأربعة أرقام — سيُستخدم هذا الرقم تلقائياً عند تسليم المركبة لأحد الموظفين</div>'+
+      '</div>'+
+      '<div class="field">'+
+        '<label><i class="ti ti-hash"></i> رقم الهيكل / الرقم التسلسلي VIN <span style="font-size:10px;color:var(--text3)">(اختياري)</span></label>'+
+        '<input id="f-vin" value="'+(a.vinNumber||'')+'" placeholder="مثال: 1HGCM82633A004352" maxlength="50" style="font-family:monospace;font-weight:600;letter-spacing:1px" oninput="this.value=this.value.toUpperCase()">'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:4px">رقم الهيكل مرجع قانوني مهم — يظهر في جميع وثائق ونماذج تسليم المركبة</div>'+
       '</div>'+
     '</div>'+
     '<div class="form-section">خصائص الأصل</div>'+
@@ -3794,6 +3876,7 @@ async function saveAsset() {
     subType: document.getElementById('f-subtype').value||'',
     manufacturer, capacity,
     plateNumber,
+    vinNumber: (document.getElementById('f-vin')?.value||'').trim().toUpperCase(),
     totalQty, availableQty, clientQty, maintenanceQty, damagedQty, disposedQty,
     status: initStatus,
     notes: document.getElementById('f-notes').value,
@@ -3853,7 +3936,33 @@ function isVehicleAssetType(typeName) {
   return /مركب|سيار|شاحن/.test(typeName||'');
 }
 
-/* إظهار/إخفاء حقل رقم اللوحة في نموذج الأصل حسب النوع المختار */
+/* ════════════════════════════════════════
+   مسميات مخصصة لكل نوع أصل
+   لأن كل نوع له طبيعة مختلفة:
+   - المركبات: مسلّم / موظف مستلم / قائد
+   - الأجهزة والمعدات: موضوع لدى / مشغّل
+   - الأثاث والمفروشات: مخصص لـ / مستخدم
+   - ثلاجات العرض وغيرها: عند عميل / عميل
+════════════════════════════════════════ */
+function getAssetTerms(typeName) {
+  const t = (typeName||'').trim();
+  if (/مركب|سيار|شاحن/.test(t)) {
+    return { handedTo:'موظف مستلم', status:'تم التسليم', handoverLabel:'تسليم مركبة', returnLabel:'استرجاع', assignedLabel:'قائد/مستخدم', quantityLabel:'عدد المركبات' };
+  }
+  if (/معد|آل|جهاز أو معدة|ماكينة|مولد|رافع|ضاغط/.test(t)) {
+    return { handedTo:'مشغّل المعدة', status:'قيد التشغيل', handoverLabel:'تسليم معدة', returnLabel:'إرجاع', assignedLabel:'مشغّل', quantityLabel:'عدد الوحدات' };
+  }
+  if (/أثاث|كرسي|مكتب|خزان|رف|طاولة|مفروش/.test(t)) {
+    return { handedTo:'المستخدم', status:'مخصص', handoverLabel:'تخصيص', returnLabel:'استرداد', assignedLabel:'مستخدم', quantityLabel:'عدد القطع' };
+  }
+  if (/حاسب|لابتوب|طابعة|شاشة|جهاز تقني|جهاز كمبيوتر/.test(t)) {
+    return { handedTo:'مستخدم الجهاز', status:'مستخدَم', handoverLabel:'تسليم جهاز', returnLabel:'إرجاع جهاز', assignedLabel:'مستخدم', quantityLabel:'عدد الأجهزة' };
+  }
+  // الافتراضي (ثلاجات العرض والمعدات التجارية وغيرها)
+  return { handedTo:'عميل', status:'عند عميل', handoverLabel:'تسليم', returnLabel:'استرداد', assignedLabel:'عميل', quantityLabel:'العدد الكلي' };
+}
+
+/* ──  التحقق من رقم اللوحة  ── */
 function toggleVehiclePlateField() {
   const tp = document.getElementById('f-type')?.value;
   const wrap = document.getElementById('f-plate-wrap');
@@ -6209,8 +6318,8 @@ function buildVehicleAssetOptions(preAssetId) {
   const vehicles = getAssets().filter(a=>isVehicleAssetType(a.type) && (a.availableQty>0 || a._id===preAssetId));
   if (!vehicles.length) return '';
   return vehicles.map(a=>
-    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+' data-code="'+(a.code||'')+'" data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-plate="'+(a.plateNumber||'')+'" data-avail="'+(a.availableQty||0)+'">'+
-    a.name+' ['+(a.code||'')+']'+(a.subType?' - '+a.subType:'')+(a.plateNumber?' — لوحة: '+a.plateNumber:'')+'</option>'
+    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+' data-code="'+(a.code||'')+'" data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-plate="'+(a.plateNumber||'')+'" data-vin="'+(a.vinNumber||'')+'" data-avail="'+(a.availableQty||0)+'">'+
+    a.name+' ['+(a.code||'')+']'+(a.subType?' - '+a.subType:'')+(a.plateNumber?' — لوحة: '+a.plateNumber:'')+(a.vinNumber?' — هيكل: '+a.vinNumber:'')+'</option>'
   ).join('');
 }
 
@@ -6315,8 +6424,10 @@ function onVehicleDeliveryAssetChange() {
     const subs=[opt.dataset.subtype,opt.dataset.mfg].filter(Boolean);
     const code=opt.dataset.code||'';
     const avail=opt.dataset.avail||'0';
+    const vin=opt.dataset.vin||'';
     det.innerHTML=(code?'<span class="badge badge-blue" style="margin:2px"><i class="ti ti-barcode"></i> '+code+'</span>':'')+
       subs.map(s=>'<span class="badge badge-gray" style="margin:2px">'+s+'</span>').join('')+
+      (vin?'<span class="badge" style="background:var(--bg2);color:var(--text2);margin:2px;font-family:monospace"><i class="ti ti-hash"></i> هيكل: '+vin+'</span>':'')+
       '<span class="badge" style="background:var(--green-bg);color:var(--green);margin:2px"><i class="ti ti-check"></i> متاحة في المخزون (الكمية المتاحة: '+avail+')</span>';
     det.style.display='block';
     if (plateInput) {
@@ -6413,9 +6524,9 @@ async function saveVehicleDelivery() {
       status: newAvail===0 && newClient>0 ? 'عند عميل' : a.status
     };
     if (!a.plateNumber && plate) assetUpdate.plateNumber = plate; // مزامنة رقم اللوحة المُدخل مع سجل الأصل إن لم يكن مسجلاً من قبل
-    await upd(docRef(window.db,"assets",a._id), assetUpdate);
-    await add(col(window.db,"vehicleDeliveries"),{
+    await upd(docRef(window.db,"assets",a._id), assetUpdate);    await add(col(window.db,"vehicleDeliveries"),{
       assetId, assetName:a.name, assetCode:a.code||'', assetType:a.type||'', assetSubType:a.subType||'',
+      vinNumber:a.vinNumber||'',
       plate, employeeName:empName,
       employeeJobId:document.getElementById('vd-emp-id').value.trim(),
       department:document.getElementById('vd-dept').value.trim(),
@@ -6588,6 +6699,7 @@ function printVehicleDeliveryForm(vid) {
         <table>
           <tr><td class="lbl">اسم المركبة</td><td style="font-weight:700">${v.assetName||asset.name||'—'}</td><td class="lbl">النوع</td><td>${asset.type||v.assetType||'—'}</td></tr>
           <tr><td class="lbl">رقم اللوحة</td><td style="font-weight:800;font-size:15px;color:#5B21B6">${v.plate||'—'}</td><td class="lbl">الموديل/الفئة</td><td>${asset.subType||v.assetSubType||'—'}</td></tr>
+          ${(v.vinNumber||asset.vinNumber)?'<tr><td class="lbl">رقم الهيكل / VIN</td><td colspan="3" style="font-family:monospace;font-weight:700;letter-spacing:1px">'+(v.vinNumber||asset.vinNumber||'—')+'</td></tr>':''}
         </table>
       </div>
     </div>
@@ -7085,6 +7197,8 @@ if(typeof can!=='undefined')window.can=can;
 if(typeof showPage!=='undefined')window.showPage=showPage;
 if(typeof renderAll!=='undefined')window.renderAll=renderAll;
 if(typeof populateTypeFilters!=='undefined')window.populateTypeFilters=populateTypeFilters;
+if(typeof renderAssetTypeTabs!=='undefined')window.renderAssetTypeTabs=renderAssetTypeTabs;
+if(typeof setAssetTypeTab!=='undefined')window.setAssetTypeTab=setAssetTypeTab;
 if(typeof applyCompanySettings!=='undefined')window.applyCompanySettings=applyCompanySettings;
 if(typeof showToast!=='undefined')window.showToast=showToast;
 if(typeof closeModal!=='undefined')window.closeModal=closeModal;
@@ -7237,6 +7351,7 @@ if(typeof clearCustodyAsset!=='undefined')window.clearCustodyAsset=clearCustodyA
 if(typeof hideCustodyDropdown!=='undefined')window.hideCustodyDropdown=hideCustodyDropdown;
 if(typeof filterCustody!=='undefined')window.filterCustody=filterCustody;
 if(typeof isVehicleAssetType!=='undefined')window.isVehicleAssetType=isVehicleAssetType;
+if(typeof getAssetTerms!=='undefined')window.getAssetTerms=getAssetTerms;
 if(typeof openNewVehicleDelivery!=='undefined')window.openNewVehicleDelivery=openNewVehicleDelivery;
 if(typeof openVehicleDeliveryFromAsset!=='undefined')window.openVehicleDeliveryFromAsset=openVehicleDeliveryFromAsset;
 if(typeof openVehicleDeliveryModal!=='undefined')window.openVehicleDeliveryModal=openVehicleDeliveryModal;
