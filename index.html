@@ -1015,22 +1015,26 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
       <div class="page" id="page-asset-history">
         <div class="page-title">
           <span><i class="ti ti-history"></i> سجل تاريخ الأصل</span>
-          <div style="display:flex;gap:8px;align-items:center">
-            <button class="report-page-btn" onclick="printAssetHistory()"><i class="ti ti-printer"></i> طباعة السجل</button>
-          </div>
+          <button class="report-page-btn" onclick="printAssetHistory()"><i class="ti ti-printer"></i> طباعة السجل</button>
         </div>
-        <div class="table-card" style="padding:20px;margin-bottom:16px">
-          <div style="font-size:14px;font-weight:700;margin-bottom:14px;color:var(--blue)">البحث عن أصل بالباركود أو الاسم</div>
+        <!-- خطوة 1: اختيار نوع الأصل -->
+        <div class="table-card" style="padding:18px;margin-bottom:14px">
+          <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px"><i class="ti ti-filter"></i> الخطوة 1 — اختر نوع الأصل</div>
+          <div id="history-type-tabs" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+        </div>
+        <!-- خطوة 2: اختيار الأصل -->
+        <div class="table-card" style="padding:18px;margin-bottom:14px" id="history-asset-pick-card">
+          <div style="font-size:13px;font-weight:700;color:var(--text2);margin-bottom:10px"><i class="ti ti-package"></i> الخطوة 2 — اختر الأصل</div>
           <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-            <div class="field" style="margin:0;flex:1;min-width:200px">
-              <label>الباركود / كود الأصل</label>
-              <input type="text" id="history-barcode" placeholder="مثال: FR-123456" oninput="searchAssetHistory()">
-            </div>
             <div class="field" style="margin:0;flex:2;min-width:200px">
-              <label>اسم الأصل</label>
+              <label>اختر الأصل من القائمة</label>
               <select id="history-asset-select" onchange="loadAssetHistoryById(this.value)">
-                <option value="">-- اختر من القائمة --</option>
+                <option value="">-- اختر نوع الأصل أولاً --</option>
               </select>
+            </div>
+            <div class="field" style="margin:0;flex:1;min-width:160px">
+              <label>أو ابحث بالكود / الاسم</label>
+              <input type="text" id="history-barcode" placeholder="مثال: FR-123456" oninput="searchAssetHistory()">
             </div>
             <button class="add-btn" style="height:38px" onclick="searchAssetHistory()"><i class="ti ti-search"></i> بحث</button>
           </div>
@@ -3604,8 +3608,10 @@ function populateTypeFilters() {
   });
   const sp = document.getElementById('subtype-parent');
   if (sp) sp.innerHTML = '<option value="">-- اختر النوع الرئيسي --</option>' + types.map(t=>'<option value="'+t+'">'+t+'</option>').join('');
-  // تبويبات نوع الأصل
+  // تبويبات نوع الأصل (سجل الأصول + سجل التاريخ)
   renderAssetTypeTabs();
+  renderHistoryTypeTabs();
+  populateHistoryAssetSelect();
 }
 
 /* تبويبات نوع الأصل فوق الجدول — اختيار نوع أولاً ثم عرض أصوله */
@@ -5355,83 +5361,155 @@ function getFinancialItems() {
   });
   return items;
 }
+let _historyActiveType = '';
+let _currentHistoryAssetId = null;
+
+/* تبويبات نوع الأصل في صفحة التاريخ */
+function renderHistoryTypeTabs() {
+  const wrap = document.getElementById('history-type-tabs');
+  if (!wrap) return;
+  const types = getAssetTypes();
+  const tab = (active, label, icon, onclick) =>
+    `<button onclick="${onclick}" style="padding:7px 16px;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid;font-family:var(--font);transition:all .2s;${active?'background:var(--blue);color:#fff;border-color:var(--blue)':'background:var(--card);color:var(--text2);border-color:var(--border)'}">
+      <i class="ti ${icon}" style="font-size:12px"></i> ${label}
+    </button>`;
+  wrap.innerHTML = tab(_historyActiveType==='','الكل','ti-layout-grid',"setHistoryTypeTab('')") +
+    types.map(t=>{
+      const isVeh = isVehicleAssetType(t);
+      const icon = isVeh?'ti-car':/ثلاج|عرض|تبريد/.test(t)?'ti-snowflake':/معد|آل|مولد/.test(t)?'ti-tool':/حاسب|لابتوب|جهاز/.test(t)?'ti-device-laptop':'ti-package';
+      return tab(_historyActiveType===t, t, icon, `setHistoryTypeTab('${t.replace(/'/g,"\\'")}')`)
+    }).join('');
+}
+
+function setHistoryTypeTab(type) {
+  _historyActiveType = type;
+  _currentHistoryAssetId = null;
+  document.getElementById('asset-history-result').innerHTML = '';
+  renderHistoryTypeTabs();
+  populateHistoryAssetSelect();
+}
+
 function populateHistoryAssetSelect() {
   const sel = document.getElementById('history-asset-select');
   if (!sel) return;
-  const assets = getAssets();
-  sel.innerHTML = '<option value="">-- اختر من القائمة --</option>' +
-    assets.map(a=>'<option value="'+a._id+'">'+a.name+' ['+a.code+']</option>').join('');
+  const assets = _historyActiveType
+    ? getAssets().filter(a=>a.type===_historyActiveType)
+    : getAssets();
+  sel.innerHTML = '<option value="">-- اختر الأصل --</option>' +
+    assets.map(a=>'<option value="'+a._id+'">'+a.name+' ['+a.code+']'+(a.plateNumber?' — لوحة: '+a.plateNumber:'')+'</option>').join('');
+  sel.size = 1;
 }
 
 function searchAssetHistory() {
   const barcode = (document.getElementById('history-barcode')?.value||'').trim().toLowerCase();
   if (!barcode) { populateHistoryAssetSelect(); return; }
-  const assets = getAssets();
-  const found = assets.find(a=>(a.code||'').toLowerCase()===barcode||(a.barcode||'').toLowerCase()===barcode);
+  const pool = _historyActiveType ? getAssets().filter(a=>a.type===_historyActiveType) : getAssets();
+  const found = pool.find(a=>(a.code||'').toLowerCase()===barcode||(a.barcode||'').toLowerCase()===barcode||(a.vinNumber||'').toLowerCase()===barcode||(a.plateNumber||'').toLowerCase()===barcode);
   if (found) { loadAssetHistoryById(found._id); }
   else {
-    // fuzzy: search by name too
-    const fuzzy = assets.filter(a=>(a.code||'').toLowerCase().includes(barcode)||(a.name||'').toLowerCase().includes(barcode));
+    const fuzzy = pool.filter(a=>(a.code||'').toLowerCase().includes(barcode)||(a.name||'').toLowerCase().includes(barcode)||(a.plateNumber||'').toLowerCase().includes(barcode));
     if (fuzzy.length===1) { loadAssetHistoryById(fuzzy[0]._id); }
     else if (fuzzy.length>1) {
       const sel=document.getElementById('history-asset-select');
-      if(sel){sel.innerHTML='<option value="">-- اختر من النتائج --</option>'+fuzzy.map(a=>'<option value="'+a._id+'">'+a.name+' ['+a.code+']</option>').join('');sel.size=Math.min(fuzzy.length+1,8);}
+      if(sel){sel.innerHTML='<option value="">-- اختر من النتائج --</option>'+fuzzy.map(a=>'<option value="'+a._id+'">'+a.name+' ['+a.code+']'+(a.plateNumber?' — لوحة: '+a.plateNumber:'')+'</option>').join('');sel.size=Math.min(fuzzy.length+1,8);}
       document.getElementById('asset-history-result').innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> وُجد '+fuzzy.length+' نتائج، اختر من القائمة أعلاه</div>';
     } else {
-      document.getElementById('asset-history-result').innerHTML='<div class="alert alert-warning"><i class="ti ti-alert-circle"></i> لم يُوجد أصل بهذا الباركود أو الاسم</div>';
+      document.getElementById('asset-history-result').innerHTML='<div class="alert alert-warning"><i class="ti ti-alert-circle"></i> لم يُوجد أصل بهذا الكود أو الاسم</div>';
     }
   }
 }
 
-let _currentHistoryAssetId = null;
 function loadAssetHistoryById(assetId) {
   if (!assetId) return;
   _currentHistoryAssetId = assetId;
   const a = getAssets().find(x=>x._id===assetId);
   if (!a) return;
-  const handovers = getHandovers().filter(h=>h.assetId===assetId);
-  const returns = getReturns().filter(r=>r.assetId===assetId);
+  const isVeh = isVehicleAssetType(a.type);
+  const terms = getAssetTerms(a.type);
+
+  const handovers    = getHandovers().filter(h=>h.assetId===assetId);
+  const returns      = getReturns().filter(r=>r.assetId===assetId);
   const maintenances = getMaintenances().filter(m=>m.assetId===assetId);
-  const disposes = getDisposes().filter(d=>d.assetId===assetId);
-  const custody = (window.custodyRequests||[]).filter(c=>c.assetId===assetId);
+  const disposes     = getDisposes().filter(d=>d.assetId===assetId);
+  const custody      = (window.custodyRequests||[]).filter(c=>c.assetId===assetId);
+  const vDeliveries  = isVeh ? getVehicleDeliveries().filter(v=>v.assetId===assetId) : [];
 
-  // Build unified timeline
+  // بناء الجدول الزمني الموحد
   let events = [];
-  events.push({type:'إضافة',icon:'ti-plus',color:'var(--green)',date:a.date||'',desc:'تمت إضافة الأصل إلى المخزون',qty:a.totalQty,ref:''});
-  handovers.forEach(h=>events.push({type:'تسليم',icon:'ti-transfer',color:'var(--blue)',date:h.date||'',desc:'تسليم إلى: '+h.clientName+' | الكمية: '+h.qty,qty:h.qty,ref:h._id}));
-  returns.forEach(r=>events.push({type:'استرداد',icon:'ti-corner-up-left',color:'var(--teal)',date:r.date||'',desc:'استرداد من: '+r.clientName+' | السبب: '+r.reason+' | الحالة: '+r.conditionAfterReturn,qty:r.qty,ref:r._id}));
-  maintenances.forEach(m=>events.push({type:'صيانة',icon:'ti-tool',color:'var(--amber)',date:m.date||'',desc:'تحويل لصيانة: '+m.vendor+' | '+m.fault+' | الحالة: '+m.status+(m.autoCreated?' (تلقائي)':''),qty:m.qty,ref:m._id}));
-  disposes.forEach(d=>events.push({type:'إتلاف',icon:'ti-trash',color:'var(--red)',date:d.date||'',desc:'الإتلاف: '+d.reason+' | المعتمد: '+d.approved+(d.autoCreated?' (تلقائي)':''),qty:d.qty,ref:d._id}));
-  custody.forEach(c=>events.push({type:'عهدة',icon:'ti-file-invoice',color:'var(--purple)',date:c.date||'',desc:'طلب عهدة: '+c.requesterName+' | الغرض: '+c.purpose+' | الحالة: '+c.requestStatus,qty:'-',ref:c._id}));
-  events.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  events.push({type:'إضافة',icon:'ti-plus',color:'var(--green)',date:a.date||'',desc:'تمت إضافة الأصل إلى المخزون'+(a.totalQty?' | الكمية: '+a.totalQty:''),qty:a.totalQty||1,ref:''});
 
-  const typeColors={'إضافة':'badge-green','تسليم':'badge-blue','استرداد':'badge-teal','صيانة':'badge-amber','إتلاف':'badge-red','عهدة':'badge-purple'};
+  if (isVeh) {
+    // المركبات: التسليم للموظفين واسترجاعها
+    vDeliveries.forEach(v=>{
+      const active = v.status!=='مُرتجعة';
+      events.push({
+        type:'تسليم مركبة', icon:'ti-car', color:'var(--blue)',
+        date:v.date||'', time:v.time||'',
+        desc:'تسليم إلى: '+v.employeeName+(v.department?' | القسم: '+v.department:'')+
+             (v.plate?' | اللوحة: '+v.plate:'')+
+             (v.odometer?' | العداد: '+Number(v.odometer).toLocaleString('ar-SA')+' كم':'')+
+             (v.condition?' | الحالة: '+v.condition:'')+
+             (v.responsible?' | المسؤول: '+v.responsible:''),
+        qty:1, ref:v._id, badge:'badge-blue'
+      });
+      if (!active && v.returnedAt) {
+        events.push({
+          type:'استرجاع مركبة', icon:'ti-corner-up-left', color:'var(--teal)',
+          date:v.returnedAt.slice(0,10)||'',
+          desc:'استرجاع المركبة من: '+v.employeeName+(v.returnedBy?' | بواسطة: '+v.returnedBy:''),
+          qty:1, ref:v._id, badge:'badge-teal'
+        });
+      }
+    });
+  } else {
+    handovers.forEach(h=>events.push({type:'تسليم',icon:'ti-transfer',color:'var(--blue)',date:h.date||'',desc:terms.handedTo+': '+h.clientName+' | الكمية: '+h.qty,qty:h.qty,ref:h._id,badge:'badge-blue'}));
+    returns.forEach(r=>events.push({type:'استرداد',icon:'ti-corner-up-left',color:'var(--teal)',date:r.date||'',desc:'استرداد من: '+r.clientName+' | السبب: '+r.reason+' | الحالة: '+r.conditionAfterReturn,qty:r.qty,ref:r._id,badge:'badge-teal'}));
+  }
+  maintenances.forEach(m=>events.push({type:'صيانة',icon:'ti-tool',color:'var(--amber)',date:m.date||'',desc:'تحويل لصيانة: '+m.vendor+' | '+m.fault+' | الحالة: '+m.status+(m.autoCreated?' (تلقائي)':''),qty:m.qty,ref:m._id,badge:'badge-amber'}));
+  disposes.forEach(d=>events.push({type:'إتلاف',icon:'ti-trash',color:'var(--red)',date:d.date||'',desc:'سبب الإتلاف: '+d.reason+' | المعتمد: '+d.approved+(d.autoCreated?' (تلقائي)':''),qty:d.qty,ref:d._id,badge:'badge-red'}));
+  custody.forEach(c=>events.push({type:'عهدة',icon:'ti-file-invoice',color:'var(--purple)',date:c.date||'',desc:'طلب عهدة: '+c.requesterName+' | الغرض: '+c.purpose+' | الحالة: '+c.requestStatus,qty:'-',ref:c._id,badge:'badge-purple'}));
+  events.sort((a,b)=>{ const da=(a.date||'')+(a.time||''), db=(b.date||'')+(b.time||''); return da<db?-1:da>db?1:0; });
+
+  // بطاقة المعلومات الأساسية للمركبة
+  const vehicleInfoCard = isVeh ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px">
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px"><i class="ti ti-id"></i> رقم اللوحة</div><div style="font-weight:700;color:var(--purple);font-size:15px">${a.plateNumber||'—'}</div></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px"><i class="ti ti-hash"></i> رقم الهيكل VIN</div><div style="font-weight:700;font-family:monospace;font-size:12px">${a.vinNumber||'—'}</div></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px"><i class="ti ti-car"></i> الحالة الحالية</div><div>${statusBadge(a.status,a._id)}</div></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">عمليات التسليم</div><div style="font-weight:700;color:var(--blue)">${vDeliveries.length}</div></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">حالياً مع موظف</div><div style="font-weight:700;color:${a.clientQty>0?'var(--blue)':'var(--green)'}">${a.clientQty>0?'نعم':'لا'}</div></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">مسؤول التسليم الأخير</div><div style="font-weight:600;font-size:12px">${vDeliveries.length?vDeliveries[vDeliveries.length-1].responsible||'—':'—'}</div></div>
+    </div>` : '';
+
+  const statKey = isVeh ? terms.status : 'عند عميل';
   const html =
     '<div class="table-card" style="margin-bottom:16px;padding:18px" id="asset-history-panel">'+
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'+
       '<div>'+
-        '<div style="font-size:16px;font-weight:700;color:var(--blue)">'+a.name+'</div>'+
-        '<div style="margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">'+
+        '<div style="font-size:16px;font-weight:700;color:var(--blue)"><i class="ti '+(isVeh?'ti-car':'ti-package')+'" style="margin-left:6px"></i>'+a.name+'</div>'+
+        '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'+
           '<code class="tag" style="font-size:13px"><i class="ti ti-barcode"></i> '+a.code+'</code>'+
           '<span class="badge badge-blue">'+a.type+'</span>'+
           (a.subType?'<span class="badge badge-gray">'+a.subType+'</span>':'')+
+          (a.manufacturer?'<span class="badge badge-gray">'+a.manufacturer+'</span>':'')+
           statusBadge(a.status,a._id)+
         '</div>'+
       '</div>'+
-      '<div style="display:flex;gap:6px">'+
-        '<button class="report-page-btn" onclick="printAssetHistory()"><i class="ti ti-printer"></i> طباعة</button>'+
-      '</div>'+
+      '<button class="report-page-btn" onclick="printAssetHistory()"><i class="ti ti-printer"></i> طباعة</button>'+
     '</div>'+
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:16px">'+
-      ['الإجمالي|'+a.totalQty+'|var(--blue)','متاح|'+a.availableQty+'|var(--green)','عند عميل|'+a.clientQty+'|#2655A8','صيانة|'+a.maintenanceQty+'|var(--amber)','تالف|'+a.damagedQty+'|var(--red)','عمليات|'+events.length+'|var(--purple)'].map(s=>{const[k,v,c]=s.split('|');return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;text-align:center"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">'+k+'</div><div style="font-size:20px;font-weight:700;color:'+c+'">'+v+'</div></div>'}).join('')+
+    vehicleInfoCard+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:16px">'+
+      [['الإجمالي',a.totalQty,'var(--blue)'],['متاح',a.availableQty,'var(--green)'],[statKey,a.clientQty,'#2655A8'],['صيانة',a.maintenanceQty,'var(--amber)'],['تالف',a.damagedQty,'var(--red)'],['إجمالي العمليات',events.length,'var(--purple)']].map(([k,v,col])=>
+        '<div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px;text-align:center"><div style="font-size:10px;color:var(--text2);margin-bottom:4px">'+k+'</div><div style="font-size:20px;font-weight:700;color:'+col+'">'+v+'</div></div>'
+      ).join('')+
     '</div>'+
-    '<div style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:10px;border-bottom:2px solid var(--blue-bg);padding-bottom:6px"><i class="ti ti-timeline"></i> جميع العمليات ('+events.length+')</div>'+
+    '<div style="font-size:13px;font-weight:700;color:var(--blue);margin-bottom:10px;border-bottom:2px solid var(--blue-bg);padding-bottom:6px"><i class="ti ti-timeline"></i> الجدول الزمني لجميع العمليات ('+events.length+')</div>'+
     '<table><thead><tr><th>#</th><th>التاريخ</th><th>نوع العملية</th><th>التفاصيل</th><th>الكمية</th></tr></thead><tbody>'+
     (events.length?events.map((e,i)=>
       '<tr>'+
       '<td style="color:var(--text3)">'+(i+1)+'</td>'+
-      '<td style="font-size:12px;white-space:nowrap">'+(e.date||'-')+'</td>'+
-      '<td><span class="badge '+(typeColors[e.type]||'badge-gray')+'"><i class="ti '+e.icon+'"></i> '+e.type+'</span></td>'+
+      '<td style="font-size:12px;white-space:nowrap">'+(e.date||'-')+(e.time?' '+e.time:'')+'</td>'+
+      '<td><span class="badge '+(e.badge||'badge-gray')+'"><i class="ti '+e.icon+'"></i> '+e.type+'</span></td>'+
       '<td style="font-size:12px;color:var(--text2)">'+e.desc+'</td>'+
       '<td style="text-align:center;font-weight:700">'+e.qty+'</td>'+
       '</tr>'
@@ -5439,6 +5517,9 @@ function loadAssetHistoryById(assetId) {
     '</tbody></table></div>';
 
   document.getElementById('asset-history-result').innerHTML = html;
+  // مزامنة الاختيار في القائمة
+  const sel = document.getElementById('history-asset-select');
+  if (sel) sel.value = assetId;
 }
 
 function printAssetHistory() {
@@ -7199,6 +7280,9 @@ if(typeof renderAll!=='undefined')window.renderAll=renderAll;
 if(typeof populateTypeFilters!=='undefined')window.populateTypeFilters=populateTypeFilters;
 if(typeof renderAssetTypeTabs!=='undefined')window.renderAssetTypeTabs=renderAssetTypeTabs;
 if(typeof setAssetTypeTab!=='undefined')window.setAssetTypeTab=setAssetTypeTab;
+if(typeof renderHistoryTypeTabs!=='undefined')window.renderHistoryTypeTabs=renderHistoryTypeTabs;
+if(typeof setHistoryTypeTab!=='undefined')window.setHistoryTypeTab=setHistoryTypeTab;
+if(typeof populateHistoryAssetSelect!=='undefined')window.populateHistoryAssetSelect=populateHistoryAssetSelect;
 if(typeof applyCompanySettings!=='undefined')window.applyCompanySettings=applyCompanySettings;
 if(typeof showToast!=='undefined')window.showToast=showToast;
 if(typeof closeModal!=='undefined')window.closeModal=closeModal;
