@@ -4493,8 +4493,8 @@ function buildCustomerOptions() {
 /* فئة نوع الأصل: ثلاجات → عميل | كهربائيات → موظف */
 function getHandoverMode(typeName) {
   const t = (typeName||'').trim();
-  if (/كهرب|تلفاز|شاش|طابع|مكيف|مجفف|غسال|مايكروويف|فرن/.test(t)) return 'employee';
-  return 'customer';                  /* الافتراضي: عميل */
+  if (/كهرب|إلكتر|الكتر|تلفاز|شاش|طابع|مكيف|مجفف|غسال|مايكروويف|فرن|جهاز/.test(t)) return 'employee';
+  return 'customer';
 }
 
 /* فلترة الأصول المتاحة حسب جهة التسليم */
