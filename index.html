@@ -10,7 +10,7 @@
 <script>
 (function(){
   try {
-    var s = localStorage.getItem('_assetSession');
+    var s = sessionStorage.getItem('_assetSession');
     if (s) {
       var sess = JSON.parse(s);
       if (sess && sess._id) {
@@ -1478,7 +1478,7 @@ try {
 
   // Auto-restore session from localStorage
   try {
-    const saved = localStorage.getItem('_assetSession');
+    const saved = sessionStorage.getItem('_assetSession');
     if (saved) {
       const sess = JSON.parse(saved);
       const fresh = (window.users||[]).find(u=>u._id===sess._id);
@@ -1525,7 +1525,7 @@ try {
         try { if (typeof refreshNotificationSourceData === 'function') refreshNotificationSourceData(); } catch(e){}
         console.log("✅ Session restored for:", fresh.name);
       } else {
-        localStorage.removeItem('_assetSession');
+        sessionStorage.removeItem('_assetSession');
         // إزالة مؤشر التحميل وإعادة شاشة الدخول بشكل طبيعي
         document.documentElement.removeAttribute('data-restoring-session');
         const loginEl = document.getElementById('login-screen');
@@ -3305,7 +3305,7 @@ async function doLogin() {
     // تسجيل حدث الدخول
     try { logAudit('login','تسجيل دخول',`${found.name} (${found.role}) سجّل دخوله للنظام`); } catch(e){}
     // Save session to localStorage for auto-login on refresh
-    try { localStorage.setItem('_assetSession', JSON.stringify({_id:found._id, username:found.username, name:found.name, role:found.role, perms:found.perms})); } catch(e) {}
+    try { sessionStorage.setItem('_assetSession', JSON.stringify({_id:found._id, username:found.username, name:found.name, role:found.role, perms:found.perms})); } catch(e) {}
     document.getElementById('login-error').style.display='none';
     document.getElementById('login-screen').style.display='none';
     // مسح display:none الصريح الذي يضعه doLogout + إزالة hidden class
@@ -3356,7 +3356,7 @@ async function doLogin() {
 
 function doLogout() {
   currentUser = null;
-  try { localStorage.removeItem('_assetSession'); } catch(e) {}
+  try { sessionStorage.removeItem('_assetSession'); } catch(e) {}
   // إزالة أي حالة تحميل تلقائي
   document.documentElement.removeAttribute('data-restoring-session');
   resetNav();
