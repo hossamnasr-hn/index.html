@@ -6,7 +6,7 @@
 <title id="page-title">نظام إدارة الأصول - ثمار القمة</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<!-- إخفاء شاشة الدخول فوراً إذا كانت هناك جلسة محفوظة — يمنع الوميض عند تحديث الصفحة -->
+<!-- سكريبت تجهيزي: إذا كانت هناك جلسة محفوظة نُظهر مؤشر التحميل على شاشة الدخول بدلاً من إخفائها -->
 <script>
 (function(){
   try {
@@ -14,11 +14,8 @@
     if (s) {
       var sess = JSON.parse(s);
       if (sess && sess._id) {
-        // نُنشئ style tag بـ id محدد حتى نتمكن من إزالته عند تسجيل الخروج
-        var st = document.createElement('style');
-        st.id = '_session_hide_login';
-        st.textContent = '#login-screen{display:none}#app-shell{display:flex;flex-direction:column;min-height:100vh}';
-        document.head.appendChild(st);
+        // نعلم المتصفح بوجود جلسة لكن نبقي شاشة الدخول ظاهرة مع مؤشر تحميل
+        document.documentElement.setAttribute('data-restoring-session','1');
       }
     }
   } catch(e) {}
@@ -48,6 +45,11 @@ input,select,textarea{font-family:var(--font);direction:rtl}
 
 /* ── Login ── */
 #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(145deg,#EBF4FF 0%,#DBEAFE 50%,#E8F5E9 100%)}
+/* حالة استعادة الجلسة التلقائية — overlay تحميل شفاف فوق شاشة الدخول */
+[data-restoring-session='1'] #login-screen::before{content:'';position:fixed;inset:0;background:linear-gradient(145deg,#EBF4FF 0%,#DBEAFE 50%,#E8F5E9 100%);z-index:9999;display:flex;align-items:center;justify-content:center}
+[data-restoring-session='1'] #login-screen::after{content:'جارٍ استعادة الجلسة...';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;font-family:'Cairo',sans-serif;font-size:16px;font-weight:700;color:#1C3F8A;padding:24px 40px;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(28,63,138,.15);border:1.5px solid #BFDBFE}
+@keyframes pulse-text{0%,100%{opacity:1}50%{opacity:.5}}
+[data-restoring-session='1'] #login-screen::after{animation:pulse-text 1.2s ease-in-out infinite}
 .login-wrap{display:flex;flex-direction:column;align-items:center;gap:20px;width:100%;max-width:400px}
 .login-logo-area{width:120px;height:120px;border-radius:16px;overflow:hidden;background:#fff;border:2px solid var(--border);box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center}
 .login-logo-area img{width:100%;height:100%;object-fit:contain;padding:8px}
@@ -1482,7 +1484,8 @@ try {
       const fresh = (window.users||[]).find(u=>u._id===sess._id);
       if (fresh) {
         currentUser = fresh;
-        // إزالة hidden و إخفاء شاشة الدخول (قد تكون الـ CSS خفّتها مسبقاً لكن نؤكد هنا)
+        // إزالة مؤشر التحميل وإخفاء شاشة الدخول وإظهار التطبيق
+        document.documentElement.removeAttribute('data-restoring-session');
         const loginEl = document.getElementById('login-screen');
         const appEl   = document.getElementById('app-shell');
         if (loginEl) loginEl.style.display = 'none';
@@ -1523,7 +1526,8 @@ try {
         console.log("✅ Session restored for:", fresh.name);
       } else {
         localStorage.removeItem('_assetSession');
-        // إعادة إظهار شاشة الدخول إذا كانت الجلسة غير صالحة
+        // إزالة مؤشر التحميل وإعادة شاشة الدخول بشكل طبيعي
+        document.documentElement.removeAttribute('data-restoring-session');
         const loginEl = document.getElementById('login-screen');
         const appEl   = document.getElementById('app-shell');
         if (loginEl) loginEl.style.cssText = '';
@@ -3351,14 +3355,13 @@ async function doLogin() {
 function doLogout() {
   currentUser = null;
   try { localStorage.removeItem('_assetSession'); } catch(e) {}
-  // إزالة الـ style tag الذي خفى شاشة الدخول عند التحميل الأول
-  var hideStyle = document.getElementById('_session_hide_login');
-  if (hideStyle) hideStyle.parentNode.removeChild(hideStyle);
+  // إزالة أي حالة تحميل تلقائي
+  document.documentElement.removeAttribute('data-restoring-session');
   resetNav();
-  // إعادة إظهار شاشة الدخول بشكل صريح
+  // إظهار شاشة الدخول وإخفاء التطبيق
   var loginEl = document.getElementById('login-screen');
   var appEl   = document.getElementById('app-shell');
-  if (loginEl) { loginEl.style.cssText = 'display:flex'; }
+  if (loginEl) { loginEl.style.cssText = ''; loginEl.style.display = 'flex'; }
   if (appEl)   { appEl.classList.add('hidden'); appEl.style.display = 'none'; }
   // إعادة ضبط الصفحة الافتراضية
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
