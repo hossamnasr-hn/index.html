@@ -4486,203 +4486,249 @@ function buildCustomerOptions() {
 
 /* تحديد نوع التسليم: ثلاجات → عميل | أجهزة كهربائية → موظف | غيرها → عميل */
 /* ═══ كشف وضع التسليم تلقائياً ═══ */
+/* ══════════════════════════════════════════════════════
+   نموذج تسليم الأصول — اختيار الجهة أولاً ثم الأصول
+══════════════════════════════════════════════════════ */
+
+/* فئة نوع الأصل: ثلاجات → عميل | كهربائيات → موظف */
 function getHandoverMode(typeName) {
   const t = (typeName||'').trim();
   if (/كهرب|تلفاز|شاش|طابع|مكيف|مجفف|غسال|مايكروويف|فرن/.test(t)) return 'employee';
-  return 'customer';
+  return 'customer';                  /* الافتراضي: عميل */
 }
 
-function setHandoverMode(mode, lockMode) {
-  const custSec = document.getElementById('h-customer-section');
-  const empSec  = document.getElementById('h-employee-section');
-  const btnCust = document.getElementById('h-mode-btn-customer');
-  const btnEmp  = document.getElementById('h-mode-btn-employee');
-  const title   = document.getElementById('modal-title');
-  const wrap    = document.getElementById('h-mode-wrap');
-  if (!custSec||!empSec) return;
-  if (mode==='employee') {
-    custSec.style.display='none'; empSec.style.display='';
-    if(title) title.innerHTML='<i class="ti ti-transfer" style="color:var(--purple)"></i> تسليم جهاز كهربائي لموظف';
-    if(btnCust){btnCust.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--text2);font-family:var(--font);opacity:'+(lockMode?'.4':'1');}
-    if(btnEmp) {btnEmp.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--purple);background:var(--purple);color:#fff;font-family:var(--font)';}
-  } else {
-    custSec.style.display=''; empSec.style.display='none';
-    if(title) title.innerHTML='<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم أصل لعميل';
-    if(btnCust){btnCust.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--green);background:var(--green);color:#fff;font-family:var(--font)';}
-    if(btnEmp) {btnEmp.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--text2);font-family:var(--font);opacity:'+(lockMode?'.4':'1');}
-  }
-  if(wrap) { wrap.dataset.mode=mode; wrap.dataset.lockMode=lockMode?'1':'0'; }
-  // إذا النوع محدد (lockMode) نوقف زر الوضع الآخر
-  if (lockMode) {
-    if(btnCust) { btnCust.onclick = mode==='customer' ? ()=>setHandoverMode('customer',true) : ()=>{ showToast('هذا النوع من الأصول يُسلَّم للموظفين فقط','error'); }; }
-    if(btnEmp)  { btnEmp.onclick  = mode==='employee' ? ()=>setHandoverMode('employee',true) : ()=>{ showToast('هذا النوع من الأصول يُسلَّم للعملاء فقط','error'); }; }
-  } else {
-    if(btnCust) btnCust.onclick = ()=>setHandoverMode('customer',false);
-    if(btnEmp)  btnEmp.onclick  = ()=>setHandoverMode('employee',false);
-  }
+/* فلترة الأصول المتاحة حسب جهة التسليم */
+function getHandoverAssets(mode) {
+  return getAssets().filter(a => {
+    if (a.availableQty < 1) return false;
+    if (isVehicleAssetType(a.type)) return false;       /* المركبات من صفحتها */
+    return getHandoverMode(a.type) === mode;
+  });
 }
 
 function openHandoverModal(preAssetId) {
-  // استبعاد المركبات من قائمة الأصول
-  const availAssets = getAssets().filter(a=>a.availableQty>0 && !isVehicleAssetType(a.type));
-  if (!availAssets.length) { showToast('لا توجد أصول متاحة للتسليم (المركبات تُسلَّم من صفحة تسليم المركبات)','error'); return; }
-  const assetOpts = availAssets.map(a=>
-    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+
-    ' data-assettype="'+(a.type||'').replace(/"/g,'&quot;')+'"'+
-    ' data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-code="'+(a.code||'')+'">'+
-    a.name+' ['+(a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' — متاح: '+a.availableQty+'</option>'
-  ).join('');
+  /* تحديد الوضع المبدئي إذا عُرف الأصل مسبقاً */
+  let initMode = null;
+  if (preAssetId) {
+    const pa = getAssets().find(a=>a._id===preAssetId);
+    if (pa) initMode = getHandoverMode(pa.type||'');
+  }
   const today = new Date().toISOString().split('T')[0];
-  const btnBase = 'padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s';
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم أصل لعميل';
+  document.getElementById('modal-title').innerHTML = '<i class="ti ti-transfer"></i> تسليم أصل';
   document.getElementById('modal-body').innerHTML =
-    /* زر التبديل الواضح */
-    '<div id="h-mode-wrap" data-mode="customer" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-      '<span style="font-size:12px;font-weight:700;color:var(--text2)"><i class="ti ti-arrows-exchange"></i> تسليم إلى:</span>'+
-      '<button id="h-mode-btn-customer" type="button" onclick="setHandoverMode(\'customer\')" style="'+btnBase+';background:var(--green);color:#fff;border:1.5px solid var(--green)"><i class="ti ti-building-store"></i> عميل</button>'+
-      '<button id="h-mode-btn-employee" type="button" onclick="setHandoverMode(\'employee\')" style="'+btnBase+';background:var(--card);color:var(--text2);border:1.5px solid var(--border)"><i class="ti ti-user-check"></i> موظف</button>'+
-      '<span style="font-size:11px;color:var(--text3)">يتغير تلقائياً عند اختيار الأصل — أو اختر يدوياً</span>'+
-    '</div>'+
-    '<div class="form-row" style="margin-bottom:12px">'+
-      '<div class="field"><label>الأصل *</label><select id="h-asset" onchange="onHandoverAssetChange()">'+assetOpts+'</select></div>'+
-      '<div class="field"><label>عدد الوحدات *</label><input id="h-qty" type="number" min="1" value="1"></div>'+
-    '</div>'+
-    '<div id="h-asset-details" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-bottom:12px;font-size:12px;display:none"></div>'+
-    // --- حقول عميل (ثلاجات العرض) ---
-    '<div id="h-customer-section">'+
-      '<div class="form-section"><i class="ti ti-building-store"></i> بيانات العميل</div>'+
-      '<div class="field" style="margin-bottom:10px">'+
-        '<label>اختر من قائمة العملاء</label>'+
-        '<select id="h-customer-select" onchange="onHandoverCustomerSelect()">'+buildCustomerOptions()+'</select>'+
-      '</div>'+
-      '<div style="text-align:center;font-size:12px;color:var(--text3);margin-bottom:10px">— أو أدخل بيانات عميل جديد —</div>'+
-      '<div class="form-row" style="margin-bottom:12px">'+
-        '<div class="field"><label>اسم العميل / الشركة *</label><input id="h-name" placeholder="اسم العميل"></div>'+
-        '<div class="field"><label>السجل التجاري</label><input id="h-cr" placeholder="4030xxxxxx"></div>'+
-      '</div>'+
-      '<div class="form-row" style="margin-bottom:12px">'+
-        '<div class="field"><label>الجوال الرئيسي</label><input id="h-phone1" placeholder="05xxxxxxxx"></div>'+
-        '<div class="field"><label>الجوال الثانوي</label><input id="h-phone2" placeholder="اختياري"></div>'+
-      '</div>'+
-      '<div class="form-row full" style="margin-bottom:12px"><div class="field"><label>العنوان</label><input id="h-address" placeholder="المدينة — الحي — الشارع"></div></div>'+
-    '</div>'+
-    // --- حقول موظف (الأجهزة الكهربائية) ---
-    '<div id="h-employee-section" style="display:none">'+
-      '<div class="form-section"><i class="ti ti-user-check"></i> بيانات الموظف المستلم</div>'+
-      '<div class="form-row" style="margin-bottom:12px">'+
-        '<div class="field"><label>اسم الموظف *</label><input id="h-emp-name" placeholder="الاسم الكامل"></div>'+
-        '<div class="field"><label>رقم الهوية / الإقامة *</label><input id="h-emp-id" placeholder="1xxxxxxxxx"></div>'+
-      '</div>'+
-      '<div class="form-row" style="margin-bottom:12px">'+
-        '<div class="field"><label>الرقم الوظيفي</label><input id="h-emp-job-id" placeholder="اختياري"></div>'+
-        '<div class="field"><label>القسم / الإدارة</label><input id="h-emp-dept" placeholder="مثال: المبيعات"></div>'+
-      '</div>'+
-      '<div class="form-row" style="margin-bottom:12px">'+
-        '<div class="field"><label>رقم الجوال</label><input id="h-emp-phone" placeholder="05xxxxxxxx"></div>'+
-        '<div class="field"><label>المنصب الوظيفي</label><input id="h-emp-position" placeholder="مثال: مشغّل"></div>'+
+    /* ── خطوة 1: اختيار الجهة ── */
+    '<div id="h-step1" style="margin-bottom:4px">'+
+      '<div class="form-section" style="margin-top:0">الخطوة 1 — اختر الجهة المستلمة</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:6px">'+
+        '<button id="h-btn-customer" type="button" onclick="handoverPickMode(\'customer\')" style="'+
+          'padding:20px 12px;border-radius:var(--radius);font-size:14px;font-weight:700;cursor:pointer;border:2px solid var(--green);'+
+          'background:var(--green);color:#fff;font-family:var(--font);display:flex;flex-direction:column;align-items:center;gap:8px;transition:all .2s">'+
+          '<i class="ti ti-building-store" style="font-size:28px"></i><span>عميل</span>'+
+          '<span style="font-size:10px;font-weight:400;opacity:.85">ثلاجات العرض وما شابهها</span>'+
+        '</button>'+
+        '<button id="h-btn-employee" type="button" onclick="handoverPickMode(\'employee\')" style="'+
+          'padding:20px 12px;border-radius:var(--radius);font-size:14px;font-weight:700;cursor:pointer;border:2px solid var(--purple);'+
+          'background:var(--purple);color:#fff;font-family:var(--font);display:flex;flex-direction:column;align-items:center;gap:8px;transition:all .2s">'+
+          '<i class="ti ti-user-check" style="font-size:28px"></i><span>موظف</span>'+
+          '<span style="font-size:10px;font-weight:400;opacity:.85">الأجهزة الكهربائية وغيرها</span>'+
+        '</button>'+
       '</div>'+
     '</div>'+
-    '<div class="form-section">تفاصيل التسليم</div>'+
-    '<div class="form-row" style="margin-bottom:12px">'+
-      '<div class="field"><label>المسؤول</label><input id="h-resp" value="'+(currentUser?.name||'')+'"></div>'+
-      '<div class="field"><label>تاريخ التسليم</label><input id="h-date" type="date" value="'+today+'"></div>'+
+    /* ── خطوة 2: تفاصيل (مخفية حتى يُختار الوضع) ── */
+    '<div id="h-step2" style="display:none">'+
+      '<div class="form-section" style="margin-top:6px">الخطوة 2 — اختر الأصل والمستلم</div>'+
+      /* الأصل */
+      '<div class="form-row" style="margin-bottom:12px">'+
+        '<div class="field"><label>الأصل المتاح *</label>'+
+          '<select id="h-asset" onchange="onHandoverAssetChange()"><option value="">-- اختر --</option></select>'+
+        '</div>'+
+        '<div class="field"><label>عدد الوحدات *</label><input id="h-qty" type="number" min="1" value="1"></div>'+
+      '</div>'+
+      '<div id="h-asset-details" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-bottom:12px;font-size:12px;display:none"></div>'+
+      /* بيانات العميل */
+      '<div id="h-customer-section" style="display:none">'+
+        '<div class="form-section" style="background:var(--green-bg);border-color:var(--green);color:var(--green)"><i class="ti ti-building-store"></i> بيانات العميل</div>'+
+        '<div class="field" style="margin-bottom:10px"><label>اختر من قائمة العملاء</label>'+
+          '<select id="h-customer-select" onchange="onHandoverCustomerSelect()">'+buildCustomerOptions()+'</select>'+
+        '</div>'+
+        '<div style="text-align:center;font-size:12px;color:var(--text3);margin-bottom:10px">— أو أدخل بيانات عميل جديد —</div>'+
+        '<div class="form-row" style="margin-bottom:12px">'+
+          '<div class="field"><label>اسم العميل / الشركة *</label><input id="h-name" placeholder="اسم العميل"></div>'+
+          '<div class="field"><label>السجل التجاري</label><input id="h-cr" placeholder="4030xxxxxx"></div>'+
+        '</div>'+
+        '<div class="form-row" style="margin-bottom:12px">'+
+          '<div class="field"><label>الجوال الرئيسي</label><input id="h-phone1" placeholder="05xxxxxxxx"></div>'+
+          '<div class="field"><label>الجوال الثانوي</label><input id="h-phone2" placeholder="اختياري"></div>'+
+        '</div>'+
+        '<div class="form-row full" style="margin-bottom:12px"><div class="field"><label>العنوان</label><input id="h-address" placeholder="المدينة — الحي — الشارع"></div></div>'+
+      '</div>'+
+      /* بيانات الموظف */
+      '<div id="h-employee-section" style="display:none">'+
+        '<div class="form-section" style="background:var(--purple-bg);border-color:var(--purple);color:var(--purple)"><i class="ti ti-user-check"></i> بيانات الموظف المستلم</div>'+
+        '<div class="form-row" style="margin-bottom:12px">'+
+          '<div class="field"><label>اسم الموظف *</label><input id="h-emp-name" placeholder="الاسم الكامل"></div>'+
+          '<div class="field"><label>رقم الهوية / الإقامة *</label><input id="h-emp-id" placeholder="1xxxxxxxxx" maxlength="12" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')"></div>'+
+        '</div>'+
+        '<div class="form-row" style="margin-bottom:12px">'+
+          '<div class="field"><label>الرقم الوظيفي</label><input id="h-emp-job-id" placeholder="اختياري"></div>'+
+          '<div class="field"><label>القسم / الإدارة</label><input id="h-emp-dept" placeholder="مثال: المبيعات"></div>'+
+        '</div>'+
+        '<div class="form-row" style="margin-bottom:12px">'+
+          '<div class="field"><label>رقم الجوال</label><input id="h-emp-phone" placeholder="05xxxxxxxx"></div>'+
+          '<div class="field"><label>المنصب الوظيفي</label><input id="h-emp-position" placeholder="مثال: مشغّل"></div>'+
+        '</div>'+
+      '</div>'+
+      /* تفاصيل مشتركة */
+      '<div class="form-section">تفاصيل التسليم</div>'+
+      '<div class="form-row" style="margin-bottom:12px">'+
+        '<div class="field"><label>المسؤول</label><input id="h-resp" value="'+(window.currentUser?.name||'')+'"></div>'+
+        '<div class="field"><label>تاريخ التسليم</label><input id="h-date" type="date" value="'+today+'"></div>'+
+      '</div>'+
+      '<div class="form-row full" style="margin-bottom:12px"><div class="field"><label>ملاحظات</label><textarea id="h-notes" rows="2"></textarea></div></div>'+
+      '<div class="form-row full"><div class="field"><label>الإجراءات والشروط</label><textarea id="h-actions" rows="2" placeholder="مثال: يُعاد خلال 30 يوماً..."></textarea></div></div>'+
     '</div>'+
-    '<div class="form-row full" style="margin-bottom:12px"><div class="field"><label>ملاحظات</label><textarea id="h-notes" rows="2"></textarea></div></div>'+
-    '<div class="form-row full"><div class="field"><label>الإجراءات والشروط</label><textarea id="h-actions" rows="2" placeholder="مثال: يُسلَّم بحالة ممتازة، يُعاد خلال 30 يوماً..."></textarea></div></div>';
+    /* حقل مخفي للوضع الحالي */
+    '<input type="hidden" id="h-mode" value="">';
+
   document.getElementById('modal-save-btn').className='btn-save success-btn';
   document.getElementById('modal-save-btn').textContent='تأكيد التسليم';
+  document.getElementById('modal-save-btn').style.display='none'; /* مخفي حتى يُختار وضع */
   document.getElementById('modal-save-btn').onclick=saveHandover;
   document.getElementById('modal-box').className='modal wide';
   document.getElementById('modal-overlay').classList.add('show');
-  setTimeout(onHandoverAssetChange,100);
+
+  /* إذا جاء بأصل محدد مسبقاً، نفعّل الوضع مباشرة */
+  if (initMode) setTimeout(()=>handoverPickMode(initMode, preAssetId), 80);
+}
+
+function handoverPickMode(mode, preAssetId) {
+  /* تحديث الأزرار */
+  const btnC = document.getElementById('h-btn-customer');
+  const btnE = document.getElementById('h-btn-employee');
+  if (btnC) { btnC.style.opacity = mode==='customer'?'1':'0.45'; btnC.style.transform = mode==='customer'?'scale(1.03)':'scale(1)'; }
+  if (btnE) { btnE.style.opacity = mode==='employee'?'1':'0.45'; btnE.style.transform = mode==='employee'?'scale(1.03)':'scale(1)'; }
+
+  /* تحديث العنوان */
+  const title = document.getElementById('modal-title');
+  if (title) title.innerHTML = mode==='customer'
+    ? '<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم ثلاجة عرض لعميل'
+    : '<i class="ti ti-transfer" style="color:var(--purple)"></i> تسليم جهاز كهربائي لموظف';
+
+  /* حفظ الوضع */
+  const modeInput = document.getElementById('h-mode');
+  if (modeInput) modeInput.value = mode;
+
+  /* إظهار الخطوة 2 */
+  const step2 = document.getElementById('h-step2');
+  if (step2) step2.style.display = '';
+
+  /* إظهار/إخفاء أقسام العميل والموظف */
+  const custSec = document.getElementById('h-customer-section');
+  const empSec  = document.getElementById('h-employee-section');
+  if (custSec) custSec.style.display = mode==='customer' ? '' : 'none';
+  if (empSec)  empSec.style.display  = mode==='employee' ? '' : 'none';
+
+  /* ملء قائمة الأصول بالنوع المناسب فقط */
+  const assets = getHandoverAssets(mode);
+  const sel = document.getElementById('h-asset');
+  if (sel) {
+    if (!assets.length) {
+      sel.innerHTML = '<option value="">-- لا توجد أصول متاحة لهذه الفئة --</option>';
+    } else {
+      sel.innerHTML = '<option value="">-- اختر --</option>' + assets.map(a=>
+        '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+
+        ' data-assettype="'+(a.type||'').replace(/"/g,'&quot;')+'"'+
+        ' data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-code="'+(a.code||'')+'">'+
+        a.name+' ['+(a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' — متاح: '+a.availableQty+
+        '</option>'
+      ).join('');
+    }
+    if (preAssetId) { sel.value = preAssetId; onHandoverAssetChange(); }
+    else { const det=document.getElementById('h-asset-details'); if(det) det.style.display='none'; }
+  }
+
+  /* إظهار زر الحفظ */
+  const saveBtn = document.getElementById('modal-save-btn');
+  if (saveBtn) saveBtn.style.display = '';
 }
 
 function onHandoverAssetChange() {
   const sel = document.getElementById('h-asset');
   if (!sel||!sel.options[sel.selectedIndex]) return;
   const opt = sel.options[sel.selectedIndex];
-  if (!opt.value) return;
   const det = document.getElementById('h-asset-details');
-  const subs = [opt.dataset.subtype, opt.dataset.mfg].filter(Boolean);
-  const code = opt.dataset.code||'';
-  // قراءة النوع من data-assettype (بدون ترميز)
-  const assetType = opt.dataset.assettype||opt.getAttribute('data-assettype')||'';
+  if (!opt.value) { if(det) det.style.display='none'; return; }
+  const subs  = [opt.dataset.subtype, opt.dataset.mfg].filter(Boolean);
+  const code  = opt.dataset.code||'';
+  const atype = opt.dataset.assettype||opt.getAttribute('data-assettype')||'';
   if (det) {
     det.innerHTML =
       (code?'<span class="badge badge-blue" style="margin:2px"><i class="ti ti-barcode"></i> '+code+'</span>':'')+
-      (assetType?'<span class="badge badge-purple" style="margin:2px">'+assetType+'</span>':'')+
+      (atype?'<span class="badge badge-purple" style="margin:2px">'+atype+'</span>':'')+
       subs.map(s=>'<span class="badge badge-gray" style="margin:2px">'+s+'</span>').join('');
     det.style.display='block';
   }
-  // تبديل الوضع تلقائياً وقفله حسب نوع الأصل
-  const mode = getHandoverMode(assetType);
-  const shouldLock = assetType.length > 0; // قفل الوضع إذا تم تحديد نوع الأصل
-  setHandoverMode(mode, shouldLock);
 }
 
 function onHandoverCustomerSelect() {
   const sel = document.getElementById('h-customer-select');
   if (!sel||!sel.value) return;
   const opt = sel.options[sel.selectedIndex];
-  document.getElementById('h-name').value = opt.dataset.name||'';
-  document.getElementById('h-phone1').value = opt.dataset.phone||'';
-  document.getElementById('h-address').value = opt.dataset.address||'';
-  document.getElementById('h-cr').value = opt.dataset.cr||'';
+  const n=document.getElementById('h-name');       if(n) n.value=opt.dataset.name||'';
+  const p=document.getElementById('h-phone1');     if(p) p.value=opt.dataset.phone||'';
+  const a=document.getElementById('h-address');    if(a) a.value=opt.dataset.address||'';
+  const c=document.getElementById('h-cr');         if(c) c.value=opt.dataset.cr||'';
 }
 
 async function saveHandover() {
-  const assetId = document.getElementById('h-asset').value;
-  const qty = parseInt(document.getElementById('h-qty').value)||0;
+  const assetId = document.getElementById('h-asset')?.value;
+  const qty     = parseInt(document.getElementById('h-qty')?.value)||0;
+  const mode    = document.getElementById('h-mode')?.value||'';
   const a = getAssets().find(x=>x._id===assetId);
-  if (!assetId||!a) { showToast('يرجى اختيار الأصل','error'); return; }
+  if (!mode)       { showToast('يرجى اختيار الجهة المستلمة (عميل أو موظف)','error'); return; }
+  if (!assetId||!a){ showToast('يرجى اختيار الأصل','error'); return; }
   if (!qty||qty<1) { showToast('يرجى إدخال عدد صحيح','error'); return; }
-  if (a.availableQty<qty) { showToast('العدد يتجاوز المتاح','error'); return; }
-
-  const mode = document.getElementById('h-mode-wrap')?.dataset.mode || 'customer';
-  let clientName='', customerId='', crNumber='', phone1='', phone2='', clientAddress='';
-  let empName='', empNationalId='', empJobId='', empDept='', empPhone='', empPosition='';
-
+  if (a.availableQty<qty){ showToast('العدد يتجاوز الكمية المتاحة','error'); return; }
+  let clientName='',customerId='',crNumber='',phone1='',phone2='',clientAddress='';
+  let empNationalId='',empJobId='',empDept='',empPhone='',empPosition='';
   if (mode==='employee') {
-    empName      = (document.getElementById('h-emp-name')?.value||'').trim();
-    empNationalId= (document.getElementById('h-emp-id')?.value||'').trim();
-    empJobId     = (document.getElementById('h-emp-job-id')?.value||'').trim();
-    empDept      = (document.getElementById('h-emp-dept')?.value||'').trim();
-    empPhone     = (document.getElementById('h-emp-phone')?.value||'').trim();
-    empPosition  = (document.getElementById('h-emp-position')?.value||'').trim();
-    if (!empName)      { showToast('يرجى إدخال اسم الموظف','error'); return; }
-    if (!empNationalId){ showToast('يرجى إدخال رقم الهوية / الإقامة','error'); return; }
-    clientName = empName; // يُستخدم في الجدول والحالة
+    clientName    = (document.getElementById('h-emp-name')?.value||'').trim();
+    empNationalId = (document.getElementById('h-emp-id')?.value||'').trim();
+    empJobId      = (document.getElementById('h-emp-job-id')?.value||'').trim();
+    empDept       = (document.getElementById('h-emp-dept')?.value||'').trim();
+    empPhone      = (document.getElementById('h-emp-phone')?.value||'').trim();
+    empPosition   = (document.getElementById('h-emp-position')?.value||'').trim();
+    if (!clientName)    { showToast('يرجى إدخال اسم الموظف','error'); return; }
+    if (!empNationalId) { showToast('يرجى إدخال رقم الهوية / الإقامة','error'); return; }
   } else {
-    clientName   = (document.getElementById('h-name')?.value||'').trim();
-    customerId   = document.getElementById('h-customer-select')?.value||'';
-    crNumber     = document.getElementById('h-cr')?.value||'';
-    phone1       = document.getElementById('h-phone1')?.value||'';
-    phone2       = document.getElementById('h-phone2')?.value||'';
-    clientAddress= document.getElementById('h-address')?.value||'';
-    if (!clientName) { showToast('يرجى إدخال اسم العميل','error'); return; }
+    clientName    = (document.getElementById('h-name')?.value||'').trim();
+    customerId    = document.getElementById('h-customer-select')?.value||'';
+    crNumber      = document.getElementById('h-cr')?.value||'';
+    phone1        = document.getElementById('h-phone1')?.value||'';
+    phone2        = document.getElementById('h-phone2')?.value||'';
+    clientAddress = document.getElementById('h-address')?.value||'';
+    if (!clientName){ showToast('يرجى إدخال اسم العميل','error'); return; }
   }
-
-  try {
+  try{
     await waitForFirebase();
-    const {collection:col, doc:docRef, addDoc:add, updateDoc:upd} = window.fsApi;
+    const {collection:col,doc:docRef,addDoc:add,updateDoc:upd}=window.fsApi;
     const newAvail=a.availableQty-qty, newClient=a.clientQty+qty;
     await upd(docRef(window.db,"assets",a._id),{availableQty:newAvail,clientQty:newClient,status:newAvail===0&&newClient>0?'عند عميل':a.status});
     await add(col(window.db,"handovers"),{
-      assetId, assetName:a.name, assetCode:a.code||'', assetType:a.type, assetSubType:a.subType||'',
-      qty, clientName, clientId:customerId,
-      clientAddress, crNumber, phone1, phone2,
+      assetId,assetName:a.name,assetCode:a.code||'',assetType:a.type,assetSubType:a.subType||'',
+      qty,clientName,clientId:customerId,clientAddress,crNumber,phone1,phone2,
       handoverMode:mode,
-      empNationalId, empJobId, empDept, empPhone, empPosition,
+      empNationalId,empJobId,empDept,empPhone,empPosition,
       responsible:document.getElementById('h-resp')?.value||'',
       date:document.getElementById('h-date')?.value||'',
       notes:document.getElementById('h-notes')?.value||'',
       actions:document.getElementById('h-actions')?.value||'',
       status:'مُسلَّم'
     });
-    logAudit('handover','تسليم أصل',`${a.name} [${a.code||''}] — إلى: ${clientName}${mode==='employee'?' (موظف)':''} — العدد: ${qty}`);
-    showToast('تم تسجيل التسليم بنجاح','success');
+    logAudit('handover','تسليم أصل',`${a.name} [${a.code||''}] — إلى: ${clientName}${mode==='employee'?' (موظف)':' (عميل)'} — الكمية: ${qty}`);
+    showToast('تم تسجيل التسليم بنجاح ✅','success');
     closeModal(); await window.reloadData();
-  } catch(e) { showToast('خطأ: '+e.message,'error'); }
+  }catch(e){ showToast('خطأ: '+e.message,'error'); }
 }
 
 function filterHandovers() {
@@ -8031,6 +8077,8 @@ if(typeof viewCustomerDetails!=='undefined')window.viewCustomerDetails=viewCusto
 if(typeof openNewHandover!=='undefined')window.openNewHandover=openNewHandover;
 if(typeof openHandoverFromAsset!=='undefined')window.openHandoverFromAsset=openHandoverFromAsset;
 if(typeof getHandoverMode!=='undefined')window.getHandoverMode=getHandoverMode;
+if(typeof getHandoverAssets!=='undefined')window.getHandoverAssets=getHandoverAssets;
+if(typeof handoverPickMode!=='undefined')window.handoverPickMode=handoverPickMode;
 if(typeof setHandoverMode!=='undefined')window.setHandoverMode=setHandoverMode;
 if(typeof onHandoverAssetChange!=='undefined')window.onHandoverAssetChange=onHandoverAssetChange;
 if(typeof openNewReturn!=='undefined')window.openNewReturn=openNewReturn;
