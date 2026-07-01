@@ -14,9 +14,11 @@
     if (s) {
       var sess = JSON.parse(s);
       if (sess && sess._id) {
-        // نخفي شاشة الدخول فوراً بالـ CSS قبل أي شيء
-        document.documentElement.style.setProperty('--login-display','none');
-        document.write('<style>#login-screen{display:none!important}#app-shell{display:flex!important}</style>');
+        // نُنشئ style tag بـ id محدد حتى نتمكن من إزالته عند تسجيل الخروج
+        var st = document.createElement('style');
+        st.id = '_session_hide_login';
+        st.textContent = '#login-screen{display:none}#app-shell{display:flex;flex-direction:column;min-height:100vh}';
+        document.head.appendChild(st);
       }
     }
   } catch(e) {}
@@ -3349,10 +3351,16 @@ async function doLogin() {
 function doLogout() {
   currentUser = null;
   try { localStorage.removeItem('_assetSession'); } catch(e) {}
+  // إزالة الـ style tag الذي خفى شاشة الدخول عند التحميل الأول
+  var hideStyle = document.getElementById('_session_hide_login');
+  if (hideStyle) hideStyle.parentNode.removeChild(hideStyle);
   resetNav();
-  document.getElementById('login-screen').style.display='flex';
-  document.getElementById('app-shell').classList.add('hidden');
-  // إعادة ضبط لوحة التحكم كصفحة افتراضية
+  // إعادة إظهار شاشة الدخول بشكل صريح
+  var loginEl = document.getElementById('login-screen');
+  var appEl   = document.getElementById('app-shell');
+  if (loginEl) { loginEl.style.cssText = 'display:flex'; }
+  if (appEl)   { appEl.classList.add('hidden'); appEl.style.display = 'none'; }
+  // إعادة ضبط الصفحة الافتراضية
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   const dash = document.getElementById('page-dashboard');
   if (dash) dash.classList.add('active');
