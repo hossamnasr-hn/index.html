@@ -4485,14 +4485,14 @@ function buildCustomerOptions() {
 }
 
 /* تحديد نوع التسليم: ثلاجات → عميل | أجهزة كهربائية → موظف | غيرها → عميل */
-/* ═══ كشف وضع التسليم تلقائياً — قابل للتجاوز بزر التبديل ═══ */
+/* ═══ كشف وضع التسليم تلقائياً ═══ */
 function getHandoverMode(typeName) {
   const t = (typeName||'').trim();
   if (/كهرب|تلفاز|شاش|طابع|مكيف|مجفف|غسال|مايكروويف|فرن/.test(t)) return 'employee';
   return 'customer';
 }
 
-function setHandoverMode(mode) {
+function setHandoverMode(mode, lockMode) {
   const custSec = document.getElementById('h-customer-section');
   const empSec  = document.getElementById('h-employee-section');
   const btnCust = document.getElementById('h-mode-btn-customer');
@@ -4503,15 +4503,23 @@ function setHandoverMode(mode) {
   if (mode==='employee') {
     custSec.style.display='none'; empSec.style.display='';
     if(title) title.innerHTML='<i class="ti ti-transfer" style="color:var(--purple)"></i> تسليم جهاز كهربائي لموظف';
-    if(btnCust){btnCust.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--text2);font-family:var(--font)';}
+    if(btnCust){btnCust.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--text2);font-family:var(--font);opacity:'+(lockMode?'.4':'1');}
     if(btnEmp) {btnEmp.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--purple);background:var(--purple);color:#fff;font-family:var(--font)';}
   } else {
     custSec.style.display=''; empSec.style.display='none';
-    if(title) title.innerHTML='<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم ثلاجة عرض / أصل لعميل';
+    if(title) title.innerHTML='<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم أصل لعميل';
     if(btnCust){btnCust.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--green);background:var(--green);color:#fff;font-family:var(--font)';}
-    if(btnEmp) {btnEmp.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--text2);font-family:var(--font)';}
+    if(btnEmp) {btnEmp.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--text2);font-family:var(--font);opacity:'+(lockMode?'.4':'1');}
   }
-  if(wrap) wrap.dataset.mode=mode;
+  if(wrap) { wrap.dataset.mode=mode; wrap.dataset.lockMode=lockMode?'1':'0'; }
+  // إذا النوع محدد (lockMode) نوقف زر الوضع الآخر
+  if (lockMode) {
+    if(btnCust) { btnCust.onclick = mode==='customer' ? ()=>setHandoverMode('customer',true) : ()=>{ showToast('هذا النوع من الأصول يُسلَّم للموظفين فقط','error'); }; }
+    if(btnEmp)  { btnEmp.onclick  = mode==='employee' ? ()=>setHandoverMode('employee',true) : ()=>{ showToast('هذا النوع من الأصول يُسلَّم للعملاء فقط','error'); }; }
+  } else {
+    if(btnCust) btnCust.onclick = ()=>setHandoverMode('customer',false);
+    if(btnEmp)  btnEmp.onclick  = ()=>setHandoverMode('employee',false);
+  }
 }
 
 function openHandoverModal(preAssetId) {
@@ -4519,7 +4527,9 @@ function openHandoverModal(preAssetId) {
   const availAssets = getAssets().filter(a=>a.availableQty>0 && !isVehicleAssetType(a.type));
   if (!availAssets.length) { showToast('لا توجد أصول متاحة للتسليم (المركبات تُسلَّم من صفحة تسليم المركبات)','error'); return; }
   const assetOpts = availAssets.map(a=>
-    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+' data-type="'+encodeURIComponent(a.type||'')+'" data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-code="'+(a.code||'')+'">'+
+    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+
+    ' data-assettype="'+(a.type||'').replace(/"/g,'&quot;')+'"'+
+    ' data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-code="'+(a.code||'')+'">'+
     a.name+' ['+(a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' — متاح: '+a.availableQty+'</option>'
   ).join('');
   const today = new Date().toISOString().split('T')[0];
@@ -4595,8 +4605,8 @@ function onHandoverAssetChange() {
   const det = document.getElementById('h-asset-details');
   const subs = [opt.dataset.subtype, opt.dataset.mfg].filter(Boolean);
   const code = opt.dataset.code||'';
-  // data-type مُشفَّر بـ encodeURIComponent عند البناء
-  const assetType = decodeURIComponent(opt.dataset.type||'');
+  // قراءة النوع من data-assettype (بدون ترميز)
+  const assetType = opt.dataset.assettype||opt.getAttribute('data-assettype')||'';
   if (det) {
     det.innerHTML =
       (code?'<span class="badge badge-blue" style="margin:2px"><i class="ti ti-barcode"></i> '+code+'</span>':'')+
@@ -4604,8 +4614,10 @@ function onHandoverAssetChange() {
       subs.map(s=>'<span class="badge badge-gray" style="margin:2px">'+s+'</span>').join('');
     det.style.display='block';
   }
-  // تبديل الوضع تلقائياً بناء على نوع الأصل
-  setHandoverMode(getHandoverMode(assetType));
+  // تبديل الوضع تلقائياً وقفله حسب نوع الأصل
+  const mode = getHandoverMode(assetType);
+  const shouldLock = assetType.length > 0; // قفل الوضع إذا تم تحديد نوع الأصل
+  setHandoverMode(mode, shouldLock);
 }
 
 function onHandoverCustomerSelect() {
@@ -6499,53 +6511,111 @@ function printHandoverForm(hid) {
     '<td style="border:1px solid #C8DBF0;padding:7px 12px;font-size:13px;font-weight:600">'+r[1]+'</td></tr>'
   ).join('');
 
+  const isEmpHandover = h.handoverMode === 'employee';
+  const docNum = `HO-${h._id ? h._id.slice(-6).toUpperCase() : Date.now().toString().slice(-6)}`;
+  const hdrColor  = isEmpHandover ? 'linear-gradient(135deg,#5B21B6,#7C3AED)' : 'linear-gradient(135deg,#1C3F8A 0%,#2655A8 100%)';
+  const titleText = isEmpHandover ? '🧑‍💼 وثيقة تسليم جهاز كهربائي لموظف' : '📋 وثيقة تسليم أصل لعميل';
+  const sectionColor = isEmpHandover ? '#5B21B6' : '#1C3F8A';
+  const sectionBg    = isEmpHandover ? '#F5F3FF' : '#F0F6FF';
+  const borderColor  = isEmpHandover ? '#DDD6FE' : '#C8DBF0';
+
+  /* قسم بيانات المستلم — يتغير حسب النوع */
+  const recipientSection = isEmpHandover ? `
+    <div class="section">👤 بيانات الموظف المستلم</div>
+    <table style="margin-bottom:16px">
+      <tr>
+        <td class="lbl">اسم الموظف</td><td style="font-weight:700;font-size:14px">${h.clientName||h.empName||'—'}</td>
+        <td class="lbl">رقم الهوية / الإقامة</td><td style="font-family:monospace;font-weight:700">${h.empNationalId||'—'}</td>
+      </tr>
+      <tr>
+        <td class="lbl">الرقم الوظيفي</td><td>${h.empJobId||'—'}</td>
+        <td class="lbl">المنصب</td><td>${h.empPosition||'—'}</td>
+      </tr>
+      <tr>
+        <td class="lbl">القسم / الإدارة</td><td>${h.empDept||'—'}</td>
+        <td class="lbl">رقم الجوال</td><td>${h.empPhone||'—'}</td>
+      </tr>
+      <tr>
+        <td class="lbl">العدد المُسلَّم</td><td><span class="badge badge-qty">${h.qty} وحدة</span></td>
+        <td class="lbl">تاريخ التسليم</td><td style="font-weight:700">${h.date||'—'}</td>
+      </tr>
+      <tr>
+        <td class="lbl">المسؤول</td><td>${h.responsible||'—'}</td>
+        <td class="lbl">حالة التسليم</td>
+        <td><span class="badge" style="background:${h.status==='مُسلَّم'?'#D1FAE5':'#FEE2E2'};color:${h.status==='مُسلَّم'?'#065F46':'#991B1B'}">${h.status||'—'}</span></td>
+      </tr>
+      ${h.actions ? '<tr><td class="lbl">الإجراءات / الشروط</td><td colspan="3" style="color:#B45309;font-weight:600">'+h.actions+'</td></tr>' : ''}
+      ${h.notes ? '<tr><td class="lbl">ملاحظات</td><td colspan="3">'+h.notes+'</td></tr>' : ''}
+    </table>` : `
+    <div class="section">🏪 بيانات العميل</div>
+    <table style="margin-bottom:16px">
+      <tr>
+        <td class="lbl">العميل</td><td style="font-weight:700;font-size:14px">${h.clientName||'—'}</td>
+        <td class="lbl">السجل التجاري</td><td>${h.crNumber||'—'}</td>
+      </tr>
+      <tr>
+        <td class="lbl">رقم التواصل</td><td>${(h.phone1||'—')+(h.phone2?' / '+h.phone2:'')}</td>
+        <td class="lbl">العنوان</td><td style="font-size:12px">${h.clientAddress||'—'}</td>
+      </tr>
+      <tr>
+        <td class="lbl">العدد المُسلَّم</td><td><span class="badge badge-qty">${h.qty} وحدة</span></td>
+        <td class="lbl">تاريخ التسليم</td><td style="font-weight:700">${h.date||'—'}</td>
+      </tr>
+      <tr>
+        <td class="lbl">المسؤول</td><td>${h.responsible||'—'}</td>
+        <td class="lbl">حالة التسليم</td>
+        <td><span class="badge" style="background:${h.status==='مُسلَّم'?'#D1FAE5':'#FEE2E2'};color:${h.status==='مُسلَّم'?'#065F46':'#991B1B'}">${h.status||'—'}</span></td>
+      </tr>
+      ${h.actions ? '<tr><td class="lbl">الإجراءات / الشروط</td><td colspan="3" style="color:#B45309;font-weight:600">'+h.actions+'</td></tr>' : ''}
+      ${h.notes ? '<tr><td class="lbl">ملاحظات</td><td colspan="3">'+h.notes+'</td></tr>' : ''}
+    </table>`;
+
   const win = window.open('', '_blank');
   win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
 <title>وثيقة تسليم - ${h.assetName}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Cairo',Arial,sans-serif;font-size:13px;direction:rtl;color:#0E1D3A;background:#F0F6FF;padding:20px}
+  body{font-family:'Cairo',Arial,sans-serif;font-size:13px;direction:rtl;color:#0E1D3A;background:${isEmpHandover?'#F5F3FF':'#F0F6FF'};padding:20px}
   .doc{background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(28,63,138,.12);overflow:hidden;max-width:820px;margin:0 auto}
-  .hdr{background:linear-gradient(135deg,#1C3F8A 0%,#2655A8 100%);padding:18px 24px;display:flex;justify-content:space-between;align-items:center}
+  .hdr{background:${hdrColor};padding:18px 24px;display:flex;justify-content:space-between;align-items:center}
   .hdr-co{color:#fff;font-size:18px;font-weight:800}
   .hdr-sub{color:rgba(255,255,255,.75);font-size:12px;margin-top:3px}
   .hdr-meta{text-align:left;font-size:12px;color:rgba(255,255,255,.85);line-height:1.9}
   .hdr-meta strong{color:#fff}
-  .doc-title{text-align:center;font-size:15px;font-weight:800;color:#1C3F8A;background:#DBEAFE;padding:10px;border-top:3px solid #93C5FD}
+  .doc-title{text-align:center;font-size:15px;font-weight:800;color:${sectionColor};background:${sectionBg};padding:10px;border-top:3px solid ${borderColor}}
   .body{padding:20px 24px}
-  .section{font-size:12px;font-weight:800;color:#1C3F8A;border-right:4px solid #1C3F8A;padding:4px 10px;margin:16px 0 10px;background:#F0F6FF;border-radius:0 4px 4px 0;display:flex;align-items:center;gap:6px}
+  .section{font-size:12px;font-weight:800;color:${sectionColor};border-right:4px solid ${sectionColor};padding:4px 10px;margin:16px 0 10px;background:${sectionBg};border-radius:0 4px 4px 0;display:flex;align-items:center;gap:6px}
   table{width:100%;border-collapse:collapse}
-  .lbl{background:#F0F6FF;font-weight:700;color:#1C3F8A;width:25%;font-size:12px}
-  td{border:1px solid #C8DBF0;padding:8px 12px}
-  .asset-bar{display:flex;gap:20px;align-items:flex-start;background:#F8FBFF;border:1px solid #DBEAFE;border-radius:8px;padding:14px;margin-bottom:16px}
+  .lbl{background:${sectionBg};font-weight:700;color:${sectionColor};width:25%;font-size:12px}
+  td{border:1px solid ${borderColor};padding:8px 12px}
+  .asset-bar{display:flex;gap:20px;align-items:flex-start;background:#F8FBFF;border:1px solid ${borderColor};border-radius:8px;padding:14px;margin-bottom:16px}
   .asset-bar-info{flex:1}
-  .asset-bar-code{border-right:2px solid #DBEAFE;padding-right:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+  .asset-bar-code{border-right:2px solid ${borderColor};padding-right:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
   .sign{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}
-  .sbox{border:1.5px solid #C8DBF0;border-radius:8px;padding:14px;min-height:110px}
-  .stitle{font-weight:700;color:#1C3F8A;margin-bottom:8px;font-size:13px;display:flex;align-items:center;gap:6px}
-  .sline{border-top:2px dashed #B0CCE8;margin-top:36px;padding-top:5px;font-size:11px;color:#7090B0;text-align:center}
-  .footer{text-align:center;font-size:11px;color:#7090B0;border-top:1px solid #C8DBF0;padding:12px;background:#F8FBFF;margin-top:20px}
+  .sbox{border:1.5px solid ${borderColor};border-radius:8px;padding:14px;min-height:110px}
+  .stitle{font-weight:700;color:${sectionColor};margin-bottom:8px;font-size:13px;display:flex;align-items:center;gap:6px}
+  .sline{border-top:2px dashed ${borderColor};margin-top:36px;padding-top:5px;font-size:11px;color:#7090B0;text-align:center}
+  .footer{text-align:center;font-size:11px;color:#7090B0;border-top:1px solid ${borderColor};padding:12px;background:${sectionBg};margin-top:20px}
   .badge{display:inline-block;padding:2px 10px;border-radius:100px;font-size:11px;font-weight:700}
-  .badge-qty{background:#DBEAFE;color:#1C3F8A;font-size:14px;padding:4px 14px}
+  .badge-qty{background:${isEmpHandover?'#EDE9FE':'#DBEAFE'};color:${sectionColor};font-size:14px;padding:4px 14px}
   @media print{.noprint{display:none!important}body{background:#fff;padding:0}.doc{box-shadow:none;border-radius:0}}
 </style></head><body>
 <div class="doc">
   <div class="hdr">
-    <div style="display:flex;align-items:center;gap:14px">${logoHTML}<div><div class="hdr-co">${cn}</div><div class="hdr-sub">نموذج تسليم أصل</div></div></div>
+    <div style="display:flex;align-items:center;gap:14px">${logoHTML}<div><div class="hdr-co">${cn}</div><div class="hdr-sub">${isEmpHandover?'تسليم جهاز كهربائي لموظف':'تسليم أصل لعميل'}</div></div></div>
     <div class="hdr-meta">
-      <div>رقم: <strong>HO-${h._id ? h._id.slice(-6).toUpperCase() : Date.now().toString().slice(-6)}</strong></div>
-      <div>التاريخ: <strong>${h.date || new Date().toISOString().slice(0,10)}</strong></div>
+      <div>رقم: <strong>${docNum}</strong></div>
+      <div>التاريخ: <strong>${h.date||new Date().toISOString().slice(0,10)}</strong></div>
     </div>
   </div>
-  <div class="doc-title">📋 وثيقة تسليم أصل</div>
+  <div class="doc-title">${titleText}</div>
   <div class="body">
 
-    <!-- معلومات الأصل مع الباركود -->
     <div class="section">📦 بيانات الأصل</div>
     <div class="asset-bar">
       <div class="asset-bar-code">
-        ${barcodeHTML || '<div style="color:#aaa;font-size:12px">لا يوجد كود</div>'}
+        ${barcodeHTML||'<div style="color:#aaa;font-size:12px">لا يوجد كود</div>'}
         <div style="font-size:10px;color:#7090B0;margin-top:4px">باركود الأصل</div>
       </div>
       <div class="asset-bar-info">
@@ -6553,42 +6623,18 @@ function printHandoverForm(hid) {
       </div>
     </div>
 
-    <!-- بيانات التسليم -->
-    <div class="section">📋 تفاصيل التسليم</div>
-    <table style="margin-bottom:16px">
-      <tr>
-        <td class="lbl">العميل</td><td style="font-weight:700;font-size:14px">${h.clientName}</td>
-        <td class="lbl">السجل التجاري</td><td>${h.crNumber || '—'}</td>
-      </tr>
-      <tr>
-        <td class="lbl">رقم التواصل</td><td>${(h.phone1||'—')+(h.phone2?' / '+h.phone2:'')}</td>
-        <td class="lbl">العنوان</td><td style="font-size:12px">${h.clientAddress || '—'}</td>
-      </tr>
-      <tr>
-        <td class="lbl">العدد المُسلَّم</td>
-        <td><span class="badge badge-qty">${h.qty} وحدة</span></td>
-        <td class="lbl">تاريخ التسليم</td><td style="font-weight:700">${h.date}</td>
-      </tr>
-      <tr>
-        <td class="lbl">المسؤول</td><td>${h.responsible}</td>
-        <td class="lbl">حالة التسليم</td>
-        <td><span class="badge" style="background:${h.status==='مُسلَّم'?'#D1FAE5':'#FEE2E2'};color:${h.status==='مُسلَّم'?'#065F46':'#991B1B'}">${h.status}</span></td>
-      </tr>
-      ${h.actions ? '<tr><td class="lbl">الإجراءات / الشروط</td><td colspan="3" style="color:#B45309;font-weight:600">'+h.actions+'</td></tr>' : ''}
-      ${h.notes ? '<tr><td class="lbl">ملاحظات</td><td colspan="3">'+h.notes+'</td></tr>' : ''}
-    </table>
+    ${recipientSection}
 
-    <!-- التوقيعات -->
     <div class="section">✍️ التوقيعات</div>
     <div class="sign">
       <div class="sbox">
         <div class="stitle">✍ توقيع المُسلِّم</div>
-        <div style="font-size:12px;color:#5B7AAA">الاسم: ${h.responsible}</div>
+        <div style="font-size:12px;color:#5B7AAA">الاسم: ${h.responsible||'—'}</div>
         <div class="sline">التوقيع / الختم</div>
       </div>
       <div class="sbox">
-        <div class="stitle">✍ توقيع المستلم</div>
-        <div style="font-size:12px;color:#5B7AAA">الاسم: ${h.clientName}</div>
+        <div class="stitle">✍ توقيع ${isEmpHandover?'الموظف المستلم':'العميل المستلم'}</div>
+        <div style="font-size:12px;color:#5B7AAA">الاسم: ${h.clientName||h.empName||'—'}${isEmpHandover&&h.empNationalId?'<div style="font-size:11px;font-family:monospace">هوية: '+h.empNationalId+'</div>':''}</div>
         <div class="sline">التوقيع / الختم</div>
       </div>
     </div>
@@ -6597,7 +6643,7 @@ function printHandoverForm(hid) {
   <div class="footer">${cn} | نظام إدارة الأصول | ${new Date().toLocaleDateString('ar-SA')}</div>
 </div>
 <div class="noprint" style="text-align:center;margin:20px 0">
-  <button onclick="window.print()" style="padding:10px 32px;background:#1C3F8A;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;margin-left:10px">🖨️ طباعة</button>
+  <button onclick="window.print()" style="padding:10px 32px;background:${sectionColor};color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;margin-left:10px">🖨️ طباعة</button>
   <button onclick="window.close()" style="padding:10px 20px;background:#6B7280;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:14px">✕ إغلاق</button>
 </div>
 </body></html>`);
