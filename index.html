@@ -4484,16 +4484,20 @@ function buildCustomerOptions() {
   ).join('');
 }
 
-/* تحديد نوع التسليم: ثلاجات → عميل | أجهزة كهربائية → موظف | غيرها → عميل */
+/* تحديد نوع التسليم: ثلاجات → عميل | أجهزة إلكترونية → موظف | غيرها → عميل */
 /* ═══ كشف وضع التسليم تلقائياً ═══ */
 /* ══════════════════════════════════════════════════════
    نموذج تسليم الأصول — اختيار الجهة أولاً ثم الأصول
 ══════════════════════════════════════════════════════ */
 
-/* فئة نوع الأصل: ثلاجات → عميل | كهربائيات → موظف */
+/* فئة نوع الأصل: ثلاجات → عميل | إلكترونيات → موظف */
 function getHandoverMode(typeName) {
-  const t = (typeName||'').trim();
-  if (/كهرب|إلكتر|الكتر|تلفاز|شاش|طابع|مكيف|مجفف|غسال|مايكروويف|فرن|جهاز/.test(t)) return 'employee';
+  // تطبيع حروف الألف (أ، إ، آ، ا → ا) قبل المطابقة لتجنب مشاكل Unicode
+  const t = (typeName||'').trim()
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ة/g, 'ه');
+  // الأجهزة الإلكترونية وما شابهها → موظف
+  if (/الكتر|كهرب|تلفاز|شاش|طابع|مكيف|مجفف|غسال|مايكروويف|فرن|اجهز/.test(t)) return 'employee';
   return 'customer';
 }
 
@@ -4530,7 +4534,7 @@ function openHandoverModal(preAssetId) {
           'padding:20px 12px;border-radius:var(--radius);font-size:14px;font-weight:700;cursor:pointer;border:2px solid var(--purple);'+
           'background:var(--purple);color:#fff;font-family:var(--font);display:flex;flex-direction:column;align-items:center;gap:8px;transition:all .2s">'+
           '<i class="ti ti-user-check" style="font-size:28px"></i><span>موظف</span>'+
-          '<span style="font-size:10px;font-weight:400;opacity:.85">الأجهزة الكهربائية وغيرها</span>'+
+          '<span style="font-size:10px;font-weight:400;opacity:.85">الأجهزة الإلكترونية وغيرها</span>'+
         '</button>'+
       '</div>'+
     '</div>'+
@@ -4612,7 +4616,7 @@ function handoverPickMode(mode, preAssetId) {
   const title = document.getElementById('modal-title');
   if (title) title.innerHTML = mode==='customer'
     ? '<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم ثلاجة عرض لعميل'
-    : '<i class="ti ti-transfer" style="color:var(--purple)"></i> تسليم جهاز كهربائي لموظف';
+    : '<i class="ti ti-transfer" style="color:var(--purple)"></i> تسليم جهاز إلكتروني لموظف';
 
   /* حفظ الوضع */
   const modeInput = document.getElementById('h-mode');
@@ -6560,7 +6564,7 @@ function printHandoverForm(hid) {
   const isEmpHandover = h.handoverMode === 'employee';
   const docNum = `HO-${h._id ? h._id.slice(-6).toUpperCase() : Date.now().toString().slice(-6)}`;
   const hdrColor  = isEmpHandover ? 'linear-gradient(135deg,#5B21B6,#7C3AED)' : 'linear-gradient(135deg,#1C3F8A 0%,#2655A8 100%)';
-  const titleText = isEmpHandover ? '🧑‍💼 وثيقة تسليم جهاز كهربائي لموظف' : '📋 وثيقة تسليم أصل لعميل';
+  const titleText = isEmpHandover ? '🧑‍💼 وثيقة تسليم جهاز إلكتروني لموظف' : '📋 وثيقة تسليم أصل لعميل';
   const sectionColor = isEmpHandover ? '#5B21B6' : '#1C3F8A';
   const sectionBg    = isEmpHandover ? '#F5F3FF' : '#F0F6FF';
   const borderColor  = isEmpHandover ? '#DDD6FE' : '#C8DBF0';
@@ -6649,7 +6653,7 @@ function printHandoverForm(hid) {
 </style></head><body>
 <div class="doc">
   <div class="hdr">
-    <div style="display:flex;align-items:center;gap:14px">${logoHTML}<div><div class="hdr-co">${cn}</div><div class="hdr-sub">${isEmpHandover?'تسليم جهاز كهربائي لموظف':'تسليم أصل لعميل'}</div></div></div>
+    <div style="display:flex;align-items:center;gap:14px">${logoHTML}<div><div class="hdr-co">${cn}</div><div class="hdr-sub">${isEmpHandover?'تسليم جهاز إلكتروني لموظف':'تسليم أصل لعميل'}</div></div></div>
     <div class="hdr-meta">
       <div>رقم: <strong>${docNum}</strong></div>
       <div>التاريخ: <strong>${h.date||new Date().toISOString().slice(0,10)}</strong></div>
