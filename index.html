@@ -4484,15 +4484,25 @@ function buildCustomerOptions() {
   ).join('');
 }
 
+/* تحديد نوع التسليم: ثلاجات → عميل | أجهزة كهربائية → موظف | غيرها → عميل */
+function getHandoverMode(typeName) {
+  const t = (typeName||'').trim();
+  if (/ثلاج|عرض|تبريد|فريزر/.test(t)) return 'customer';
+  if (/جهاز كهرب|أجهزة كهرب|كهربائي|تلفاز|شاشة|طابعة|جهاز منزل/.test(t)) return 'employee';
+  // الافتراضي: عميل
+  return 'customer';
+}
+
 function openHandoverModal(preAssetId) {
-  const availAssets = getAssets().filter(a=>a.availableQty>0);
-  if (!availAssets.length) { showToast('لا توجد أصول متاحة','error'); return; }
+  // استبعاد المركبات من قائمة الأصول
+  const availAssets = getAssets().filter(a=>a.availableQty>0 && !isVehicleAssetType(a.type));
+  if (!availAssets.length) { showToast('لا توجد أصول متاحة للتسليم (المركبات تُسلَّم من صفحة تسليم المركبات)','error'); return; }
   const assetOpts = availAssets.map(a=>
-    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+' data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-code="'+(a.code||'')+'">'+
-    a.name+' ['+(a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' - متاح: '+a.availableQty+'</option>'
+    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+' data-type="'+(a.type||'')+'" data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-code="'+(a.code||'')+'">'+
+    a.name+' ['+(a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' — متاح: '+a.availableQty+'</option>'
   ).join('');
   const today = new Date().toISOString().split('T')[0];
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم أصل لعميل';
+  document.getElementById('modal-title').innerHTML = '<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم أصل';
   document.getElementById('modal-body').innerHTML =
     '<div class="form-section">الأصل المُسلَّم</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
@@ -4500,28 +4510,47 @@ function openHandoverModal(preAssetId) {
       '<div class="field"><label>عدد الوحدات *</label><input id="h-qty" type="number" min="1" value="1"></div>'+
     '</div>'+
     '<div id="h-asset-details" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-bottom:12px;font-size:12px;display:none"></div>'+
-    '<div class="form-section">بيانات العميل</div>'+
-    '<div class="field" style="margin-bottom:10px">'+
-      '<label>اختر من قائمة العملاء</label>'+
-      '<select id="h-customer-select" onchange="onHandoverCustomerSelect()">'+buildCustomerOptions()+'</select>'+
+    // --- حقول عميل (ثلاجات العرض) ---
+    '<div id="h-customer-section">'+
+      '<div class="form-section"><i class="ti ti-building-store"></i> بيانات العميل</div>'+
+      '<div class="field" style="margin-bottom:10px">'+
+        '<label>اختر من قائمة العملاء</label>'+
+        '<select id="h-customer-select" onchange="onHandoverCustomerSelect()">'+buildCustomerOptions()+'</select>'+
+      '</div>'+
+      '<div style="text-align:center;font-size:12px;color:var(--text3);margin-bottom:10px">— أو أدخل بيانات عميل جديد —</div>'+
+      '<div class="form-row" style="margin-bottom:12px">'+
+        '<div class="field"><label>اسم العميل / الشركة *</label><input id="h-name" placeholder="اسم العميل"></div>'+
+        '<div class="field"><label>السجل التجاري</label><input id="h-cr" placeholder="4030xxxxxx"></div>'+
+      '</div>'+
+      '<div class="form-row" style="margin-bottom:12px">'+
+        '<div class="field"><label>الجوال الرئيسي</label><input id="h-phone1" placeholder="05xxxxxxxx"></div>'+
+        '<div class="field"><label>الجوال الثانوي</label><input id="h-phone2" placeholder="اختياري"></div>'+
+      '</div>'+
+      '<div class="form-row full" style="margin-bottom:12px"><div class="field"><label>العنوان</label><input id="h-address" placeholder="المدينة — الحي — الشارع"></div></div>'+
     '</div>'+
-    '<div style="text-align:center;font-size:12px;color:var(--text3);margin-bottom:10px">— أو أدخل بيانات عميل جديد —</div>'+
-    '<div class="form-row" style="margin-bottom:12px">'+
-      '<div class="field"><label>اسم العميل *</label><input id="h-name" placeholder="اسم العميل / الشركة"></div>'+
-      '<div class="field"><label>السجل التجاري</label><input id="h-cr" placeholder="4030xxxxxx"></div>'+
+    // --- حقول موظف (الأجهزة الكهربائية) ---
+    '<div id="h-employee-section" style="display:none">'+
+      '<div class="form-section"><i class="ti ti-user-check"></i> بيانات الموظف المستلم</div>'+
+      '<div class="form-row" style="margin-bottom:12px">'+
+        '<div class="field"><label>اسم الموظف *</label><input id="h-emp-name" placeholder="الاسم الكامل"></div>'+
+        '<div class="field"><label>رقم الهوية / الإقامة *</label><input id="h-emp-id" placeholder="1xxxxxxxxx"></div>'+
+      '</div>'+
+      '<div class="form-row" style="margin-bottom:12px">'+
+        '<div class="field"><label>الرقم الوظيفي</label><input id="h-emp-job-id" placeholder="اختياري"></div>'+
+        '<div class="field"><label>القسم / الإدارة</label><input id="h-emp-dept" placeholder="مثال: المبيعات"></div>'+
+      '</div>'+
+      '<div class="form-row" style="margin-bottom:12px">'+
+        '<div class="field"><label>رقم الجوال</label><input id="h-emp-phone" placeholder="05xxxxxxxx"></div>'+
+        '<div class="field"><label>المنصب الوظيفي</label><input id="h-emp-position" placeholder="مثال: مشغّل"></div>'+
+      '</div>'+
     '</div>'+
+    '<div class="form-section">تفاصيل التسليم</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
-      '<div class="field"><label>الجوال الرئيسي</label><input id="h-phone1" placeholder="05xxxxxxxx"></div>'+
-      '<div class="field"><label>الجوال الثانوي</label><input id="h-phone2" placeholder="اختياري"></div>'+
-    '</div>'+
-    '<div class="form-row full" style="margin-bottom:12px"><div class="field"><label>العنوان</label><input id="h-address" placeholder="المدينة - الحي - الشارع"></div></div>'+
-    '<div class="form-row" style="margin-bottom:12px">'+
-      '<div class="field"><label>المسؤول</label><input id="h-resp" value="'+currentUser.name+'"></div>'+
+      '<div class="field"><label>المسؤول</label><input id="h-resp" value="'+(currentUser?.name||'')+'"></div>'+
       '<div class="field"><label>تاريخ التسليم</label><input id="h-date" type="date" value="'+today+'"></div>'+
     '</div>'+
-    '<div class="form-row full" style="margin-bottom:0"><div class="field"><label>ملاحظات</label><textarea id="h-notes" rows="2"></textarea></div></div>'+
-    '<div class="form-section">الإجراءات والشروط</div>'+
-    '<div class="form-row full" style="margin-bottom:0"><div class="field"><label>إجراءات خاصة / شروط التسليم</label><textarea id="h-actions" rows="2" placeholder="مثال: يُسلَّم بحالة ممتازة، يُعاد خلال 30 يوماً..."></textarea></div></div>';
+    '<div class="form-row full" style="margin-bottom:12px"><div class="field"><label>ملاحظات</label><textarea id="h-notes" rows="2"></textarea></div></div>'+
+    '<div class="form-row full"><div class="field"><label>الإجراءات والشروط</label><textarea id="h-actions" rows="2" placeholder="مثال: يُسلَّم بحالة ممتازة، يُعاد خلال 30 يوماً..."></textarea></div></div>';
   document.getElementById('modal-save-btn').className='btn-save success-btn';
   document.getElementById('modal-save-btn').textContent='تأكيد التسليم';
   document.getElementById('modal-save-btn').onclick=saveHandover;
@@ -4535,11 +4564,27 @@ function onHandoverAssetChange() {
   if (!sel) return;
   const opt = sel.options[sel.selectedIndex];
   const det = document.getElementById('h-asset-details');
-  if (det && opt.value) {
+  if (det && opt?.value) {
     const subs = [opt.dataset.subtype, opt.dataset.mfg].filter(Boolean);
     const code = opt.dataset.code||'';
-    det.innerHTML = (code?'<span class="badge badge-blue" style="margin:2px"><i class="ti ti-barcode"></i> '+code+'</span>':'') + subs.map(s=>'<span class="badge badge-gray" style="margin:2px">'+s+'</span>').join('');
+    const assetType = opt.dataset.type||'';
+    det.innerHTML = (code?'<span class="badge badge-blue" style="margin:2px"><i class="ti ti-barcode"></i> '+code+'</span>':'') +
+      subs.map(s=>'<span class="badge badge-gray" style="margin:2px">'+s+'</span>').join('');
     det.style.display = (subs.length||code) ? 'block' : 'none';
+    // تبديل الحقول حسب نوع الأصل
+    const mode = getHandoverMode(assetType);
+    const custSec = document.getElementById('h-customer-section');
+    const empSec  = document.getElementById('h-employee-section');
+    const title   = document.getElementById('modal-title');
+    if (mode === 'employee') {
+      if (custSec) custSec.style.display = 'none';
+      if (empSec)  empSec.style.display  = '';
+      if (title)   title.innerHTML = '<i class="ti ti-transfer" style="color:var(--purple)"></i> تسليم جهاز كهربائي لموظف';
+    } else {
+      if (custSec) custSec.style.display = '';
+      if (empSec)  empSec.style.display  = 'none';
+      if (title)   title.innerHTML = '<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم ثلاجة عرض لعميل';
+    }
   }
 }
 
@@ -4556,12 +4601,35 @@ function onHandoverCustomerSelect() {
 async function saveHandover() {
   const assetId = document.getElementById('h-asset').value;
   const qty = parseInt(document.getElementById('h-qty').value)||0;
-  const clientName = document.getElementById('h-name').value.trim();
-  const customerId = document.getElementById('h-customer-select').value||'';
-  if (!clientName) { showToast('يرجى إدخال اسم العميل','error'); return; }
-  if (!qty||qty<1) { showToast('يرجى إدخال عدد صحيح','error'); return; }
   const a = getAssets().find(x=>x._id===assetId);
-  if (!a||a.availableQty<qty) { showToast('العدد يتجاوز المتاح','error'); return; }
+  if (!assetId||!a) { showToast('يرجى اختيار الأصل','error'); return; }
+  if (!qty||qty<1) { showToast('يرجى إدخال عدد صحيح','error'); return; }
+  if (a.availableQty<qty) { showToast('العدد يتجاوز المتاح','error'); return; }
+
+  const mode = getHandoverMode(a.type||'');
+  let clientName='', customerId='', crNumber='', phone1='', phone2='', clientAddress='';
+  let empName='', empNationalId='', empJobId='', empDept='', empPhone='', empPosition='';
+
+  if (mode==='employee') {
+    empName      = (document.getElementById('h-emp-name')?.value||'').trim();
+    empNationalId= (document.getElementById('h-emp-id')?.value||'').trim();
+    empJobId     = (document.getElementById('h-emp-job-id')?.value||'').trim();
+    empDept      = (document.getElementById('h-emp-dept')?.value||'').trim();
+    empPhone     = (document.getElementById('h-emp-phone')?.value||'').trim();
+    empPosition  = (document.getElementById('h-emp-position')?.value||'').trim();
+    if (!empName)      { showToast('يرجى إدخال اسم الموظف','error'); return; }
+    if (!empNationalId){ showToast('يرجى إدخال رقم الهوية / الإقامة','error'); return; }
+    clientName = empName; // يُستخدم في الجدول والحالة
+  } else {
+    clientName   = (document.getElementById('h-name')?.value||'').trim();
+    customerId   = document.getElementById('h-customer-select')?.value||'';
+    crNumber     = document.getElementById('h-cr')?.value||'';
+    phone1       = document.getElementById('h-phone1')?.value||'';
+    phone2       = document.getElementById('h-phone2')?.value||'';
+    clientAddress= document.getElementById('h-address')?.value||'';
+    if (!clientName) { showToast('يرجى إدخال اسم العميل','error'); return; }
+  }
+
   try {
     await waitForFirebase();
     const {collection:col, doc:docRef, addDoc:add, updateDoc:upd} = window.fsApi;
@@ -4570,18 +4638,17 @@ async function saveHandover() {
     await add(col(window.db,"handovers"),{
       assetId, assetName:a.name, assetCode:a.code||'', assetType:a.type, assetSubType:a.subType||'',
       qty, clientName, clientId:customerId,
-      clientAddress:document.getElementById('h-address').value,
-      crNumber:document.getElementById('h-cr').value,
-      phone1:document.getElementById('h-phone1').value,
-      phone2:document.getElementById('h-phone2').value,
-      responsible:document.getElementById('h-resp').value,
-      date:document.getElementById('h-date').value,
-      notes:document.getElementById('h-notes').value,
+      clientAddress, crNumber, phone1, phone2,
+      handoverMode:mode,
+      empNationalId, empJobId, empDept, empPhone, empPosition,
+      responsible:document.getElementById('h-resp')?.value||'',
+      date:document.getElementById('h-date')?.value||'',
+      notes:document.getElementById('h-notes')?.value||'',
       actions:document.getElementById('h-actions')?.value||'',
       status:'مُسلَّم'
     });
-    logAudit('handover','تسليم أصل',`${a.name} [${a.code||''}] — إلى: ${clientName} — العدد: ${qty} — التاريخ: ${document.getElementById('h-date').value}`);
-    showToast('تم تسجيل التسليم','success');
+    logAudit('handover','تسليم أصل',`${a.name} [${a.code||''}] — إلى: ${clientName}${mode==='employee'?' (موظف)':''} — العدد: ${qty}`);
+    showToast('تم تسجيل التسليم بنجاح','success');
     closeModal(); await window.reloadData();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
@@ -4604,24 +4671,38 @@ function renderHandovers() { filterHandovers(); }
 
 function renderHandoverRows(list) {
   if (!list.length) { document.getElementById('handover-body').innerHTML='<tr><td colspan="12" class="empty-row">لا توجد عمليات تسليم</td></tr>'; return; }
-  document.getElementById('handover-body').innerHTML = list.map((h,i)=>
-    '<tr>'+
+  document.getElementById('handover-body').innerHTML = list.map((h,i)=>{
+    const isEmp = h.handoverMode==='employee';
+    const recipientInfo = isEmp
+      ? '<div style="font-weight:600">'+h.clientName+'</div>'+
+        (h.empNationalId?'<div style="font-size:10px;color:var(--text3)"><i class="ti ti-id" style="font-size:9px"></i> هوية: '+h.empNationalId+'</div>':'')+
+        (h.empDept?'<div style="font-size:10px;color:var(--text3)">'+h.empDept+'</div>':'')
+      : '<div style="font-weight:600">'+h.clientName+'</div>'+
+        (h.crNumber?'<div style="font-size:10px;color:var(--text3)">س.ت: '+h.crNumber+'</div>':'');
+    const phoneInfo = isEmp ? (h.empPhone||'-') : (h.phone1||'-');
+    const addrInfo  = isEmp
+      ? (h.empPosition?'<div style="font-size:11px">'+h.empPosition+'</div>':'')+(h.empJobId?'<div style="font-size:10px;color:var(--text3)">رقم وظيفي: '+h.empJobId+'</div>':'')
+      : '<div style="font-size:12px;color:var(--text2)">'+(h.clientAddress||'-')+'</div>';
+    const typeBadge = isEmp
+      ? '<span class="badge" style="background:var(--purple-bg);color:var(--purple);font-size:10px;margin-top:3px;display:inline-block"><i class="ti ti-user-check" style="font-size:9px"></i> موظف</span>'
+      : '<span class="badge badge-blue" style="font-size:10px;margin-top:3px;display:inline-block"><i class="ti ti-building-store" style="font-size:9px"></i> عميل</span>';
+    return '<tr>'+
     '<td style="color:var(--text3)">'+(i+1)+'</td>'+
-    '<td><div style="font-weight:600">'+h.assetName+'</div>'+(h.assetType?'<div style="font-size:10px;color:var(--text3)">'+h.assetType+'</div>':'')+'</td>'+
+    '<td><div style="font-weight:600">'+h.assetName+'</div>'+(h.assetType?'<div style="font-size:10px;color:var(--text3)">'+h.assetType+'</div>':'')+typeBadge+'</td>'+
     '<td>'+(h.assetSubType?'<span class="badge badge-gray">'+h.assetSubType+'</span>':'-')+'</td>'+
     '<td style="text-align:center;font-weight:700">'+h.qty+'</td>'+
-    '<td><div style="font-weight:600">'+h.clientName+'</div>'+(h.crNumber?'<div style="font-size:10px;color:var(--text3)">س.ت: '+h.crNumber+'</div>':'')+'</td>'+
-    '<td style="font-size:12px">'+(h.phone1||'-')+'</td>'+
-    '<td style="font-size:12px;color:var(--text2)">'+(h.clientAddress||'-')+'</td>'+
+    '<td>'+recipientInfo+'</td>'+
+    '<td style="font-size:12px">'+phoneInfo+'</td>'+
+    '<td>'+addrInfo+'</td>'+
     '<td>'+h.responsible+'</td>'+
     '<td style="font-size:12px">'+h.date+'</td>'+
     '<td>'+statusBadge(h.status,h.assetId)+'</td>'+
     '<td style="max-width:180px">'+(h.actions?'<div style="display:flex;align-items:flex-start;gap:5px;font-size:12px;color:var(--amber);padding:4px 6px;background:var(--amber-bg);border-radius:var(--radius);border:1px solid #F0D080"><i class="ti ti-clipboard-list" style="flex-shrink:0;margin-top:1px"></i><span>'+h.actions+'</span></div>':'<span style="color:var(--text3);font-size:11px">—</span>')+'</td>'+
     '<td style="white-space:nowrap">'+
-      (h.status!=='مُرتجع'&&can('return')?'<button class="btn-action teal" onclick="openReturnFromHandover(\''+h._id+'\')" title="استرداد"><i class="ti ti-corner-up-left"></i> استرداد</button>':'')+
+      (h.status!=='مُرتجع'&&can('return')?'<button class="btn-action teal" onclick="openReturnFromHandover(\''+h._id+'\')" title="استرداد"><i class="ti ti-corner-up-left"></i></button>':'')+
       '<button class="btn-action info" onclick="printHandoverForm(\''+h._id+'\')" title="طباعة"><i class="ti ti-printer"></i></button>'+
-    '</td></tr>'
-  ).join('');
+    '</td></tr>';
+  }).join('');
 }
 
 /* ────────── RETURNS ────────── */
@@ -6548,11 +6629,15 @@ function openVehicleDeliveryModal(preAssetId) {
     '<div class="form-section">بيانات الموظف المستلم</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
       '<div class="field"><label>اسم الموظف المستلم *</label><input id="vd-emp-name" placeholder="الاسم الكامل"></div>'+
-      '<div class="field"><label>الرقم الوظيفي</label><input id="vd-emp-id" placeholder="اختياري"></div>'+
+      '<div class="field"><label>رقم الهوية / الإقامة *</label><input id="vd-emp-national-id" placeholder="1xxxxxxxxx" maxlength="12" oninput="this.value=this.value.replace(/[^0-9]/g,\'\')"></div>'+
     '</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
+      '<div class="field"><label>الرقم الوظيفي</label><input id="vd-emp-id" placeholder="اختياري"></div>'+
       '<div class="field"><label>القسم / الإدارة</label><input id="vd-dept" placeholder="مثال: قسم التوصيل"></div>'+
+    '</div>'+
+    '<div class="form-row" style="margin-bottom:12px">'+
       '<div class="field"><label>رقم جوال المستلم</label><input id="vd-phone" placeholder="05xxxxxxxx"></div>'+
+      '<div class="field"><label>المنصب الوظيفي</label><input id="vd-position" placeholder="مثال: سائق — مندوب"></div>'+
     '</div>'+
 
     '<div class="form-section">تفاصيل التسليم</div>'+
@@ -6695,11 +6780,13 @@ async function saveVehicleDelivery() {
   const assetId=document.getElementById('vd-asset').value;
   const plate=document.getElementById('vd-plate').value.trim();
   const empName=document.getElementById('vd-emp-name').value.trim();
+  const empNationalId=(document.getElementById('vd-emp-national-id')?.value||'').trim();
   const odometer=document.getElementById('vd-odometer').value;
   if(!assetId){ showToast('يرجى اختيار المركبة','error'); return; }
   if(!plate){ showToast('يرجى إدخال رقم اللوحة','error'); return; }
   if(!isValidPlateNumber(plate)){ showToast('رقم اللوحة يجب أن يتكون من 3 أحرف و4 أرقام','error'); return; }
   if(!empName){ showToast('يرجى إدخال اسم الموظف المستلم','error'); return; }
+  if(!empNationalId){ showToast('يرجى إدخال رقم الهوية / الإقامة','error'); return; }
   if(odometer===''||isNaN(parseFloat(odometer))||parseFloat(odometer)<0){ showToast('يرجى إدخال عدد كيلومترات صحيح','error'); return; }
   const a=getAssets().find(x=>x._id===assetId);
   if(!a){ showToast('تعذر إيجاد بيانات المركبة','error'); return; }
@@ -6724,9 +6811,11 @@ async function saveVehicleDelivery() {
       assetId, assetName:a.name, assetCode:a.code||'', assetType:a.type||'', assetSubType:a.subType||'',
       vinNumber:a.vinNumber||'',
       plate, employeeName:empName,
+      employeeNationalId:empNationalId,
       employeeJobId:document.getElementById('vd-emp-id').value.trim(),
       department:document.getElementById('vd-dept').value.trim(),
       phone:document.getElementById('vd-phone').value.trim(),
+      position:document.getElementById('vd-position')?.value.trim()||'',
       odometer:parseFloat(odometer),
       date:document.getElementById('vd-date').value,
       time:document.getElementById('vd-time').value,
@@ -6982,8 +7071,8 @@ td{border:1px solid #A7F3D0;padding:5px 8px;font-size:11px}
 
   <div class="sec">👤 بيانات الموظف المُسلِّم</div>
   <table>
-    <tr><td class="lbl">الاسم</td><td style="font-weight:700">${v.employeeName||'—'}</td><td class="lbl">الرقم الوظيفي</td><td>${v.employeeJobId||'—'}</td></tr>
-    <tr><td class="lbl">القسم</td><td>${v.department||'—'}</td><td class="lbl">تاريخ التسليم</td><td>${v.date||'—'} ${v.time||''}</td></tr>
+    <tr><td class="lbl">الاسم</td><td style="font-weight:700">${v.employeeName||'—'}</td><td class="lbl">رقم الهوية / الإقامة</td><td style="font-family:monospace;font-weight:700">${v.employeeNationalId||'—'}</td></tr>
+    <tr><td class="lbl">الرقم الوظيفي</td><td>${v.employeeJobId||'—'}</td><td class="lbl">تاريخ التسليم</td><td>${v.date||'—'} ${v.time||''}</td></tr>
   </table>
 
   <div class="km-box">
@@ -7168,7 +7257,8 @@ td{border:1px solid #DDD6FE;padding:5px 8px;font-size:11px}
   <!-- بيانات الموظف -->
   <div class="sec">👤 بيانات الموظف المستلم</div>
   <table>
-    <tr><td class="lbl">الاسم الكامل</td><td style="font-weight:700;font-size:13px">${v.employeeName||'—'}</td><td class="lbl">الرقم الوظيفي</td><td>${v.employeeJobId||'—'}</td></tr>
+    <tr><td class="lbl">الاسم الكامل</td><td style="font-weight:700;font-size:13px">${v.employeeName||'—'}</td><td class="lbl">رقم الهوية / الإقامة</td><td style="font-weight:700;font-family:monospace">${v.employeeNationalId||'—'}</td></tr>
+    <tr><td class="lbl">الرقم الوظيفي</td><td>${v.employeeJobId||'—'}</td><td class="lbl">المنصب</td><td>${v.position||'—'}</td></tr>
     <tr><td class="lbl">القسم / الإدارة</td><td>${v.department||'—'}</td><td class="lbl">رقم الجوال</td><td>${v.phone||'—'}</td></tr>
   </table>
 
@@ -7874,6 +7964,8 @@ if(typeof openEditCustomer!=='undefined')window.openEditCustomer=openEditCustome
 if(typeof viewCustomerDetails!=='undefined')window.viewCustomerDetails=viewCustomerDetails;
 if(typeof openNewHandover!=='undefined')window.openNewHandover=openNewHandover;
 if(typeof openHandoverFromAsset!=='undefined')window.openHandoverFromAsset=openHandoverFromAsset;
+if(typeof getHandoverMode!=='undefined')window.getHandoverMode=getHandoverMode;
+if(typeof onHandoverAssetChange!=='undefined')window.onHandoverAssetChange=onHandoverAssetChange;
 if(typeof openNewReturn!=='undefined')window.openNewReturn=openNewReturn;
 if(typeof openReturnFromHandover!=='undefined')window.openReturnFromHandover=openReturnFromHandover;
 if(typeof openNewMaintenance!=='undefined')window.openNewMaintenance=openNewMaintenance;
