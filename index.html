@@ -3308,7 +3308,9 @@ async function doLogin() {
     try { localStorage.setItem('_assetSession', JSON.stringify({_id:found._id, username:found.username, name:found.name, role:found.role, perms:found.perms})); } catch(e) {}
     document.getElementById('login-error').style.display='none';
     document.getElementById('login-screen').style.display='none';
-    document.getElementById('app-shell').classList.remove('hidden');
+    // مسح display:none الصريح الذي يضعه doLogout + إزالة hidden class
+    const appShell = document.getElementById('app-shell');
+    if (appShell) { appShell.classList.remove('hidden'); appShell.style.display = ''; }
     document.getElementById('header-avatar').textContent = found.name.split(' ').map(w=>w[0]).join('').slice(0,2);
     const nameEl = document.getElementById('header-name');
     if (nameEl) nameEl.textContent = found.name;
