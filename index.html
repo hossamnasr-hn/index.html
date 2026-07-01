@@ -3548,25 +3548,37 @@ function statusBadge(s, assetId) {
   if (s==='عند عميل' && assetId) {
     const asset = getAssets().find(a=>a._id===assetId);
     const terms = getAssetTerms(asset?.type||'');
-    // المركبات: نعرض "تم التسليم" + اسم الموظف المستلم من سجل تسليم المركبات
-    if (asset && isVehicleAssetType(asset.type)) {
+    const isVeh = asset && isVehicleAssetType(asset.type);
+    const isElec = asset && getHandoverMode(asset.type)==='employee' && !isVeh;
+
+    // المركبات: "تم التسليم" + اسم الموظف
+    if (isVeh) {
       const vd = getVehicleDeliveries().filter(v=>v.assetId===assetId && v.status==='مُسلَّمة');
       if (vd.length) {
         const last = vd[vd.length-1];
         const empName = last.employeeName||null;
-        return '<span class="badge badge-blue" title="'+(empName?'مُسلَّمة إلى: '+empName:terms.status)+'">'+
-          '<i class="ti ti-car" style="font-size:10px"></i> '+terms.status+
+        return '<span class="badge badge-blue" title="'+(empName?'مع الموظف: '+empName:'تم التسليم')+'">'+
+          '<i class="ti ti-car" style="font-size:10px"></i> تم التسليم'+
           (empName?'<div style="font-size:9px;font-weight:600;margin-top:1px;opacity:.85">'+empName+'</div>':'')+
           '</span>';
       }
     }
-    // باقي الأنواع: نستخدم حالة ومسمى مخصص حسب النوع + اسم العميل الفعلي
-    label = terms.status;
-    const hh = getHandovers().filter(h=>h.assetId===assetId&&h.status==='مُسلَّم');
-    if (hh.length) {
-      const ln = hh[hh.length-1];
-      if (ln.clientName) label = 'عند: '+ln.clientName;
+    // الأجهزة الإلكترونية: "حالياً مع موظف" + اسم الموظف
+    if (isElec) {
+      const eh = getHandovers().filter(h=>h.assetId===assetId&&h.status==='مُسلَّم'&&h.handoverMode==='employee');
+      if (eh.length) {
+        const last = eh[eh.length-1];
+        const empName = last.clientName||null;
+        return '<span class="badge" style="background:var(--purple-bg);color:var(--purple)" title="'+(empName?'حالياً مع الموظف: '+empName:'مع موظف')+'">'+
+          '<i class="ti ti-user-check" style="font-size:10px"></i> مع موظف'+
+          (empName?'<div style="font-size:9px;font-weight:600;margin-top:1px;opacity:.85">'+empName+'</div>':'')+
+          '</span>';
+      }
     }
+    // ثلاجات العرض وغيرها: عند عميل + اسم العميل
+    label = terms.status;
+    const hh = getHandovers().filter(h=>h.assetId===assetId&&h.status==='مُسلَّم'&&h.handoverMode!=='employee');
+    if (hh.length) { const ln=hh[hh.length-1]; if (ln.clientName) label='عند: '+ln.clientName; }
   }
   return '<span class="badge '+(m[s]||m[label]||'badge-blue')+'" title="'+label+'">'+label+'</span>';
 }
@@ -3652,14 +3664,12 @@ function filterAssets() {
     (!q||(a.name||'').toLowerCase().includes(q)||(a.code||'').toLowerCase().includes(q)||(a.plateNumber||'').toLowerCase().includes(q)||(a.vinNumber||'').toLowerCase().includes(q))&&
     (!st||a.status===st)&&(!tp||a.type===tp)&&(!stp||a.subType===stp)
   );
-  // رأس الجدول الديناميكي حسب النوع المختار
+  // رأس الجدول — عدد الأعمدة ثابت (11) في جميع الأوضاع، النوع يظهر داخل خلية الاسم
   const terms = getAssetTerms(tp);
-  const isVeh = tp && isVehicleAssetType(tp);
   const thead = document.getElementById('assets-thead');
   if (thead) {
-    thead.innerHTML = '<tr><th>الصورة</th><th>الكود</th><th>الاسم</th>'+(tp?'':'<th>النوع</th>')+'<th>النوع الفرعي</th><th>الإجمالي</th><th>متاح</th><th>'+terms.status+'</th><th>صيانة</th><th>تالف</th><th>الحالة</th><th>الإجراءات</th></tr>';
+    thead.innerHTML = '<tr><th>الصورة</th><th>الكود</th><th>الاسم والنوع</th><th>النوع الفرعي</th><th>الإجمالي</th><th>متاح</th><th>'+terms.status+'</th><th>صيانة</th><th>تالف</th><th>الحالة</th><th>الإجراءات</th></tr>';
   }
-  // تحديث الأنواع الفرعية
   const stpEl = document.getElementById('filter-subtype');
   if (stpEl && tp) {
     const subs = getAssetSubTypes(tp);
@@ -3673,35 +3683,51 @@ function renderAssets() { filterAssets(); }
 
 function renderAssetRows(list, activeType) {
   const body = document.getElementById('assets-body');
-  if (!list.length) { body.innerHTML = '<tr><td colspan="12" class="empty-row">لا توجد أصول مطابقة</td></tr>'; return; }
-  const showTypeCol = !activeType;
+  if (!list.length) { body.innerHTML = '<tr><td colspan="11" class="empty-row">لا توجد أصول مطابقة</td></tr>'; return; }
+  const showTypeBadge = !activeType; // يُعرض شارة النوع داخل خلية الاسم فقط في الكل
   body.innerHTML = list.map(a=>{
     const isVeh = isVehicleAssetType(a.type);
+    const isElec = getHandoverMode(a.type) === 'employee' && !isVeh;
     const terms = getAssetTerms(a.type);
-    // حركات المركبة الأخيرة (تسليم/استرجاع)
-    let vehicleHistory = '';
+
+    // ── حركات المركبات الأخيرة ──
+    let assetHistory = '';
     if (isVeh) {
-      const deliveries = getVehicleDeliveries().filter(v=>v.assetId===a._id).slice(-3).reverse();
+      const deliveries = getVehicleDeliveries().filter(v=>v.assetId===a._id).slice(-2).reverse();
       if (deliveries.length) {
-        vehicleHistory = '<div style="margin-top:4px">'+deliveries.map(v=>{
+        assetHistory = '<div style="margin-top:3px">'+deliveries.map(v=>{
           const isActive = v.status!=='مُرتجعة';
-          return '<div style="font-size:9px;padding:1px 0;color:'+(isActive?'var(--blue)':'var(--text3)')+'">'+
+          return '<div style="font-size:9px;color:'+(isActive?'var(--blue)':'var(--text3)')+'">'+
             (isActive?'🚗':'↩')+' '+(v.date||'')+(v.employeeName?' — '+v.employeeName:'')+
             (v.plate?' <code style="font-size:8px;background:var(--bg2);padding:0 3px;border-radius:2px">'+v.plate+'</code>':'')+
           '</div>';
         }).join('')+'</div>';
       }
     }
+    // ── حركات الأجهزة الإلكترونية — عرض اسم الموظف مثل المركبات ──
+    if (isElec && a.clientQty > 0) {
+      const elecHandovers = getHandovers().filter(h=>h.assetId===a._id&&h.status==='مُسلَّم'&&h.handoverMode==='employee').slice(-2).reverse();
+      if (elecHandovers.length) {
+        assetHistory = '<div style="margin-top:3px">'+elecHandovers.map(h=>
+          '<div style="font-size:9px;color:var(--purple)">👤 '+(h.date||'')+' — '+(h.clientName||'')+(h.empDept?' ('+h.empDept+')':'')+'</div>'
+        ).join('')+'</div>';
+      }
+    }
+
+    // أيقونة حسب النوع
+    const typeIcon = isVeh ? 'ti-car' : isElec ? 'ti-device-laptop' : /ثلاج/.test(a.type) ? 'ti-snowflake' : 'ti-package';
+    const typeBadgeColor = isVeh ? 'var(--purple)' : isElec ? 'var(--blue)' : 'var(--teal)';
+
     return '<tr>'+
-    '<td>'+(a.imageUrl?'<img src="'+a.imageUrl+'" class="asset-img" onclick="viewAssetImage(\''+a._id+'\')">':'<div class="asset-img-placeholder"><i class="ti '+(isVeh?'ti-car':a.type&&/ثلاج/.test(a.type)?'ti-snowflake':'ti-package')+'"></i></div>')+'</td>'+
+    '<td>'+(a.imageUrl?'<img src="'+a.imageUrl+'" class="asset-img" onclick="viewAssetImage(\''+a._id+'\')">':'<div class="asset-img-placeholder"><i class="ti '+typeIcon+'"></i></div>')+'</td>'+
     '<td><code class="tag">'+a.code+'</code></td>'+
     '<td style="font-weight:600;min-width:140px">'+a.name+
+      (showTypeBadge?'<span class="badge" style="font-size:9px;padding:1px 6px;margin-right:4px;background:var(--bg2);color:'+typeBadgeColor+'">'+a.type+'</span>':'')+
       (a.manufacturer?'<div style="font-size:10px;color:var(--text3)">'+a.manufacturer+'</div>':'')+
       (a.plateNumber?'<div style="font-size:10px;color:var(--purple);margin-top:1px"><i class="ti ti-id" style="font-size:9px"></i> '+a.plateNumber+'</div>':'')+
       (a.vinNumber?'<div style="font-size:9px;color:var(--text3);font-family:monospace"><i class="ti ti-hash" style="font-size:8px"></i> '+a.vinNumber+'</div>':'')+
-      vehicleHistory+
+      assetHistory+
     '</td>'+
-    (showTypeCol?'<td><span class="badge badge-blue">'+a.type+'</span></td>':'')+
     '<td>'+(a.subType?'<span class="badge badge-gray">'+a.subType+'</span>':'-')+(a.capacity?'<div style="font-size:10px;color:var(--text3)">'+a.capacity+'</div>':'')+'</td>'+
     '<td style="font-weight:700;text-align:center">'+a.totalQty+'</td>'+
     '<td style="text-align:center"><span style="color:var(--green);font-weight:700">'+a.availableQty+'</span></td>'+
@@ -5596,6 +5622,7 @@ function loadAssetHistoryById(assetId) {
   const a = getAssets().find(x=>x._id===assetId);
   if (!a) return;
   const isVeh = isVehicleAssetType(a.type);
+  const isElec = getHandoverMode(a.type) === 'employee' && !isVeh;
   const terms = getAssetTerms(a.type);
 
   const handovers    = getHandovers().filter(h=>h.assetId===assetId);
@@ -5610,35 +5637,61 @@ function loadAssetHistoryById(assetId) {
   events.push({type:'إضافة',icon:'ti-plus',color:'var(--green)',date:a.date||'',desc:'تمت إضافة الأصل إلى المخزون'+(a.totalQty?' | الكمية: '+a.totalQty:''),qty:a.totalQty||1,ref:''});
 
   if (isVeh) {
-    // المركبات: التسليم للموظفين واسترجاعها
     vDeliveries.forEach(v=>{
       const active = v.status!=='مُرتجعة';
-      events.push({
-        type:'تسليم مركبة', icon:'ti-car', color:'var(--blue)',
-        date:v.date||'', time:v.time||'',
+      events.push({type:'تسليم مركبة',icon:'ti-car',color:'var(--blue)',date:v.date||'',time:v.time||'',
         desc:'تسليم إلى: '+v.employeeName+(v.department?' | القسم: '+v.department:'')+
              (v.plate?' | اللوحة: '+v.plate:'')+
              (v.odometer?' | العداد: '+Number(v.odometer).toLocaleString('ar-SA')+' كم':'')+
              (v.condition?' | الحالة: '+v.condition:'')+
              (v.responsible?' | المسؤول: '+v.responsible:''),
-        qty:1, ref:v._id, badge:'badge-blue'
-      });
+        qty:1,ref:v._id,badge:'badge-blue'});
       if (!active && v.returnedAt) {
-        events.push({
-          type:'استرجاع مركبة', icon:'ti-corner-up-left', color:'var(--teal)',
-          date:v.returnedAt.slice(0,10)||'',
-          desc:'استرجاع المركبة من: '+v.employeeName+(v.returnedBy?' | بواسطة: '+v.returnedBy:''),
-          qty:1, ref:v._id, badge:'badge-teal'
-        });
+        events.push({type:'استرجاع مركبة',icon:'ti-corner-up-left',color:'var(--teal)',
+          date:v.returnedAt.slice(0,10)||'',time:v.returnedAt.slice(11,16)||'',
+          desc:'استرجاع من: '+v.employeeName+(v.returnOdometer?' | عداد: '+Number(v.returnOdometer).toLocaleString('ar-SA')+' كم':'')+
+               (v.kmUsed!=null?' | مسافة مقطوعة: '+Number(v.kmUsed).toLocaleString('ar-SA')+' كم':'')+
+               (v.returnCondition?' | الحالة: '+v.returnCondition:'')+
+               (v.returnedBy?' | بواسطة: '+v.returnedBy:''),
+          qty:1,ref:v._id,badge:'badge-teal'});
       }
     });
+  } else if (isElec) {
+    // الأجهزة الإلكترونية: تسليم/استرداد من موظفين مع بياناتهم الكاملة
+    handovers.forEach(h=>{
+      const isEmpMode = h.handoverMode==='employee';
+      events.push({
+        type: isEmpMode ? 'تسليم لموظف' : 'تسليم لعميل',
+        icon: isEmpMode ? 'ti-user-check' : 'ti-transfer',
+        color: isEmpMode ? 'var(--purple)' : 'var(--blue)',
+        date:h.date||'',time:'',
+        desc: isEmpMode
+          ? 'حالياً مع الموظف: '+h.clientName+
+            (h.empNationalId?' | هوية: '+h.empNationalId:'')+
+            (h.empDept?' | القسم: '+h.empDept:'')+
+            (h.empPosition?' | المنصب: '+h.empPosition:'')+
+            (h.empPhone?' | جوال: '+h.empPhone:'')+
+            (h.responsible?' | المسؤول: '+h.responsible:'')
+          : terms.handedTo+': '+h.clientName+' | الكمية: '+h.qty,
+        qty:h.qty,ref:h._id,
+        badge: isEmpMode ? 'badge-purple' : 'badge-blue'
+      });
+    });
+    returns.forEach(r=>events.push({type:'استرداد',icon:'ti-corner-up-left',color:'var(--teal)',date:r.date||'',time:'',
+      desc:'استرداد من: '+r.clientName+' | السبب: '+r.reason+' | الحالة: '+r.conditionAfterReturn,qty:r.qty,ref:r._id,badge:'badge-teal'}));
   } else {
-    handovers.forEach(h=>events.push({type:'تسليم',icon:'ti-transfer',color:'var(--blue)',date:h.date||'',desc:terms.handedTo+': '+h.clientName+' | الكمية: '+h.qty,qty:h.qty,ref:h._id,badge:'badge-blue'}));
-    returns.forEach(r=>events.push({type:'استرداد',icon:'ti-corner-up-left',color:'var(--teal)',date:r.date||'',desc:'استرداد من: '+r.clientName+' | السبب: '+r.reason+' | الحالة: '+r.conditionAfterReturn,qty:r.qty,ref:r._id,badge:'badge-teal'}));
+    // ثلاجات العرض: تسليم/استرداد مع العملاء
+    handovers.forEach(h=>events.push({type:'تسليم',icon:'ti-transfer',color:'var(--blue)',date:h.date||'',time:'',
+      desc:terms.handedTo+': '+h.clientName+' | الكمية: '+h.qty,qty:h.qty,ref:h._id,badge:'badge-blue'}));
+    returns.forEach(r=>events.push({type:'استرداد',icon:'ti-corner-up-left',color:'var(--teal)',date:r.date||'',time:'',
+      desc:'استرداد من: '+r.clientName+' | السبب: '+r.reason+' | الحالة: '+r.conditionAfterReturn,qty:r.qty,ref:r._id,badge:'badge-teal'}));
   }
-  maintenances.forEach(m=>events.push({type:'صيانة',icon:'ti-tool',color:'var(--amber)',date:m.date||'',desc:'تحويل لصيانة: '+m.vendor+' | '+m.fault+' | الحالة: '+m.status+(m.autoCreated?' (تلقائي)':''),qty:m.qty,ref:m._id,badge:'badge-amber'}));
-  disposes.forEach(d=>events.push({type:'إتلاف',icon:'ti-trash',color:'var(--red)',date:d.date||'',desc:'سبب الإتلاف: '+d.reason+' | المعتمد: '+d.approved+(d.autoCreated?' (تلقائي)':''),qty:d.qty,ref:d._id,badge:'badge-red'}));
-  custody.forEach(c=>events.push({type:'عهدة',icon:'ti-file-invoice',color:'var(--purple)',date:c.date||'',desc:'طلب عهدة: '+c.requesterName+' | الغرض: '+c.purpose+' | الحالة: '+c.requestStatus,qty:'-',ref:c._id,badge:'badge-purple'}));
+  maintenances.forEach(m=>events.push({type:'صيانة',icon:'ti-tool',color:'var(--amber)',date:m.date||'',time:'',
+    desc:'تحويل لصيانة: '+m.vendor+' | '+m.fault+' | الحالة: '+m.status+(m.autoCreated?' (تلقائي)':''),qty:m.qty,ref:m._id,badge:'badge-amber'}));
+  disposes.forEach(d=>events.push({type:'إتلاف',icon:'ti-trash',color:'var(--red)',date:d.date||'',time:'',
+    desc:'سبب الإتلاف: '+d.reason+' | المعتمد: '+d.approved+(d.autoCreated?' (تلقائي)':''),qty:d.qty,ref:d._id,badge:'badge-red'}));
+  custody.forEach(c=>events.push({type:'عهدة',icon:'ti-file-invoice',color:'var(--purple)',date:c.date||'',time:'',
+    desc:'طلب عهدة: '+c.requesterName+' | الغرض: '+c.purpose+' | الحالة: '+c.requestStatus,qty:'-',ref:c._id,badge:'badge-purple'}));
   // ترتيب تصاعدي حسب التاريخ + الوقت + نوع العملية (الإضافة دائماً أولاً)
   events.sort((a,b)=>{
     const da=(a.date||'1900-01-01')+(a.time?'T'+a.time:'T00:00');
@@ -5649,7 +5702,8 @@ function loadAssetHistoryById(assetId) {
     return 0;
   });
 
-  // بطاقة المعلومات الأساسية للمركبة
+  // بطاقة المعلومات الأساسية للمركبة أو الجهاز الإلكتروني
+  const lastEmpHandover = isElec ? handovers.filter(h=>h.handoverMode==='employee'&&h.status==='مُسلَّم').slice(-1)[0] : null;
   const vehicleInfoCard = isVeh ? `
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px">
       <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px"><i class="ti ti-id"></i> رقم اللوحة</div><div style="font-weight:700;color:var(--purple);font-size:15px">${a.plateNumber||'—'}</div></div>
@@ -5658,6 +5712,15 @@ function loadAssetHistoryById(assetId) {
       <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">عمليات التسليم</div><div style="font-weight:700;color:var(--blue)">${vDeliveries.length}</div></div>
       <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">حالياً مع موظف</div><div style="font-weight:700;color:${a.clientQty>0?'var(--blue)':'var(--green)'}">${a.clientQty>0?'نعم':'لا'}</div></div>
       <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">مسؤول التسليم الأخير</div><div style="font-weight:600;font-size:12px">${vDeliveries.length?vDeliveries[vDeliveries.length-1].responsible||'—':'—'}</div></div>
+    </div>` :
+  isElec ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;background:var(--purple-bg);border:1px solid var(--purple);border-radius:var(--radius);padding:14px;margin-bottom:14px;opacity:.95">
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px"><i class="ti ti-device-laptop"></i> الحالة الحالية</div><div>${statusBadge(a.status,a._id)}</div></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">عمليات التسليم للموظفين</div><div style="font-weight:700;color:var(--purple)">${handovers.filter(h=>h.handoverMode==='employee').length}</div></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">حالياً مع موظف</div><div style="font-weight:700;color:${a.clientQty>0?'var(--purple)':'var(--green)'}">${a.clientQty>0?'نعم':'لا'}</div></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">الموظف الحالي</div><div style="font-weight:600;font-size:12px">${lastEmpHandover?lastEmpHandover.clientName||'—':'—'}</div></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">القسم</div><div style="font-weight:600;font-size:12px">${lastEmpHandover?lastEmpHandover.empDept||'—':'—'}</div></div>
+      <div><div style="font-size:11px;color:var(--text3);margin-bottom:2px">تاريخ آخر تسليم</div><div style="font-weight:600;font-size:12px">${lastEmpHandover?lastEmpHandover.date||'—':'—'}</div></div>
     </div>` : '';
 
   const statKey = isVeh ? terms.status : 'عند عميل';
