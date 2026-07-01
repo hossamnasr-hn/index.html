@@ -4485,12 +4485,33 @@ function buildCustomerOptions() {
 }
 
 /* تحديد نوع التسليم: ثلاجات → عميل | أجهزة كهربائية → موظف | غيرها → عميل */
+/* ═══ كشف وضع التسليم تلقائياً — قابل للتجاوز بزر التبديل ═══ */
 function getHandoverMode(typeName) {
   const t = (typeName||'').trim();
-  if (/ثلاج|عرض|تبريد|فريزر/.test(t)) return 'customer';
-  if (/جهاز كهرب|أجهزة كهرب|كهربائي|تلفاز|شاشة|طابعة|جهاز منزل/.test(t)) return 'employee';
-  // الافتراضي: عميل
+  if (/كهرب|تلفاز|شاش|طابع|مكيف|مجفف|غسال|مايكروويف|فرن/.test(t)) return 'employee';
   return 'customer';
+}
+
+function setHandoverMode(mode) {
+  const custSec = document.getElementById('h-customer-section');
+  const empSec  = document.getElementById('h-employee-section');
+  const btnCust = document.getElementById('h-mode-btn-customer');
+  const btnEmp  = document.getElementById('h-mode-btn-employee');
+  const title   = document.getElementById('modal-title');
+  const wrap    = document.getElementById('h-mode-wrap');
+  if (!custSec||!empSec) return;
+  if (mode==='employee') {
+    custSec.style.display='none'; empSec.style.display='';
+    if(title) title.innerHTML='<i class="ti ti-transfer" style="color:var(--purple)"></i> تسليم جهاز كهربائي لموظف';
+    if(btnCust){btnCust.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--text2);font-family:var(--font)';}
+    if(btnEmp) {btnEmp.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--purple);background:var(--purple);color:#fff;font-family:var(--font)';}
+  } else {
+    custSec.style.display=''; empSec.style.display='none';
+    if(title) title.innerHTML='<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم ثلاجة عرض / أصل لعميل';
+    if(btnCust){btnCust.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--green);background:var(--green);color:#fff;font-family:var(--font)';}
+    if(btnEmp) {btnEmp.style.cssText='padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--text2);font-family:var(--font)';}
+  }
+  if(wrap) wrap.dataset.mode=mode;
 }
 
 function openHandoverModal(preAssetId) {
@@ -4498,13 +4519,20 @@ function openHandoverModal(preAssetId) {
   const availAssets = getAssets().filter(a=>a.availableQty>0 && !isVehicleAssetType(a.type));
   if (!availAssets.length) { showToast('لا توجد أصول متاحة للتسليم (المركبات تُسلَّم من صفحة تسليم المركبات)','error'); return; }
   const assetOpts = availAssets.map(a=>
-    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+' data-type="'+(a.type||'')+'" data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-code="'+(a.code||'')+'">'+
+    '<option value="'+a._id+'" '+(a._id===preAssetId?'selected':'')+' data-type="'+encodeURIComponent(a.type||'')+'" data-subtype="'+(a.subType||'')+'" data-mfg="'+(a.manufacturer||'')+'" data-code="'+(a.code||'')+'">'+
     a.name+' ['+(a.code||'')+']'+(a.subType?' ('+a.subType+')':'')+' — متاح: '+a.availableQty+'</option>'
   ).join('');
   const today = new Date().toISOString().split('T')[0];
-  document.getElementById('modal-title').innerHTML = '<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم أصل';
+  const btnBase = 'padding:8px 18px;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .15s';
+  document.getElementById('modal-title').innerHTML = '<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم أصل لعميل';
   document.getElementById('modal-body').innerHTML =
-    '<div class="form-section">الأصل المُسلَّم</div>'+
+    /* زر التبديل الواضح */
+    '<div id="h-mode-wrap" data-mode="customer" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+      '<span style="font-size:12px;font-weight:700;color:var(--text2)"><i class="ti ti-arrows-exchange"></i> تسليم إلى:</span>'+
+      '<button id="h-mode-btn-customer" type="button" onclick="setHandoverMode(\'customer\')" style="'+btnBase+';background:var(--green);color:#fff;border:1.5px solid var(--green)"><i class="ti ti-building-store"></i> عميل</button>'+
+      '<button id="h-mode-btn-employee" type="button" onclick="setHandoverMode(\'employee\')" style="'+btnBase+';background:var(--card);color:var(--text2);border:1.5px solid var(--border)"><i class="ti ti-user-check"></i> موظف</button>'+
+      '<span style="font-size:11px;color:var(--text3)">يتغير تلقائياً عند اختيار الأصل — أو اختر يدوياً</span>'+
+    '</div>'+
     '<div class="form-row" style="margin-bottom:12px">'+
       '<div class="field"><label>الأصل *</label><select id="h-asset" onchange="onHandoverAssetChange()">'+assetOpts+'</select></div>'+
       '<div class="field"><label>عدد الوحدات *</label><input id="h-qty" type="number" min="1" value="1"></div>'+
@@ -4561,31 +4589,23 @@ function openHandoverModal(preAssetId) {
 
 function onHandoverAssetChange() {
   const sel = document.getElementById('h-asset');
-  if (!sel) return;
+  if (!sel||!sel.options[sel.selectedIndex]) return;
   const opt = sel.options[sel.selectedIndex];
+  if (!opt.value) return;
   const det = document.getElementById('h-asset-details');
-  if (det && opt?.value) {
-    const subs = [opt.dataset.subtype, opt.dataset.mfg].filter(Boolean);
-    const code = opt.dataset.code||'';
-    const assetType = opt.dataset.type||'';
-    det.innerHTML = (code?'<span class="badge badge-blue" style="margin:2px"><i class="ti ti-barcode"></i> '+code+'</span>':'') +
+  const subs = [opt.dataset.subtype, opt.dataset.mfg].filter(Boolean);
+  const code = opt.dataset.code||'';
+  // data-type مُشفَّر بـ encodeURIComponent عند البناء
+  const assetType = decodeURIComponent(opt.dataset.type||'');
+  if (det) {
+    det.innerHTML =
+      (code?'<span class="badge badge-blue" style="margin:2px"><i class="ti ti-barcode"></i> '+code+'</span>':'')+
+      (assetType?'<span class="badge badge-purple" style="margin:2px">'+assetType+'</span>':'')+
       subs.map(s=>'<span class="badge badge-gray" style="margin:2px">'+s+'</span>').join('');
-    det.style.display = (subs.length||code) ? 'block' : 'none';
-    // تبديل الحقول حسب نوع الأصل
-    const mode = getHandoverMode(assetType);
-    const custSec = document.getElementById('h-customer-section');
-    const empSec  = document.getElementById('h-employee-section');
-    const title   = document.getElementById('modal-title');
-    if (mode === 'employee') {
-      if (custSec) custSec.style.display = 'none';
-      if (empSec)  empSec.style.display  = '';
-      if (title)   title.innerHTML = '<i class="ti ti-transfer" style="color:var(--purple)"></i> تسليم جهاز كهربائي لموظف';
-    } else {
-      if (custSec) custSec.style.display = '';
-      if (empSec)  empSec.style.display  = 'none';
-      if (title)   title.innerHTML = '<i class="ti ti-transfer" style="color:var(--green)"></i> تسليم ثلاجة عرض لعميل';
-    }
+    det.style.display='block';
   }
+  // تبديل الوضع تلقائياً بناء على نوع الأصل
+  setHandoverMode(getHandoverMode(assetType));
 }
 
 function onHandoverCustomerSelect() {
@@ -4606,7 +4626,7 @@ async function saveHandover() {
   if (!qty||qty<1) { showToast('يرجى إدخال عدد صحيح','error'); return; }
   if (a.availableQty<qty) { showToast('العدد يتجاوز المتاح','error'); return; }
 
-  const mode = getHandoverMode(a.type||'');
+  const mode = document.getElementById('h-mode-wrap')?.dataset.mode || 'customer';
   let clientName='', customerId='', crNumber='', phone1='', phone2='', clientAddress='';
   let empName='', empNationalId='', empJobId='', empDept='', empPhone='', empPosition='';
 
@@ -7965,6 +7985,7 @@ if(typeof viewCustomerDetails!=='undefined')window.viewCustomerDetails=viewCusto
 if(typeof openNewHandover!=='undefined')window.openNewHandover=openNewHandover;
 if(typeof openHandoverFromAsset!=='undefined')window.openHandoverFromAsset=openHandoverFromAsset;
 if(typeof getHandoverMode!=='undefined')window.getHandoverMode=getHandoverMode;
+if(typeof setHandoverMode!=='undefined')window.setHandoverMode=setHandoverMode;
 if(typeof onHandoverAssetChange!=='undefined')window.onHandoverAssetChange=onHandoverAssetChange;
 if(typeof openNewReturn!=='undefined')window.openNewReturn=openNewReturn;
 if(typeof openReturnFromHandover!=='undefined')window.openReturnFromHandover=openReturnFromHandover;
