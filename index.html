@@ -784,6 +784,7 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
       <div class="nav-item" id="nav-maintenance" style="display:none" onclick="showPage('maintenance',this)" data-page="maintenance"><i class="ti ti-tool"></i> الصيانة</div>
       <div class="nav-item" id="nav-dispose" style="display:none" onclick="showPage('dispose',this)" data-page="dispose"><i class="ti ti-trash"></i> الإتلاف</div>
       <div class="nav-item" id="nav-vehicle-delivery" style="display:none" onclick="showPage('vehicle-delivery',this)" data-page="vehicle-delivery"><i class="ti ti-car"></i> تسليم المركبات</div>
+      <div class="nav-item" id="nav-periodic-maint" style="display:none" onclick="showPage('periodic-maint',this)" data-page="periodic-maint"><i class="ti ti-calendar-check"></i> الصيانة الدورية</div>
       <div class="nav-item" id="nav-custody" style="display:none" onclick="showPage('custody',this)" data-page="custody"><i class="ti ti-file-invoice"></i> طلبات العهدة</div>
       <div class="nav-item" id="nav-complaints" style="display:none" onclick="showPage('complaints',this)" data-page="complaints"><i class="ti ti-speakerphone"></i> البلاغات</div>
       <div class="nav-item" id="nav-dept-custody" style="display:none" onclick="showPage('dept-custody',this)" data-page="dept-custody"><i class="ti ti-building"></i> عهدة الإدارات</div>
@@ -1128,6 +1129,27 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
         <div id="asset-history-result"></div>
       </div>
 
+      <!-- الصيانة الدورية -->
+      <div class="page" id="page-periodic-maint">
+        <div class="page-title">
+          <span><i class="ti ti-calendar-check"></i> الصيانة الدورية</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="report-page-btn" onclick="printPeriodicMaintReport()"><i class="ti ti-printer"></i> طباعة التقرير</button>
+          </div>
+        </div>
+        <!-- تبويبان: مركبات | ثلاجات عرض -->
+        <div style="display:flex;gap:0;border-bottom:1.5px solid var(--border);margin-bottom:16px">
+          <button id="pm-tab-vehicles" class="pm-tab pm-tab-active" onclick="switchPMTab('vehicles')" style="padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid var(--blue);color:var(--blue);font-family:var(--font)"><i class="ti ti-car"></i> المركبات</button>
+          <button id="pm-tab-fridges"  class="pm-tab" onclick="switchPMTab('fridges')"  style="padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;color:var(--text2);font-family:var(--font)"><i class="ti ti-snowflake"></i> ثلاجات العرض</button>
+        </div>
+        <!-- إحصائيات -->
+        <div id="pm-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"></div>
+        <!-- تنبيهات -->
+        <div id="pm-alerts"></div>
+        <!-- قائمة الأصول -->
+        <div id="pm-list"></div>
+      </div>
+
       <!-- Custody -->
       <div class="page" id="page-custody">
         <div class="page-title">
@@ -1423,7 +1445,7 @@ async function initDefaultData() {
   const usersSnap = await getDocs(collection(db,"users"));
   const existingUsers = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   
-  const ADMIN_FULL_PERMS = ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","audit","vehicle_delivery","vehicle_return","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"];
+  const ADMIN_FULL_PERMS = ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","audit","vehicle_delivery","vehicle_return","periodic_maint","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"];
   if (usersSnap.empty || existingUsers.length === 0) {
     await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms: ADMIN_FULL_PERMS });
     console.log("Admin user created");
@@ -1485,7 +1507,7 @@ async function initDefaultData() {
 }
 
 async function loadAllData() {
-  const [usersSnap,typesSnap,subTypesSnap,attrSnap,assetsSnap,handoversSnap,maintsSnap,disposesSnap,custodySnap,customersSnap,returnsSnap,settingsSnap,deptCustodySnap,vehicleDeliverySnap] = await Promise.all([
+  const [usersSnap,typesSnap,subTypesSnap,attrSnap,assetsSnap,handoversSnap,maintsSnap,disposesSnap,custodySnap,customersSnap,returnsSnap,settingsSnap,deptCustodySnap,vehicleDeliverySnap,periodicMaintSnap] = await Promise.all([
     getDocs(collection(db,"users")),
     getDocs(collection(db,"assetTypes")),
     getDocs(collection(db,"assetSubTypes")),
@@ -1500,6 +1522,7 @@ async function loadAllData() {
     getDocs(collection(db,"settings")),
     getDocs(collection(db,"deptCustodyRequests")),
     getDocs(collection(db,"vehicleDeliveries")),
+    getDocs(collection(db,"periodicMaintenance")),
   ]);
   window.users = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   console.log('✅ Users loaded from Firebase:', window.users.length, window.users.map(u=>u.username));
@@ -1515,6 +1538,7 @@ async function loadAllData() {
   window.returns = returnsSnap.docs.map(d=>({...d.data(),_id:d.id}));
   window.deptCustodyRequests = deptCustodySnap.docs.map(d=>({...d.data(),_id:d.id}));
   window.vehicleDeliveries = vehicleDeliverySnap.docs.map(d=>({...d.data(),_id:d.id}));
+  window.periodicMaintenance = periodicMaintSnap.docs.map(d=>({...d.data(),_id:d.id}));
   // Load settings
   if (!settingsSnap.empty) {
     const s = settingsSnap.docs[0].data();
@@ -1638,6 +1662,7 @@ function getUsers()        { return window.users || []; }
 function getAssets()       { return window.assets || []; }
 function getHandovers()    { return window.handovers || []; }
 function getVehicleDeliveries() { return window.vehicleDeliveries || []; }
+function getPeriodicMaint()     { return window.periodicMaintenance || []; }
 function getMaintenances() { return window.maintenances || []; }
 function getDisposes()     { return window.disposes || []; }
 function getAssetTypes()   { return (window.assetTypes || []).map(t => t.name || t); }
@@ -3525,6 +3550,7 @@ function applyNavPermissions(perms) {
   show('nav-maintenance', p.includes('maintenance'));
   show('nav-dispose',     p.includes('dispose'));
   show('nav-vehicle-delivery', p.includes('vehicle_delivery'));
+  show('nav-periodic-maint',   p.includes('periodic_maint'));
   show('nav-custody',     p.some(x=>x==='custody'||x.startsWith('custody_')));
   show('nav-complaints',   p.some(x=>x==='complaints'||x.startsWith('complaints_')));
   show('nav-dept-custody',p.some(x=>x==='dept_custody'||x.startsWith('dept_custody_')));
@@ -3542,7 +3568,7 @@ function applyNavPermissions(perms) {
 
 function resetNav() {
   ['nav-dashboard','nav-assets','nav-inventory','nav-section-ops','nav-customers','nav-handover',
-   'nav-returns','nav-maintenance','nav-dispose','nav-vehicle-delivery','nav-custody','nav-dept-custody',
+   'nav-returns','nav-maintenance','nav-dispose','nav-vehicle-delivery','nav-periodic-maint','nav-custody','nav-dept-custody',
    'nav-section-admin','nav-types','nav-reports','nav-asset-history','nav-users','nav-audit','nav-settings','nav-complaints'
   ].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
 }
@@ -3580,6 +3606,7 @@ const PAGE_PERMS = {
   'handover': 'handover', 'returns': 'return', 'maintenance': 'maintenance',
   'dispose': 'dispose', 'custody': 'custody', 'dept-custody': 'dept_custody',
   'vehicle-delivery': 'vehicle_delivery',
+  'periodic-maint': 'periodic_maint',
   'types': 'add', 'reports': 'view', 'asset-history': 'view',
   'users': 'users', 'audit': 'audit', 'settings': 'settings', 'complaints': 'complaints'
 };
@@ -3596,6 +3623,7 @@ function redirectToFirstAllowedPage(perms) {
     {page:'maintenance', navId:'nav-maintenance', perm:'maintenance'},
     {page:'dispose', navId:'nav-dispose', perm:'dispose'},
     {page:'vehicle-delivery', navId:'nav-vehicle-delivery', perm:'vehicle_delivery'},
+    {page:'periodic-maint',   navId:'nav-periodic-maint',   perm:'periodic_maint'},
     {page:'custody', navId:'nav-custody', perm:'custody'},
     {page:'dept-custody', navId:'nav-dept-custody', perm:'dept_custody'},
     {page:'reports', navId:'nav-reports', perm:'view'},
@@ -3665,6 +3693,7 @@ function renderAll() {
   try { renderInventory(); } catch(e) { console.warn('renderInventory:', e.message); }
   try { renderHandovers(); } catch(e) { console.warn('renderHandovers:', e.message); }
   try { renderVehicleDeliveries(); } catch(e) { console.warn('renderVehicleDeliveries:', e.message); }
+  try { getPeriodicMaintPage(); } catch(e) { console.warn('periodicMaint:', e.message); }
   try { renderMaintenances(); } catch(e) { console.warn('renderMaintenances:', e.message); }
   try { renderDisposes(); } catch(e) { console.warn('renderDisposes:', e.message); }
   try { renderReports(); } catch(e) { console.warn('renderReports:', e.message); }
@@ -3879,6 +3908,7 @@ function renderAssetRows(list, activeType) {
       (can('handover')&&a.availableQty>0&&!isVeh?'<button class="btn-action success" onclick="openHandoverFromAsset(\''+a._id+'\')" title="'+terms.handoverLabel+'"><i class="ti ti-transfer"></i></button>':'')+
       (can('vehicle_delivery')&&isVeh&&a.availableQty>0?'<button class="btn-action purple" onclick="openVehicleDeliveryFromAsset(\''+a._id+'\')" title="'+terms.handoverLabel+'"><i class="ti ti-car"></i></button>':'')+
       (can('maintenance')&&a.availableQty>0?'<button class="btn-action" onclick="openMaintenanceFromAsset(\''+a._id+'\')" title="صيانة" style="color:var(--amber);border-color:var(--amber)"><i class="ti ti-tool"></i></button>':'')+
+      (can('periodic_maint')&&(isVeh||/ثلاج|عرض|تبريد/.test(a.type))?'<button class="btn-action" onclick="openPeriodicMaintForAsset(\''+a._id+'\')" title="الصيانة الدورية" style="color:var(--teal);border-color:var(--teal)"><i class="ti ti-calendar-check"></i></button>':'')+
       (can('dispose')&&a.totalQty>0?'<button class="btn-action danger" onclick="openDisposeFromAsset(\''+a._id+'\')" title="إتلاف"><i class="ti ti-trash"></i></button>':'')+
     '</td></tr>';
   }).join('');
@@ -5417,6 +5447,7 @@ const ALL_PERMS=[
   {key:'handover',label:'تسليم أصل'},{key:'maintenance',label:'صيانة'},{key:'dispose',label:'إتلاف'},
   {key:'vehicle_delivery',label:'تسليم المركبات'},
   {key:'vehicle_return',label:'استرجاع المركبات'},
+  {key:'periodic_maint',label:'الصيانة الدورية'},
   {key:'users',label:'إدارة المستخدمين'},{key:'return',label:'استرداد أصل'},{key:'customers',label:'العملاء'},
   {key:'audit',label:'سجل النشاط'},
   {key:'settings',label:'الإعدادات'},
@@ -6915,7 +6946,443 @@ function printHandoverForm(hid) {
   win.document.close();
 }
 
-/* ────────── PRINT RETURN FORM ────────── */
+/* ════════════════════════════════════════════════════════
+   🔧 PERIODIC MAINTENANCE — الصيانة الدورية
+════════════════════════════════════════════════════════ */
+
+/* قوائم الفحص الافتراضية */
+const PM_CHECKLIST_VEHICLES = [
+  {key:'oil',     label:'تغيير زيت المحرك',          interval:'كل 5,000 كم'},
+  {key:'airflt',  label:'فلتر الهواء',                interval:'كل 10,000 كم'},
+  {key:'water',   label:'فحص مستوى الماء',            interval:'شهري'},
+  {key:'tires',   label:'فحص الإطارات والضغط',       interval:'شهري'},
+  {key:'brakes',  label:'فحص الفرامل',               interval:'كل 20,000 كم'},
+  {key:'fuelft',  label:'تغيير فلتر الوقود',         interval:'كل 20,000 كم'},
+  {key:'batt',    label:'فحص البطارية',               interval:'كل 6 أشهر'},
+  {key:'gearoil', label:'فحص مستوى زيت الفتيس',     interval:'كل 40,000 كم'},
+  {key:'ac',      label:'فحص نظام التكييف',           interval:'سنوي'},
+  {key:'lights',  label:'فحص الإضاءة والأنوار',      interval:'شهري'},
+];
+const PM_CHECKLIST_FRIDGES = [
+  {key:'airflt',  label:'تنظيف فلاتر الهواء',                interval:'كل 3 أشهر'},
+  {key:'temp',    label:'فحص درجة الحرارة الداخلية',         interval:'شهري'},
+  {key:'coil',    label:'تنظيف ملفات المكثف',                interval:'كل 3 أشهر'},
+  {key:'gas',     label:'فحص ضغط الغاز (الفريون)',          interval:'كل 6 أشهر'},
+  {key:'seal',    label:'فحص مانعات التسرب (الباكيات)',     interval:'كل 6 أشهر'},
+  {key:'light',   label:'تنظيف الإضاءة الداخلية',           interval:'كل 3 أشهر'},
+  {key:'fan',     label:'فحص موتور المروحة',                 interval:'كل 6 أشهر'},
+  {key:'drain',   label:'تنظيف خط تصريف الماء',             interval:'كل 3 أشهر'},
+];
+
+let _pmCurrentTab = 'vehicles';
+
+function switchPMTab(tab) {
+  _pmCurrentTab = tab;
+  ['vehicles','fridges'].forEach(t => {
+    const btn = document.getElementById('pm-tab-'+t);
+    if (!btn) return;
+    if (t === tab) {
+      btn.style.borderBottomColor = 'var(--blue)';
+      btn.style.color = 'var(--blue)';
+    } else {
+      btn.style.borderBottomColor = 'transparent';
+      btn.style.color = 'var(--text2)';
+    }
+  });
+  renderPeriodicMaint();
+}
+
+function getPeriodicMaintPage() {
+  if (!document.getElementById('page-periodic-maint')?.classList.contains('active')) return;
+  renderPeriodicMaint();
+}
+
+function renderPeriodicMaint() {
+  const tab = _pmCurrentTab;
+  const isVeh = tab === 'vehicles';
+  const checklist = isVeh ? PM_CHECKLIST_VEHICLES : PM_CHECKLIST_FRIDGES;
+
+  // الأصول المطابقة للتبويب من سجل الأصول
+  const assets = getAssets().filter(a => isVeh ? isVehicleAssetType(a.type) : /ثلاج|عرض|تبريد/.test(a.type));
+
+  // بيانات الصيانة الدورية لكل أصل
+  const pmRecords = getPeriodicMaint();
+
+  // إحصائيات
+  let cntOk = 0, cntSoon = 0, cntOverdue = 0;
+  assets.forEach(a => {
+    const rec = pmRecords.find(r=>r.assetId===a._id);
+    const status = getPMStatus(rec);
+    if (status === 'overdue') cntOverdue++;
+    else if (status === 'soon') cntSoon++;
+    else cntOk++;
+  });
+
+  const statsEl = document.getElementById('pm-stats');
+  if (statsEl) statsEl.innerHTML =
+    pmStatCard('الإجمالي', assets.length, 'var(--blue)') +
+    pmStatCard('تحتاج صيانة الآن', cntOverdue, 'var(--red)') +
+    pmStatCard('قريبة من الموعد', cntSoon, 'var(--amber)') +
+    pmStatCard('حالتها جيدة', cntOk, 'var(--green)');
+
+  // تنبيهات
+  const alertsEl = document.getElementById('pm-alerts');
+  if (alertsEl) {
+    let html = '';
+    if (cntOverdue > 0) html += `<div style="background:var(--red-bg);border:1px solid var(--red);border-radius:var(--radius);padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--red)">
+      <i class="ti ti-alert-triangle"></i><div>${cntOverdue > 1 ? cntOverdue+' أصول تجاوزت موعد الصيانة' : 'أصل واحد تجاوز موعد الصيانة'} — يُنصح بالإجراء الفوري</div></div>`;
+    if (cntSoon > 0) html += `<div style="background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--radius);padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--amber)">
+      <i class="ti ti-clock"></i><div>${cntSoon} ${isVeh?'مركبات':'ثلاجات'} موعد صيانتها خلال أسبوع</div></div>`;
+    alertsEl.innerHTML = html;
+  }
+
+  // قائمة الأصول
+  const listEl = document.getElementById('pm-list');
+  if (!listEl) return;
+  if (!assets.length) {
+    listEl.innerHTML = `<div class="empty-row" style="padding:40px;text-align:center;color:var(--text3)">
+      <i class="ti ti-${isVeh?'car':'snowflake'}" style="font-size:32px;margin-bottom:8px;display:block"></i>
+      لا توجد ${isVeh?'مركبات':'ثلاجات عرض'} مسجلة — أضف أصولاً من سجل الأصول
+    </div>`;
+    return;
+  }
+  listEl.innerHTML = assets.map(a => renderPMAssetCard(a, pmRecords.find(r=>r.assetId===a._id), checklist)).join('');
+}
+
+function pmStatCard(label, val, color) {
+  return `<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center">
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${label}</div>
+    <div style="font-size:22px;font-weight:700;color:${color}">${val}</div>
+  </div>`;
+}
+
+function getPMStatus(rec) {
+  if (!rec || !rec.nextDate) return 'ok';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const next = new Date(rec.nextDate);
+  const diffDays = Math.round((next-today)/(1000*60*60*24));
+  if (diffDays < 0) return 'overdue';
+  if (diffDays <= 7) return 'soon';
+  return 'ok';
+}
+
+function renderPMAssetCard(a, rec, checklist) {
+  const isVeh = isVehicleAssetType(a.type);
+  const status = getPMStatus(rec);
+  const statusBadgeHtml = status==='overdue'
+    ? `<span class="badge badge-red">متأخرة${rec?.nextDate?' '+Math.abs(Math.round((new Date(rec.nextDate)-new Date())/(1000*60*60*24)))+' أيام':''}</span>`
+    : status==='soon'
+    ? `<span class="badge badge-amber">بعد ${Math.round((new Date(rec?.nextDate||Date.now())-new Date())/(1000*60*60*24))} أيام</span>`
+    : `<span class="badge badge-green">بحالة جيدة</span>`;
+
+  const checks = rec?.checks || {};
+  const doneCount = checklist.filter(c=>checks[c.key]).length;
+  const pct = checklist.length ? Math.round(doneCount/checklist.length*100) : 0;
+  const cardId = 'pmc-'+a._id;
+
+  const checklistHTML = checklist.map(c => {
+    const done = !!checks[c.key];
+    const today = new Date(); today.setHours(0,0,0,0);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div onclick="togglePMCheck('${a._id}','${c.key}')" style="width:18px;height:18px;border-radius:4px;border:1.5px solid ${done?'var(--green)':'var(--border2)'};cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${done?'var(--green)':'transparent'}">
+        ${done?'<i class="ti ti-check" style="font-size:11px;color:#fff"></i>':''}
+      </div>
+      <span style="font-size:13px;color:${done?'var(--text3)':'var(--text)'};text-decoration:${done?'line-through':'none'};flex:1">${c.label}</span>
+      <span style="font-size:11px;color:var(--text3);white-space:nowrap">${c.interval}</span>
+    </div>`;
+  }).join('');
+
+  return `<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:12px;overflow:hidden">
+    <div onclick="togglePMCard('${cardId}')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none">
+      <div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ti-${isVeh?'car':'snowflake'}" style="font-size:20px;color:var(--blue)"></i>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--text)">${a.name}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${isVeh?'لوحة: '+(a.plateNumber||'—'):a.subType||a.manufacturer||''}${rec?.nextDate?' · موعد الصيانة: '+rec.nextDate:' · لم يُحدَّد موعد'}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${statusBadgeHtml}
+        <i class="ti ti-chevron-down" id="${cardId}-chv" style="font-size:16px;color:var(--text3);transition:transform .2s"></i>
+      </div>
+    </div>
+    <div id="${cardId}" style="display:none;padding:14px 16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:700;color:var(--text2)">قائمة فحص الصيانة الدورية</span>
+        <span id="${cardId}-prog-txt" style="font-size:12px;color:var(--text3)">${doneCount} / ${checklist.length} مكتملة</span>
+      </div>
+      <div style="height:5px;background:var(--bg2);border-radius:100px;margin-bottom:14px;overflow:hidden">
+        <div id="${cardId}-prog-bar" style="height:100%;width:${pct}%;background:var(--green);border-radius:100px;transition:width .3s"></div>
+      </div>
+      ${checklistHTML}
+      <!-- إعدادات الدورية -->
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text2)"><i class="ti ti-calendar" style="vertical-align:-2px"></i> دورية الصيانة:</span>
+        <input id="${cardId}-intv" type="number" value="${rec?.intervalMonths||3}" min="1" max="24" style="width:60px;font-size:13px;padding:4px 8px;text-align:center;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);font-family:var(--font)">
+        <span style="font-size:12px;color:var(--text3)">أشهر</span>
+        ${isVeh?`<span style="font-size:12px;color:var(--text2);margin-right:8px">أو كل</span>
+        <input id="${cardId}-km" type="number" value="${rec?.intervalKm||5000}" step="500" style="width:80px;font-size:13px;padding:4px 8px;text-align:center;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);font-family:var(--font)">
+        <span style="font-size:12px;color:var(--text3)">كم</span>`:''}
+        <input id="${cardId}-next" type="date" value="${rec?.nextDate||''}" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);font-family:var(--font)">
+        <button onclick="savePMSettings('${a._id}')" style="padding:5px 14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">حفظ</button>
+      </div>
+      <div style="background:var(--amber-bg);border-radius:var(--radius);padding:8px 12px;margin-top:10px;font-size:12px;color:var(--amber);display:flex;gap:8px;align-items:flex-start">
+        <i class="ti ti-bell" style="flex-shrink:0;margin-top:1px"></i>
+        <div>سيظهر تنبيه تلقائي قبل <strong>7 أيام</strong> من موعد الصيانة القادم في قائمة الإشعارات لأصحاب الصلاحية</div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:6px">
+        <button onclick="printPMChecklist('${a._id}')" style="padding:5px 12px;background:var(--card);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:var(--font)"><i class="ti ti-printer"></i> طباعة قائمة الفحص</button>
+        <button onclick="resetPMChecklist('${a._id}')" style="padding:5px 12px;background:var(--card);color:var(--red);border:1px solid var(--red);border-radius:var(--radius);font-size:12px;cursor:pointer;font-family:var(--font)"><i class="ti ti-refresh"></i> إعادة تعيين</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function togglePMCard(id) {
+  const body = document.getElementById(id);
+  const chv  = document.getElementById(id+'-chv');
+  if (!body) return;
+  const open = body.style.display === 'none';
+  body.style.display = open ? '' : 'none';
+  if (chv) chv.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+}
+
+async function togglePMCheck(assetId, key) {
+  if (!can('periodic_maint')) { showToast('ليس لديك صلاحية الصيانة الدورية','error'); return; }
+  const rec = getPeriodicMaint().find(r=>r.assetId===assetId);
+  const checks = rec ? {...(rec.checks||{})} : {};
+  checks[key] = !checks[key];
+  try {
+    await waitForFirebase();
+    const {collection:col,doc:docRef,addDoc:add,updateDoc:upd}=window.fsApi;
+    if (rec) {
+      await upd(docRef(window.db,'periodicMaintenance',rec._id),{checks,updatedAt:new Date().toISOString()});
+      const idx=window.periodicMaintenance.findIndex(r=>r._id===rec._id);
+      if(idx>=0) window.periodicMaintenance[idx]={...window.periodicMaintenance[idx],checks};
+    } else {
+      const isVeh = isVehicleAssetType(getAssets().find(a=>a._id===assetId)?.type||'');
+      const docRf=await add(col(window.db,'periodicMaintenance'),{assetId,checks,intervalMonths:isVeh?3:3,nextDate:'',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+      window.periodicMaintenance.push({assetId,checks,intervalMonths:3,nextDate:'',_id:docRf.id,createdAt:new Date().toISOString()});
+    }
+    // تحديث شريط التقدم
+    const cardId='pmc-'+assetId;
+    const checklist = isVehicleAssetType(getAssets().find(a=>a._id===assetId)?.type||'') ? PM_CHECKLIST_VEHICLES : PM_CHECKLIST_FRIDGES;
+    const doneCount = checklist.filter(c=>checks[c.key]).length;
+    const pct = checklist.length ? Math.round(doneCount/checklist.length*100) : 0;
+    const bar=document.getElementById(cardId+'-prog-bar');
+    const txt=document.getElementById(cardId+'-prog-txt');
+    if(bar) bar.style.width=pct+'%';
+    if(txt) txt.textContent=doneCount+' / '+checklist.length+' مكتملة';
+    // تحديث مظهر الخانة
+    renderPeriodicMaint();
+  } catch(e){ showToast('خطأ: '+e.message,'error'); }
+}
+
+async function savePMSettings(assetId) {
+  if (!can('periodic_maint')) { showToast('ليس لديك صلاحية','error'); return; }
+  const cardId='pmc-'+assetId;
+  const intervalMonths=parseInt(document.getElementById(cardId+'-intv')?.value)||3;
+  const intervalKm=parseInt(document.getElementById(cardId+'-km')?.value)||0;
+  const nextDate=document.getElementById(cardId+'-next')?.value||'';
+  const rec=getPeriodicMaint().find(r=>r.assetId===assetId);
+  try {
+    await waitForFirebase();
+    const {collection:col,doc:docRef,addDoc:add,updateDoc:upd}=window.fsApi;
+    if(rec){
+      await upd(docRef(window.db,'periodicMaintenance',rec._id),{intervalMonths,intervalKm,nextDate,updatedAt:new Date().toISOString()});
+      Object.assign(window.periodicMaintenance.find(r=>r._id===rec._id)||{},{intervalMonths,intervalKm,nextDate});
+    } else {
+      const newRec={assetId,checks:{},intervalMonths,intervalKm,nextDate,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+      const docRf=await add(col(window.db,'periodicMaintenance'),newRec);
+      window.periodicMaintenance.push({...newRec,_id:docRf.id});
+    }
+    logAudit('maintenance','تحديث إعدادات صيانة دورية',`أصل: ${getAssets().find(a=>a._id===assetId)?.name||assetId} — الدورية: ${intervalMonths} شهر — الموعد القادم: ${nextDate}`);
+    showToast('تم حفظ إعدادات الصيانة الدورية ✅','success');
+    renderPeriodicMaint();
+  }catch(e){showToast('خطأ: '+e.message,'error');}
+}
+
+async function resetPMChecklist(assetId) {
+  if(!confirm('هل تريد إعادة تعيين قائمة الفحص؟ سيتم مسح جميع العلامات.')) return;
+  const rec=getPeriodicMaint().find(r=>r.assetId===assetId);
+  if(!rec) return;
+  try {
+    await waitForFirebase();
+    const {doc:docRef,updateDoc:upd}=window.fsApi;
+    await upd(docRef(window.db,'periodicMaintenance',rec._id),{checks:{},updatedAt:new Date().toISOString()});
+    const idx=window.periodicMaintenance.findIndex(r=>r._id===rec._id);
+    if(idx>=0) window.periodicMaintenance[idx].checks={};
+    showToast('تم إعادة تعيين قائمة الفحص','success');
+    renderPeriodicMaint();
+  }catch(e){showToast('خطأ: '+e.message,'error');}
+}
+
+function openPeriodicMaintForAsset(assetId) {
+  if (!can('periodic_maint')) { showToast('ليس لديك صلاحية الصيانة الدورية','error'); return; }
+  const a = getAssets().find(x=>x._id===assetId);
+  if (!a) return;
+  const isVeh = isVehicleAssetType(a.type);
+  const tab = isVeh ? 'vehicles' : 'fridges';
+  // الانتقال لصفحة الصيانة الدورية والتبويب المناسب
+  const navItem = document.getElementById('nav-periodic-maint');
+  showPage('periodic-maint', navItem);
+  setTimeout(()=>{
+    switchPMTab(tab);
+    // فتح بطاقة الأصل تلقائياً
+    setTimeout(()=>{ const el=document.getElementById('pmc-'+assetId); if(el&&el.style.display==='none') togglePMCard('pmc-'+assetId); },200);
+  },100);
+}
+
+/* ── طباعة قائمة الفحص لأصل واحد ── */
+function printPMChecklist(assetId) {
+  const a=getAssets().find(x=>x._id===assetId);
+  if(!a) return;
+  const isVeh=isVehicleAssetType(a.type);
+  const checklist=isVeh?PM_CHECKLIST_VEHICLES:PM_CHECKLIST_FRIDGES;
+  const rec=getPeriodicMaint().find(r=>r.assetId===assetId)||{};
+  const checks=rec.checks||{};
+  const cn=window._settings?.companyName||'نظام إدارة الأصول';
+  const logoUrl=window._settings?.logoUrl||'';
+  const logoHTML=logoUrl?`<img src="${logoUrl}" style="height:46px;max-width:90px;object-fit:contain;border-radius:5px">`:'';
+  const today=new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
+  const doneCount=checklist.filter(c=>checks[c.key]).length;
+  const rows=checklist.map((c,i)=>`<tr>
+    <td style="text-align:center">${i+1}</td>
+    <td>${c.label}</td>
+    <td style="text-align:center;color:#6B7280">${c.interval}</td>
+    <td style="text-align:center">${checks[c.key]?'<span style="color:#065F46;font-size:18px;font-weight:800">✓</span>':'<span style="color:#D1D5DB;font-size:16px">□</span>'}</td>
+    <td></td>
+  </tr>`).join('');
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+<title>قائمة الفحص — ${a.name}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Cairo',Arial,sans-serif;font-size:12px;color:#0E1D3A;direction:rtl;padding:18px}
+.hdr{border-bottom:3px solid #1C3F8A;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.hdr-co{font-size:17px;font-weight:800;color:#1C3F8A}.hdr-sub{font-size:11px;color:#5B7AAA}
+.asset-info{background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.ai-label{font-size:10px;color:#6B7280}.ai-val{font-size:13px;font-weight:700;color:#1C3F8A}
+table{width:100%;border-collapse:collapse}
+th{background:#1C3F8A;color:#fff;padding:7px 8px;font-size:11px}
+td{padding:7px 8px;border-bottom:1px solid #E5E7EF;font-size:12px;vertical-align:middle}
+tr:nth-child(even) td{background:#F8FBFF}
+.sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:20px}
+.sbox{border:1px solid #C8DBF0;border-radius:6px;padding:10px;min-height:70px}
+.stitle{font-size:11px;font-weight:700;color:#1C3F8A;margin-bottom:4px}
+.sline{border-top:1.5px dashed #9CA3AF;margin-top:30px;text-align:center;font-size:10px;color:#9CA3AF;padding-top:4px}
+.footer{text-align:center;font-size:10px;color:#9CA3AF;border-top:1px solid #E5E7EF;padding:8px;margin-top:14px}
+@media print{body{padding:8px}.np{display:none!important}@page{size:A4;margin:10mm}}
+</style></head><body>
+<div class="hdr">
+  <div style="display:flex;align-items:center;gap:12px">${logoHTML}<div><div class="hdr-co">${cn}</div><div class="hdr-sub">قائمة فحص الصيانة الدورية</div></div></div>
+  <div style="font-size:10px;color:#5B7AAA;line-height:1.8;text-align:left"><div>تاريخ الفحص: ${today}</div><div>أُعدَّ بواسطة: ${currentUser?.name||'—'}</div></div>
+</div>
+<div class="asset-info">
+  <div><div class="ai-label">الأصل</div><div class="ai-val">${a.name}</div></div>
+  <div><div class="ai-label">الكود</div><div class="ai-val">${a.code}</div></div>
+  <div><div class="ai-label">النوع</div><div class="ai-val">${a.type}</div></div>
+  ${a.plateNumber?`<div><div class="ai-label">رقم اللوحة</div><div class="ai-val">${a.plateNumber}</div></div>`:''}
+  ${rec.nextDate?`<div><div class="ai-label">موعد الصيانة القادم</div><div class="ai-val">${rec.nextDate}</div></div>`:''}
+  <div><div class="ai-label">الإنجاز</div><div class="ai-val">${doneCount} / ${checklist.length}</div></div>
+</div>
+<table>
+  <thead><tr><th style="width:5%">#</th><th>بند الفحص</th><th style="width:16%;text-align:center">الدورية</th><th style="width:10%;text-align:center">تم</th><th style="width:20%">ملاحظات</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="sign-grid">
+  <div class="sbox"><div class="stitle">✍ منفذ الصيانة</div><div class="ai-label" style="margin-bottom:4px">الاسم: ___________________</div><div class="sline">التوقيع</div></div>
+  <div class="sbox"><div class="stitle">✍ المشرف / المدير</div><div class="ai-label" style="margin-bottom:4px">الاسم: ___________________</div><div class="sline">التوقيع / الختم</div></div>
+  <div class="sbox"><div class="stitle">✍ قائد / مستخدم الأصل</div><div class="ai-label" style="margin-bottom:4px">الاسم: ___________________</div><div class="sline">التوقيع</div></div>
+</div>
+<div class="footer">${cn} | قائمة فحص الصيانة الدورية — ${a.name} | ${today}</div>
+<div class="np" style="text-align:center;margin-top:14px;display:flex;gap:8px;justify-content:center">
+  <button onclick="window.print()" style="padding:8px 24px;background:#1C3F8A;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700">🖨️ طباعة</button>
+  <button onclick="window.close()" style="padding:8px 16px;background:#6B7280;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px">✕ إغلاق</button>
+</div>
+</body></html>`);
+  win.document.close();
+}
+
+/* ── طباعة تقرير شامل للصيانة الدورية ── */
+function printPeriodicMaintReport() {
+  const tab=_pmCurrentTab;
+  const isVeh=tab==='vehicles';
+  const checklist=isVeh?PM_CHECKLIST_VEHICLES:PM_CHECKLIST_FRIDGES;
+  const assets=getAssets().filter(a=>isVeh?isVehicleAssetType(a.type):/ثلاج|عرض|تبريد/.test(a.type));
+  const pmRecs=getPeriodicMaint();
+  const cn=window._settings?.companyName||'نظام إدارة الأصول';
+  const logoUrl=window._settings?.logoUrl||'';
+  const logoHTML=logoUrl?`<img src="${logoUrl}" style="height:46px;max-width:90px;object-fit:contain;border-radius:5px">`:'';
+  const today=new Date().toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'});
+  const rows=assets.map((a,i)=>{
+    const rec=pmRecs.find(r=>r.assetId===a._id)||{};
+    const checks=rec.checks||{};
+    const done=checklist.filter(c=>checks[c.key]).length;
+    const pct=checklist.length?Math.round(done/checklist.length*100):0;
+    const status=getPMStatus(rec);
+    const statusText=status==='overdue'?'⛔ متأخرة':status==='soon'?'⚠️ قريباً':'✅ جيدة';
+    const statusColor=status==='overdue'?'#DC2626':status==='soon'?'#D97706':'#065F46';
+    return `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td style="font-weight:700">${a.name}<div style="font-size:10px;color:#6B7280">${a.code}</div></td>
+      <td style="text-align:center">${isVeh?(a.plateNumber||'—'):a.subType||'—'}</td>
+      <td style="text-align:center"><div style="background:#E5E7EF;border-radius:100px;height:8px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${pct===100?'#065F46':pct>50?'#D97706':'#DC2626'}"></div></div><span style="font-size:10px;color:#6B7280">${done}/${checklist.length}</span></td>
+      <td style="text-align:center">${rec.nextDate||'—'}</td>
+      <td style="text-align:center;font-weight:700;color:${statusColor}">${statusText}</td>
+      <td></td>
+    </tr>`;
+  }).join('');
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">
+<title>تقرير الصيانة الدورية</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Cairo',Arial,sans-serif;font-size:11px;color:#0E1D3A;direction:rtl;padding:14px}
+.hdr{border-bottom:3px solid #1C3F8A;padding-bottom:10px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.hdr-co{font-size:17px;font-weight:800;color:#1C3F8A}.hdr-sub{font-size:11px;color:#5B7AAA}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.stat{border:1px solid #BFDBFE;border-radius:6px;padding:8px;text-align:center}
+.sv{font-size:18px;font-weight:700}.sl{font-size:9px;color:#6B7280}
+table{width:100%;border-collapse:collapse}
+th{background:#1C3F8A;color:#fff;padding:7px 8px;font-size:11px}
+td{padding:7px 8px;border-bottom:1px solid #E5E7EF;font-size:11px;vertical-align:middle}
+tr:nth-child(even) td{background:#F8FBFF}
+.sign-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.sbox{border:1px solid #C8DBF0;border-radius:6px;padding:10px;min-height:60px}
+.stitle{font-size:11px;font-weight:700;color:#1C3F8A;margin-bottom:4px}
+.sline{border-top:1.5px dashed #9CA3AF;margin-top:24px;text-align:center;font-size:10px;color:#9CA3AF;padding-top:3px}
+.footer{text-align:center;font-size:10px;color:#9CA3AF;border-top:1px solid #E5E7EF;padding:8px;margin-top:12px}
+@media print{body{padding:6px}.np{display:none!important}@page{size:A4;margin:8mm}}
+</style></head><body>
+<div class="hdr">
+  <div style="display:flex;align-items:center;gap:12px">${logoHTML}<div><div class="hdr-co">${cn}</div><div class="hdr-sub">تقرير الصيانة الدورية — ${isVeh?'المركبات':'ثلاجات العرض'}</div></div></div>
+  <div style="font-size:10px;color:#5B7AAA;line-height:1.8;text-align:left"><div>تاريخ التقرير: ${today}</div><div>أُعدَّ بواسطة: ${currentUser?.name||'—'}</div></div>
+</div>
+<div class="stats">
+  <div class="stat"><div class="sv">${assets.length}</div><div class="sl">الإجمالي</div></div>
+  <div class="stat"><div class="sv" style="color:#DC2626">${assets.filter(a=>getPMStatus(pmRecs.find(r=>r.assetId===a._id))==='overdue').length}</div><div class="sl">تحتاج صيانة</div></div>
+  <div class="stat"><div class="sv" style="color:#D97706">${assets.filter(a=>getPMStatus(pmRecs.find(r=>r.assetId===a._id))==='soon').length}</div><div class="sl">قريبة من الموعد</div></div>
+  <div class="stat"><div class="sv" style="color:#065F46">${assets.filter(a=>getPMStatus(pmRecs.find(r=>r.assetId===a._id))==='ok').length}</div><div class="sl">حالتها جيدة</div></div>
+</div>
+<table>
+  <thead><tr><th style="width:4%">#</th><th>الأصل</th><th style="width:14%;text-align:center">${isVeh?'رقم اللوحة':'النوع الفرعي'}</th><th style="width:16%;text-align:center">إنجاز قائمة الفحص</th><th style="width:14%;text-align:center">موعد الصيانة القادم</th><th style="width:12%;text-align:center">الحالة</th><th style="width:14%">ملاحظات</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="sign-grid">
+  <div class="sbox"><div class="stitle">✍ مسؤول الصيانة</div><div style="font-size:10px;color:#6B7280">الاسم: ___________________</div><div class="sline">التوقيع / الختم</div></div>
+  <div class="sbox"><div class="stitle">✍ المدير المباشر</div><div style="font-size:10px;color:#6B7280">الاسم: ___________________</div><div class="sline">التوقيع / الختم</div></div>
+</div>
+<div class="footer">${cn} | تقرير الصيانة الدورية | ${today}</div>
+<div class="np" style="text-align:center;margin-top:14px;display:flex;gap:8px;justify-content:center">
+  <button onclick="window.print()" style="padding:8px 24px;background:#1C3F8A;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700">🖨️ طباعة</button>
+  <button onclick="window.close()" style="padding:8px 16px;background:#6B7280;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:13px">✕ إغلاق</button>
+</div>
+</body></html>`);
+  win.document.close();
+}
+
+
 /* ════════════════════════════════════════
    🚗 VEHICLE DELIVERY (تسليم المركبات)
 ════════════════════════════════════════ */
@@ -8422,6 +8889,17 @@ if(typeof saveVehicleReturn!=='undefined')window.saveVehicleReturn=saveVehicleRe
 if(typeof updateRetFuelLabel!=='undefined')window.updateRetFuelLabel=updateRetFuelLabel;
 if(typeof clearRetSignature!=='undefined')window.clearRetSignature=clearRetSignature;
 if(typeof getVehicleDeliveries!=='undefined')window.getVehicleDeliveries=getVehicleDeliveries;
+if(typeof getPeriodicMaint!=='undefined')window.getPeriodicMaint=getPeriodicMaint;
+if(typeof switchPMTab!=='undefined')window.switchPMTab=switchPMTab;
+if(typeof renderPeriodicMaint!=='undefined')window.renderPeriodicMaint=renderPeriodicMaint;
+if(typeof togglePMCard!=='undefined')window.togglePMCard=togglePMCard;
+if(typeof togglePMCheck!=='undefined')window.togglePMCheck=togglePMCheck;
+if(typeof savePMSettings!=='undefined')window.savePMSettings=savePMSettings;
+if(typeof resetPMChecklist!=='undefined')window.resetPMChecklist=resetPMChecklist;
+if(typeof openPeriodicMaintForAsset!=='undefined')window.openPeriodicMaintForAsset=openPeriodicMaintForAsset;
+if(typeof printPMChecklist!=='undefined')window.printPMChecklist=printPMChecklist;
+if(typeof printPeriodicMaintReport!=='undefined')window.printPeriodicMaintReport=printPeriodicMaintReport;
+if(typeof getPMStatus!=='undefined')window.getPMStatus=getPMStatus;
 if(typeof refreshNotificationSourceData!=='undefined')window.refreshNotificationSourceData=refreshNotificationSourceData;
 if(typeof toggleVehiclePlateField!=='undefined')window.toggleVehiclePlateField=toggleVehiclePlateField;
 if(typeof isValidPlateNumber!=='undefined')window.isValidPlateNumber=isValidPlateNumber;
