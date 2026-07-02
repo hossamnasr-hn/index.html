@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0">
 <title id="page-title">نظام إدارة الأصول - ثمار القمة</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -525,8 +525,46 @@ html.dark .gs-item-page{color:#94A8C4}
     transform:translateX(0) !important;
   }
 
-  /* ── المحتوى يأخذ كامل العرض ── */
-  #content{padding:12px !important;width:100% !important;max-height:calc(100vh - 54px) !important}
+  /* ── المحتوى يأخذ كامل العرض مع سكرول أفقي وعمودي ── */
+  #content{
+    padding:10px !important;
+    width:100% !important;
+    max-height:calc(100vh - 54px) !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    box-sizing:border-box !important;
+  }
+
+  /* ── الجداول: سكرول أفقي داخل البطاقة ── */
+  .table-card{
+    overflow-x:auto !important;
+    -webkit-overflow-scrolling:touch;
+  }
+  .table-card table{
+    min-width:600px !important;
+  }
+  /* جداول العهدة والبلاغات والمركبات أعرض */
+  #custody-body, #dept-custody-body, #vd-body, #handover-body{
+    display:table-row-group;
+  }
+  table:has(#custody-body),
+  table:has(#dept-custody-body),
+  table:has(#vd-body),
+  table:has(#handover-body){
+    min-width:800px !important;
+  }
+
+  /* ── شريط الأدوات يتكيف مع الجوال ── */
+  .table-toolbar{flex-direction:column !important;gap:8px !important;align-items:stretch !important}
+  .toolbar-left{flex-wrap:wrap !important;gap:6px !important}
+  .search-box{min-width:160px !important;flex:1}
+  .filter-select{min-width:120px}
+  .date-range-wrap{flex-wrap:wrap !important;gap:4px !important}
+
+  /* ── عنوان الصفحة ── */
+  .page-title{font-size:14px !important;flex-wrap:wrap !important;gap:6px !important}
+  .page-title > span{font-size:14px}
+  .page-title > div{flex-wrap:wrap !important;gap:5px !important}
 
   /* ── الهيدر ── */
   #header{padding:0 10px !important}
@@ -544,19 +582,19 @@ html.dark .gs-item-page{color:#94A8C4}
   .global-search-bar{max-width:140px !important}
   .global-search-bar input{font-size:12px;padding:5px 8px}
 
-  /* ── الجداول ── */
+  /* ── الجداول: خط نصي أصغر ── */
   table{font-size:11px}
-  td,th{padding:6px 8px}
+  td,th{padding:5px 7px}
 
   /* ── التقارير والنماذج ── */
   .report-grid{grid-template-columns:1fr !important}
   .form-row{grid-template-columns:1fr !important}
   .form-row.three{grid-template-columns:1fr !important}
-  .modal{max-width:96vw !important;margin:8px}
 
-  /* ── عناوين الصفحات ── */
-  .page-title{font-size:15px;gap:6px}
-  .page-title > div{flex-wrap:wrap;gap:6px}
+  /* ── النوافذ المنبثقة ── */
+  .modal{max-width:96vw !important;margin:8px !important;width:96vw !important}
+  .modal-body{max-height:65vh !important;padding:14px !important}
+  .modal-footer{padding:10px 14px !important}
 
   /* ── أزرار الإجراءات ── */
   .btn-action{padding:4px 7px;font-size:11px}
@@ -565,16 +603,43 @@ html.dark .gs-item-page{color:#94A8C4}
   /* ── بطاقات العملاء ── */
   .customer-card{flex-direction:column;gap:8px}
 
-  /* ── الاحصاءات قيم أصغر ── */
+  /* ── الإحصاءات قيم أصغر ── */
   .stat-val{font-size:20px}
+
+  /* ── التبويبات (أنواع الأصول) تكون قابلة للسكرول ── */
+  #assets-type-tabs, #history-type-tabs{
+    overflow-x:auto !important;
+    -webkit-overflow-scrolling:touch;
+    flex-wrap:nowrap !important;
+    padding-bottom:6px !important;
+  }
+  #assets-type-tabs button, #history-type-tabs button{
+    white-space:nowrap;flex-shrink:0;
+  }
+
+  /* ── إخفاء بعض الأعمدة غير الضرورية في الجداول الضيقة ── */
+  .col-hide-mobile{display:none !important}
+
+  /* ── التوست في الجوال ── */
+  #toast{right:12px !important;left:12px !important;max-width:calc(100vw - 24px) !important;font-size:12px !important}
+
+  /* ── لوحة الإشعارات ── */
+  .notif-panel{right:-10px !important;width:calc(100vw - 20px) !important;max-width:360px}
 }
 
 @media(max-width:480px){
   .stats-grid{grid-template-columns:repeat(2,1fr) !important}
-  .notif-panel{width:300px !important;right:-50px}
+  .notif-panel{width:calc(100vw - 10px) !important;right:-5px}
   .user-info{gap:4px}
   .role-badge{display:none}
   .btn-sm{padding:4px 8px;font-size:11px}
+  /* عنوان النظام في الهيدر أصغر */
+  .logo{gap:6px !important}
+  /* أزرار الصفحة الرئيسية أصغر */
+  .export-btn{font-size:11px !important;padding:5px 8px !important}
+  /* نافذة منبثقة تملأ الشاشة */
+  .modal{max-width:100vw !important;width:100vw !important;margin:0 !important;border-radius:12px 12px 0 0 !important;position:fixed !important;bottom:0 !important;top:auto !important}
+  .modal-overlay{align-items:flex-end !important;padding:0 !important}
 }
 
 /* ══════════════════════════════════════
@@ -2913,7 +2978,13 @@ function filterComplaints() {
     '<td style="font-weight:600">'+(c.customerName||'—')+(c.customerPhone?'<div style="font-size:11px;color:var(--text3)">📞 '+c.customerPhone+'</div>':'')+'</td>'+
     '<td style="font-size:12px;max-width:200px;color:var(--text2)">'+(c.description||'—').slice(0,80)+(c.description?.length>80?'…':'')+'</td>'+
     '<td>'+statusBadgeC(c.status)+'</td>'+
-    '<td style="font-size:11px;color:var(--text3)">'+(c.convertedTo?'→ '+c.convertedTo:'—')+convertedStatusBadge+'</td>'+
+    '<td style="font-size:11px;color:var(--text3)">'+(c.convertedTo?'→ '+c.convertedTo:'—')+
+      (c.convertedTo && c.convertedRef ? (function(){
+        const linked = (window.custodyRequests||[]).find(r=>r._id===c.convertedRef);
+        const linkedNum = linked ? (linked.custodyNumber||linked.seqNum||'') : '';
+        return linkedNum ? '<div style="font-size:11px;font-weight:700;color:var(--blue);margin-top:2px"><i class="ti ti-hash" style="font-size:9px"></i> '+linkedNum+'</div>' : '';
+      })() : '')+
+      convertedStatusBadge+'</td>'+
     '<td style="font-size:12px;color:var(--text2)">'+(c.createdBy||'—')+'</td>'+
     '<td style="white-space:nowrap">'+
       (can('complaints_convert')&&c.status==='جديد'?'<button class="btn-action success" onclick="openConvertComplaint(\''+c._id+'\')" title="تحويل البلاغ"><i class="ti ti-git-pull-request"></i></button>':'')+
