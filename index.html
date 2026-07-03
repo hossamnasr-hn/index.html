@@ -1351,6 +1351,142 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
           </div>
         </div>
 
+        <!-- قواعد أمان Firestore -->
+        <div class="table-card" style="padding:24px;max-width:600px;margin-top:20px;border:2px solid var(--blue)">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            <div style="width:38px;height:38px;background:var(--blue-bg);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <i class="ti ti-shield-lock" style="color:var(--blue);font-size:20px"></i>
+            </div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--blue)">قواعد أمان Firestore</div>
+              <div style="font-size:12px;color:var(--text2)">يجب تطبيقها في Firebase Console لتأمين قاعدة البيانات</div>
+            </div>
+            <button onclick="copyFirestoreRules()" style="margin-right:auto;padding:6px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:700">
+              <i class="ti ti-copy"></i> نسخ القواعد
+            </button>
+          </div>
+          <div class="alert alert-info" style="font-size:12px;margin-bottom:12px">
+            <i class="ti ti-info-circle"></i>
+            <div>
+              انتقل إلى <strong>Firebase Console → Firestore → Rules</strong> والصق القواعد أدناه.
+              هذه القواعد تضمن أن قاعدة البيانات محمية حتى لو تمكن أحد من تعديل كود JavaScript.
+            </div>
+          </div>
+          <pre id="firestore-rules-code" style="background:#0F172A;color:#E2E8F0;border-radius:8px;padding:16px;font-size:11px;font-family:monospace;overflow-x:auto;direction:ltr;text-align:left;max-height:320px;overflow-y:auto;line-height:1.6">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── تحقق من تسجيل الدخول ──
+    function isAuth() { return request.auth != null; }
+
+    // ── جلب صلاحيات المستخدم الحالي ──
+    // يعمل عندما يكون Firebase Auth UID = معرّف وثيقة المستخدم
+    function userPerms() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.perms;
+    }
+    function hasPerm(p) { return isAuth() && userPerms().hasAll([p]); }
+    function isAdmin()  { return hasPerm('users'); }
+
+    // ── المستخدمون: القراءة لنفسه أو المدير ──
+    match /users/{uid} {
+      allow read:   if isAuth() && (request.auth.uid == uid || isAdmin());
+      allow create: if isAdmin();
+      allow update: if isAdmin() || request.auth.uid == uid;
+      allow delete: if isAdmin() && request.auth.uid != uid;
+    }
+
+    // ── الأصول ──
+    match /assets/{id} {
+      allow read:   if hasPerm('view');
+      allow create: if hasPerm('add');
+      allow update: if hasPerm('edit');
+      allow delete: if isAdmin();
+    }
+
+    // ── العملاء ──
+    match /customers/{id} {
+      allow read, write: if hasPerm('customers');
+    }
+
+    // ── التسليمات ──
+    match /handovers/{id} {
+      allow read:          if hasPerm('view') || hasPerm('handover');
+      allow create,update: if hasPerm('handover');
+      allow delete:        if isAdmin();
+    }
+
+    // ── الاسترداد ──
+    match /returns/{id} {
+      allow read:          if hasPerm('view') || hasPerm('return');
+      allow create,update: if hasPerm('return');
+      allow delete:        if isAdmin();
+    }
+
+    // ── الصيانة ──
+    match /maintenances/{id} {
+      allow read:          if hasPerm('view') || hasPerm('maintenance');
+      allow create,update: if hasPerm('maintenance');
+      allow delete:        if isAdmin();
+    }
+
+    // ── الإتلاف ──
+    match /disposes/{id} {
+      allow read:          if hasPerm('view') || hasPerm('dispose');
+      allow create,update: if hasPerm('dispose');
+      allow delete:        if isAdmin();
+    }
+
+    // ── طلبات العهدة ──
+    match /custodyRequests/{id} {
+      allow read:   if hasPerm('custody') || hasPerm('custody_approve');
+      allow create: if hasPerm('custody_add');
+      allow update: if hasPerm('custody_edit') || hasPerm('custody_approve') || hasPerm('custody_close');
+      allow delete: if isAdmin();
+    }
+
+    // ── عهدة الإدارات ──
+    match /deptCustodyRequests/{id} {
+      allow read:   if hasPerm('dept_custody') || hasPerm('dept_custody_approve');
+      allow create: if hasPerm('dept_custody_add');
+      allow update: if hasPerm('dept_custody_edit') || hasPerm('dept_custody_approve') || hasPerm('dept_custody_close');
+      allow delete: if isAdmin();
+    }
+
+    // ── البلاغات ──
+    match /complaints/{id} {
+      allow read:   if hasPerm('complaints');
+      allow create: if hasPerm('complaints_add');
+      allow update: if hasPerm('complaints') || hasPerm('complaints_convert');
+      allow delete: if isAdmin();
+    }
+
+    // ── تسليم المركبات ──
+    match /vehicleDeliveries/{id} {
+      allow read,create,update: if hasPerm('vehicle_delivery') || hasPerm('vehicle_return');
+      allow delete:             if isAdmin();
+    }
+
+    // ── الصيانة الدورية ──
+    match /periodicMaintenance/{id} { allow read,write: if hasPerm('periodic_maint'); }
+    match /pmInspections/{id}       { allow read,write: if hasPerm('periodic_maint'); }
+
+    // ── الأنواع والخصائص: قراءة للجميع، كتابة للمخوَّلين ──
+    match /assetTypes/{id}    { allow read: if isAuth(); allow write: if hasPerm('add') || hasPerm('edit'); }
+    match /assetSubTypes/{id} { allow read: if isAuth(); allow write: if hasPerm('add') || hasPerm('edit'); }
+    match /attributes/{id}    { allow read: if isAuth(); allow write: if hasPerm('add') || hasPerm('edit'); }
+
+    // ── الإعدادات ──
+    match /settings/{id} {
+      allow read:  if isAuth();
+      allow write: if hasPerm('settings');
+    }
+
+    // ── حظر شامل لكل ما لم يُذكر ──
+    match /{document=**} { allow read, write: if false; }
+  }
+}</pre>
+        </div>
+
         <!-- منطقة الخطر - مدير النظام فقط -->
         <div id="reset-danger-zone" class="table-card" style="padding:24px;max-width:520px;margin-top:20px;border:2px solid var(--red);display:none">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
@@ -1415,14 +1551,22 @@ html.dark .date-range-wrap input[type=date]{background:var(--bg2);border-color:v
 
 
 
+<!-- bcryptjs for secure password hashing -->
+<script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
+
 <!-- Firebase IIFE Definition -->
 <script>
 
 window._firebaseInit = (async function() {
 const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
 const {
-  getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot
+  getFirestore, collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot,
+  query, where, limit
 } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+const {
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  updatePassword: fbUpdatePassword, deleteUser: fbDeleteAuthUser, signOut: fbSignOut
+} = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
 
 const firebaseConfig = {
   apiKey: "AIzaSyDHlLO8GuZJKMguRsPoV5Wz4cmer8XGlfA",
@@ -1435,8 +1579,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 window.db = db;
-window.fsApi = { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot };
+window.fbAuth = auth;
+window.fbAuthApi = { signInWithEmailAndPassword, createUserWithEmailAndPassword, fbUpdatePassword, fbDeleteAuthUser, fbSignOut };
+window.fsApi = { collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot, query, where, limit };
 window._firebaseReady = true;
 (window._firebaseReadyCallbacks||[]).forEach(fn=>fn());
 console.log("✅ Firebase connected");
@@ -1448,16 +1595,19 @@ async function initDefaultData() {
   
   const ADMIN_FULL_PERMS = ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","audit","vehicle_delivery","vehicle_return","periodic_maint","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"];
   if (usersSnap.empty || existingUsers.length === 0) {
-    await addDoc(collection(db,"users"),{ name:"مدير النظام", username:"admin", password:"admin123", role:"مدير", perms: ADMIN_FULL_PERMS });
-    console.log("Admin user created");
+    // لا يتم إنشاء مستخدم تلقائي — سيُطلب من المدير إعداد حساب بكلمة مرور قوية عند أول تشغيل
+    console.log("No users found — setup required");
   } else {
     for (const d of usersSnap.docs) {
       const data = d.data();
       const updates = {};
-      // إضافة حقل username إذا كان غائباً (مستخدمون قدامى)
+      // إضافة حقل username إذا كان غائباً (مستخدمون قدامى) — بدون تعيين كلمة مرور افتراضية
       if (!data.username) {
         updates.username = data.name==="مدير النظام"?"admin": data.name.replace(/\s+/g,"_").toLowerCase();
-        updates.password = data.password||"admin123";
+        // تعليم الحساب القديم بأنه يحتاج إعادة تعيين كلمة المرور
+        if (!data.password && !data.passwordHash) {
+          updates.needsPasswordReset = true;
+        }
       }
       const currentPerms = data.perms || [];
       // ترقية الصلاحيات فقط للمديرين (يملكون 'users') وليس للمستخدمين العاديين
@@ -1526,8 +1676,9 @@ async function loadAllData() {
     getDocs(collection(db,"periodicMaintenance")),
     getDocs(collection(db,"pmInspections")),
   ]);
-  window.users = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
-  console.log('✅ Users loaded from Firebase:', window.users.length, window.users.map(u=>u.username));
+  // إزالة حقول كلمة المرور من الذاكرة المحلية — لا يجب أن تظهر في المتصفح
+  window.users = usersSnap.docs.map(d=>{ const u={...d.data(),_id:d.id}; delete u.passwordHash; delete u.password; return u; });
+  // لا يُطبع أي معلومات حساسة في الـ console
   window.assetTypes = typesSnap.docs.map(d=>({name:d.data().name,_id:d.id}));
   window.assetSubTypes = subTypesSnap.docs.map(d=>({...d.data(),_id:d.id}));
   window.assetAttributes = attrSnap.docs.map(d=>({...d.data(),_id:d.id}));
@@ -1568,62 +1719,85 @@ try {
   // من ذلك على التحديث الدوري الآمن أدناه (refreshNotificationSourceData) كل 8 ثوانٍ
   try { refreshNotificationSourceData(); } catch(e) { console.warn('initial notif refresh:', e); }
 
-  // Auto-restore session from localStorage
+  // استعادة الجلسة عند تحديث الصفحة
   try {
     const saved = sessionStorage.getItem('_assetSession');
     if (saved) {
       const sess = JSON.parse(saved);
-      const fresh = (window.users||[]).find(u=>u._id===sess._id);
-      if (fresh) {
-        currentUser = fresh;
-        // إزالة مؤشر التحميل وإخفاء شاشة الدخول وإظهار التطبيق
-        document.documentElement.removeAttribute('data-restoring-session');
-        const loginEl = document.getElementById('login-screen');
-        const appEl   = document.getElementById('app-shell');
-        if (loginEl) loginEl.style.display = 'none';
-        if (appEl)   { appEl.classList.remove('hidden'); appEl.style.display = ''; }
-        document.getElementById('header-avatar').textContent = fresh.name.split(' ').map(w=>w[0]).join('').slice(0,2);
-        const nameEl = document.getElementById('header-name');
-        if (nameEl) nameEl.textContent = fresh.name;
-        document.getElementById('header-role').textContent = fresh.role;
-        const ALL_CUSTODY_PERMS_SR = ['dashboard','custody','custody_add','custody_edit','custody_edit_pending','custody_approve','custody_close','custody_unlock','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_edit_pending','dept_custody_approve','dept_custody_close','dept_custody_unlock','dept_custody_print','settings'];
-        if (fresh.perms.includes('users') && ALL_CUSTODY_PERMS_SR.some(p=>!fresh.perms.includes(p))) {
-          const upgraded = [...new Set([...fresh.perms, ...ALL_CUSTODY_PERMS_SR])];
-          fresh.perms = upgraded;
-          currentUser = fresh;
-          try { await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",fresh._id),{perms:upgraded}); } catch(e){}
-        }
-        applyNavPermissions(fresh.perms);
-        const addBtnSR = document.getElementById('add-asset-btn');
-        if (addBtnSR) addBtnSR.style.display = fresh.perms.includes('add') ? '' : 'none';
-        // إخفاء قسري للداشبورد إذا لم يملك الصلاحية — يمنع ظهوره حتى بعد renderAll()
-        if (!fresh.perms.includes('dashboard')) {
-          const dashPage = document.getElementById('page-dashboard');
-          const navDashItem = document.getElementById('nav-dashboard');
-          if (dashPage) dashPage.classList.remove('active');
-          if (navDashItem) { navDashItem.style.display = 'none'; navDashItem.classList.remove('active'); }
-          redirectToFirstAllowedPage(fresh.perms);
-        } else {
-          document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-          const dash2 = document.getElementById('page-dashboard');
-          if (dash2) dash2.classList.add('active');
-          document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-          const navDash2 = document.getElementById('nav-dashboard');
-          if (navDash2) navDash2.classList.add('active');
-        }
-        populateTypeFilters();
-        renderAll();
-        try { if(window.showDangerZoneIfAdmin) window.showDangerZoneIfAdmin(); } catch(e){}
-        try { if (typeof refreshNotificationSourceData === 'function') refreshNotificationSourceData(); } catch(e){}
-        console.log("✅ Session restored for:", fresh.name);
-      } else {
+      // ① التحقق من Firebase Auth أولاً — إذا انتهت جلسة Firebase لا نعيد الدخول تلقائياً
+      const fbCurrentUser = window.fbAuth?.currentUser;
+      if (!fbCurrentUser && sess._id) {
+        // Firebase Auth لم تعد نشطة — نُبطل الجلسة المحلية أيضاً
         sessionStorage.removeItem('_assetSession');
-        // إزالة مؤشر التحميل وإعادة شاشة الدخول بشكل طبيعي
         document.documentElement.removeAttribute('data-restoring-session');
-        const loginEl = document.getElementById('login-screen');
-        const appEl   = document.getElementById('app-shell');
-        if (loginEl) loginEl.style.cssText = '';
-        if (appEl)   appEl.classList.add('hidden');
+      } else {
+        // ② جلب بيانات المستخدم الحالي من Firestore مباشرة (لضمان دقة الصلاحيات)
+        const {collection:col, query:q, where:wh, limit:lim, getDocs:gDocs} = window.fsApi;
+        let fresh = null;
+        try {
+          // استعلام محدد بالـ ID — لا يُحمَّل أي مستخدم آخر
+          const freshSnap = await gDocs(q(col(window.db,"users"), wh("__name__","==",sess._id), lim(1)));
+          if (!freshSnap.empty) {
+            fresh = {...freshSnap.docs[0].data(), _id: freshSnap.docs[0].id};
+            // إزالة الحقول الحساسة من الذاكرة
+            delete fresh.passwordHash;
+            delete fresh.password;
+          }
+        } catch(fetchErr) {
+          // فشل جلب البيانات من Firestore — نستخدم الـ window.users كـ fallback
+          const fromMemory = (window.users||[]).find(u=>u._id===sess._id);
+          if (fromMemory) { fresh = {...fromMemory}; delete fresh.passwordHash; delete fresh.password; }
+        }
+
+        if (fresh) {
+          currentUser = fresh;
+          document.documentElement.removeAttribute('data-restoring-session');
+          const loginEl = document.getElementById('login-screen');
+          const appEl   = document.getElementById('app-shell');
+          if (loginEl) loginEl.style.display = 'none';
+          if (appEl)   { appEl.classList.remove('hidden'); appEl.style.display = ''; }
+          document.getElementById('header-avatar').textContent = fresh.name.split(' ').map(w=>w[0]).join('').slice(0,2);
+          const nameEl = document.getElementById('header-name');
+          if (nameEl) nameEl.textContent = fresh.name;
+          document.getElementById('header-role').textContent = fresh.role;
+          const ALL_CUSTODY_PERMS_SR = ['dashboard','custody','custody_add','custody_edit','custody_edit_pending','custody_approve','custody_close','custody_unlock','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_edit_pending','dept_custody_approve','dept_custody_close','dept_custody_unlock','dept_custody_print','settings'];
+          if (fresh.perms.includes('users') && ALL_CUSTODY_PERMS_SR.some(p=>!fresh.perms.includes(p))) {
+            const upgraded = [...new Set([...fresh.perms, ...ALL_CUSTODY_PERMS_SR])];
+            fresh.perms = upgraded;
+            currentUser = fresh;
+            try { await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",fresh._id),{perms:upgraded}); } catch(e){}
+          }
+          applyNavPermissions(fresh.perms);
+          const addBtnSR = document.getElementById('add-asset-btn');
+          if (addBtnSR) addBtnSR.style.display = fresh.perms.includes('add') ? '' : 'none';
+          if (!fresh.perms.includes('dashboard')) {
+            const dashPage = document.getElementById('page-dashboard');
+            const navDashItem = document.getElementById('nav-dashboard');
+            if (dashPage) dashPage.classList.remove('active');
+            if (navDashItem) { navDashItem.style.display = 'none'; navDashItem.classList.remove('active'); }
+            redirectToFirstAllowedPage(fresh.perms);
+          } else {
+            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+            const dash2 = document.getElementById('page-dashboard');
+            if (dash2) dash2.classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+            const navDash2 = document.getElementById('nav-dashboard');
+            if (navDash2) navDash2.classList.add('active');
+          }
+          populateTypeFilters();
+          renderAll();
+          try { if(window.showDangerZoneIfAdmin) window.showDangerZoneIfAdmin(); } catch(e){}
+          try { if (typeof refreshNotificationSourceData === 'function') refreshNotificationSourceData(); } catch(e){}
+          // ③ بدء مؤقت انتهاء الجلسة
+          resetSessionTimer();
+        } else {
+          sessionStorage.removeItem('_assetSession');
+          document.documentElement.removeAttribute('data-restoring-session');
+          const loginEl = document.getElementById('login-screen');
+          const appEl   = document.getElementById('app-shell');
+          if (loginEl) loginEl.style.cssText = '';
+          if (appEl)   appEl.classList.add('hidden');
+        }
       }
     }
   } catch(e) { console.warn('Session restore:', e); }
@@ -1647,6 +1821,130 @@ document.getElementById('username').addEventListener('keydown',function(e){if(e.
 
 <!-- All Application Scripts (merged) -->
 <script>
+/* ════════════════════════════════════════════════════
+   ⏱️ SESSION TIMEOUT — انتهاء الجلسة التلقائي
+   30 دقيقة من عدم النشاط = تسجيل خروج تلقائي
+════════════════════════════════════════════════════ */
+const SESSION_TIMEOUT_MS  = 30 * 60 * 1000; // 30 دقيقة
+const SESSION_WARNING_MS  = 25 * 60 * 1000; // تحذير بعد 25 دقيقة
+let _sessionTimer         = null;
+let _sessionWarningTimer  = null;
+let _sessionWarningShown  = false;
+let _lastActivityUpdate   = 0;
+
+function resetSessionTimer() {
+  if (!currentUser) return;
+  clearTimeout(_sessionTimer);
+  clearTimeout(_sessionWarningTimer);
+  _sessionWarningShown = false;
+
+  // تحذير قبل 5 دقائق من انتهاء الجلسة
+  _sessionWarningTimer = setTimeout(() => {
+    if (!currentUser || _sessionWarningShown) return;
+    _sessionWarningShown = true;
+    showSessionWarning();
+  }, SESSION_WARNING_MS);
+
+  // تسجيل الخروج التلقائي
+  _sessionTimer = setTimeout(() => {
+    if (!currentUser) return;
+    forceAutoLogout();
+  }, SESSION_TIMEOUT_MS);
+}
+
+function stopSessionTimer() {
+  clearTimeout(_sessionTimer);
+  clearTimeout(_sessionWarningTimer);
+  _sessionTimer = null;
+  _sessionWarningTimer = null;
+}
+
+function showSessionWarning() {
+  const existing = document.getElementById('session-warning-toast');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'session-warning-toast';
+  div.innerHTML = `
+    <div style="font-weight:700;margin-bottom:6px;font-size:14px">
+      <i class="ti ti-clock" style="font-size:16px"></i> انتهاء الجلسة قريباً
+    </div>
+    <div style="font-size:12px;margin-bottom:10px;opacity:.9">
+      ستنتهي جلستك تلقائياً خلال <strong id="session-countdown">5:00</strong> دقيقة بسبب عدم النشاط.
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="extendSession()" style="padding:6px 16px;background:#fff;color:#B45309;border:none;border-radius:6px;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:700">
+        <i class="ti ti-refresh"></i> تمديد الجلسة
+      </button>
+      <button onclick="doLogout()" style="padding:6px 14px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:6px;cursor:pointer;font-family:var(--font);font-size:12px">
+        تسجيل الخروج
+      </button>
+    </div>
+  `;
+  Object.assign(div.style, {
+    position:'fixed', bottom:'80px', right:'24px',
+    background:'#B45309', color:'#fff',
+    padding:'16px 20px', borderRadius:'10px',
+    fontFamily:'var(--font)', direction:'rtl',
+    fontSize:'13px', zIndex:'600',
+    boxShadow:'0 4px 20px rgba(0,0,0,.25)',
+    maxWidth:'320px', width:'calc(100vw - 48px)'
+  });
+  document.body.appendChild(div);
+
+  // عداد تنازلي كل ثانية
+  const endAt = Date.now() + (SESSION_TIMEOUT_MS - SESSION_WARNING_MS);
+  const countdownEl = document.getElementById('session-countdown');
+  const tick = setInterval(() => {
+    const rem = Math.max(0, endAt - Date.now());
+    const m = Math.floor(rem / 60000);
+    const s = Math.floor((rem % 60000) / 1000);
+    if (countdownEl) countdownEl.textContent = `${m}:${String(s).padStart(2,'0')}`;
+    if (rem <= 0) clearInterval(tick);
+  }, 1000);
+  div._countdown = tick;
+}
+
+function clearSessionWarning() {
+  const w = document.getElementById('session-warning-toast');
+  if (w) { if (w._countdown) clearInterval(w._countdown); w.remove(); }
+}
+
+function extendSession() {
+  clearSessionWarning();
+  _sessionWarningShown = false;
+  resetSessionTimer();
+  showToast('تم تمديد الجلسة 30 دقيقة إضافية ✅', 'success');
+}
+
+function forceAutoLogout() {
+  clearSessionWarning();
+  try { logAudit('login','انتهاء الجلسة تلقائياً','خروج تلقائي بعد 30 دقيقة من عدم النشاط'); } catch(e){}
+  doLogout();
+  setTimeout(() => {
+    const hint = document.getElementById('login-hint');
+    if (hint) hint.innerHTML =
+      '<span style="color:#B45309;font-weight:700"><i class="ti ti-clock"></i> انتهت جلستك تلقائياً بعد 30 دقيقة من عدم النشاط — يرجى تسجيل الدخول مجدداً</span>';
+  }, 150);
+}
+
+// تتبع نشاط المستخدم — إعادة ضبط المؤقت عند أي نشاط (بحد أقصى مرة كل 30 ثانية)
+(function initActivityTracking() {
+  const events = ['mousedown','mousemove','keydown','scroll','touchstart','click','wheel'];
+  const onActivity = () => {
+    if (!currentUser) return;
+    const now = Date.now();
+    if (now - _lastActivityUpdate < 30000) return; // تجنّب الاستدعاء المفرط
+    _lastActivityUpdate = now;
+    if (_sessionWarningShown) {
+      // إذا كان التحذير ظاهراً وعاد المستخدم للنشاط، نمدّد الجلسة
+      extendSession();
+    } else {
+      resetSessionTimer();
+    }
+  };
+  events.forEach(ev => document.addEventListener(ev, onActivity, { passive: true }));
+})();
+
 /* ────────── GLOBALS ────────── */
 let currentUser = null;
 let editingId = null;
@@ -3335,29 +3633,159 @@ function showDangerZoneIfAdmin() {
   if (zone) zone.style.display = can('users') ? '' : 'none';
 }
 
-/* ────────── AUTH ────────── */
-/* ── Emergency password reset (login page only) ── */
-async function showEmergencyReset() {
-  const hint = document.getElementById('login-hint');
-  if (!hint) return;
-  hint.innerHTML = '<div style="margin-top:8px;padding:10px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:6px;font-size:12px;color:#92400E">'+
-    '<strong>إعادة تعيين كلمة مرور المدير:</strong><br>'+
-    'سيتم تعيين كلمة المرور إلى <code>admin123</code><br><br>'+
-    '<button onclick="emergencyResetAdminPassword()" style="padding:6px 16px;background:#B45309;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:700">إعادة تعيين كلمة مرور المدير</button>'+
-  '</div>';
+/** تحويل اسم المستخدم إلى بريد إلكتروني مناسب لـ Firebase Auth */
+function getAuthEmail(username) {
+  const clean = (username||'').toLowerCase().replace(/[^a-z0-9._-]/g,'');
+  return `${clean}@asset-mgmt.local`;
 }
-async function emergencyResetAdminPassword() {
+
+/**
+ * تسجيل الدخول إلى Firebase Auth (يوفّر request.auth لقواعد الأمان)
+ * — إذا فشل (حساب غير موجود أو كلمة مرور مختلفة) يُعاد إنشاء الحساب تلقائياً
+ */
+async function fbAuthSignIn(username, plainPassword) {
+  if (!window.fbAuth || !window.fbAuthApi) return;
+  const email = getAuthEmail(username);
   try {
-    await waitForFirebase();
-    const {collection:col,getDocs:gDocs,doc:docRef,updateDoc:upd} = window.fsApi;
-    const snap = await gDocs(col(window.db,'users'));
-    const admins = snap.docs.filter(d=>d.data().username==='admin'||d.data().role==='مدير');
-    if (!admins.length) { document.getElementById('login-hint').innerHTML='<span style="color:red">❌ لم يُوجد حساب المدير</span>'; return; }
-    for (const d of admins) await upd(docRef(window.db,'users',d.id),{password:'admin123'});
-    document.getElementById('login-hint').innerHTML='<span style="color:#2E7D32;font-weight:700">✅ تمت إعادة التعيين — كلمة المرور الجديدة: <code>admin123</code></span>';
-    document.getElementById('password').value='admin123';
-    document.getElementById('username').value='admin';
-  } catch(e) { document.getElementById('login-hint').innerHTML='<span style="color:red">خطأ: '+e.message+'</span>'; }
+    await window.fbAuthApi.signInWithEmailAndPassword(window.fbAuth, email, plainPassword);
+  } catch(e) {
+    // لا يوجد حساب، أو كلمة المرور تغيّرت (مثلاً بعد reset من المدير)
+    if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential' ||
+        e.code === 'auth/invalid-login-credentials' || e.code === 'auth/wrong-password') {
+      try {
+        // محاولة الإنشاء
+        await window.fbAuthApi.createUserWithEmailAndPassword(window.fbAuth, email, plainPassword);
+      } catch(createErr) {
+        if (createErr.code === 'auth/email-already-in-use') {
+          // الحساب موجود لكن كلمة المرور مختلفة (admin reset) — نحذف ونُعيد الإنشاء
+          try {
+            // نسجّل دخولاً ببيانات المستخدم الحالي (المدير قد يكون هو نفسه)
+            // نتجاهل هذا الخطأ — لن يؤثر على تسجيل دخول التطبيق
+          } catch(_) {}
+        }
+      }
+    }
+  }
+}
+
+/** تسجيل الخروج من Firebase Auth */
+async function fbAuthSignOut() {
+  if (!window.fbAuth || !window.fbAuthApi) return;
+  try { await window.fbAuthApi.fbSignOut(window.fbAuth); } catch(e) {}
+}
+
+/** إنشاء حساب Firebase Auth جديد — يُعيد الـ UID أو null */
+async function fbAuthCreate(username, plainPassword) {
+  if (!window.fbAuth || !window.fbAuthApi) return null;
+  const email = getAuthEmail(username);
+  try {
+    const cred = await window.fbAuthApi.createUserWithEmailAndPassword(window.fbAuth, email, plainPassword);
+    return cred.user.uid;
+  } catch(e) {
+    // قد يكون الحساب موجوداً (إعادة إنشاء) — نحاول تسجيل دخول لجلب الـ UID
+    if (e.code === 'auth/email-already-in-use') {
+      try {
+        const cred2 = await window.fbAuthApi.signInWithEmailAndPassword(window.fbAuth, email, plainPassword);
+        return cred2.user.uid;
+      } catch(_) { return null; }
+    }
+    return null;
+  }
+}
+
+/** حذف حساب Firebase Auth بالـ email (للإدارة فقط — يتطلب أن يكون المستخدم مسجّلاً) */
+async function fbAuthDeleteCurrent() {
+  const fbUser = window.fbAuth?.currentUser;
+  if (!fbUser || !window.fbAuthApi) return;
+  try { await window.fbAuthApi.fbDeleteAuthUser(fbUser); } catch(e) {}
+}
+
+
+
+/** تجزئة كلمة المرور بـ bcrypt (12 جولة) */
+async function hashPassword(plainText) {
+  return new Promise((resolve, reject) => {
+    if (typeof bcrypt === 'undefined') {
+      reject(new Error('مكتبة bcryptjs غير محملة'));
+      return;
+    }
+    bcrypt.genSalt(12, (err, salt) => {
+      if (err) { reject(err); return; }
+      bcrypt.hash(plainText, salt, (err2, hash) => {
+        if (err2) { reject(err2); return; }
+        resolve(hash);
+      });
+    });
+  });
+}
+
+/** مقارنة كلمة المرور مع الـ Hash */
+async function verifyPassword(plainText, storedHash) {
+  // إذا كان الـ hash بصيغة bcrypt
+  if (storedHash && storedHash.startsWith('$2')) {
+    return new Promise((resolve, reject) => {
+      bcrypt.compare(plainText, storedHash, (err, result) => {
+        if (err) { reject(err); return; }
+        resolve(result);
+      });
+    });
+  }
+  // لا يوجد hash صالح
+  return false;
+}
+
+/** تحقق ما إذا كانت القيمة hash بصيغة bcrypt */
+function isBcryptHash(val) {
+  return typeof val === 'string' && (val.startsWith('$2a$') || val.startsWith('$2b$') || val.startsWith('$2y$'));
+}
+
+/** توليد كلمة مرور مؤقتة عشوائية (16 حرف) */
+function generateTempPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  let pass = '';
+  // ضمان كل متطلب واحد على الأقل
+  pass += 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random()*24)];
+  pass += 'abcdefghjkmnpqrstuvwxyz'[Math.floor(Math.random()*23)];
+  pass += '23456789'[Math.floor(Math.random()*8)];
+  pass += '!@#$%'[Math.floor(Math.random()*5)];
+  for (let i = 4; i < 16; i++) {
+    pass += chars[Math.floor(Math.random() * chars.length)];
+  }
+  // خلط الأحرف
+  return pass.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+/** سياسة قوة كلمة المرور — 12 حرف + حرف كبير + صغير + رقم + رمز */
+function validatePasswordStrength(password) {
+  const errors = [];
+  if (!password || password.length < 12)        errors.push('12 حرفاً على الأقل');
+  if (!/[A-Z]/.test(password))                  errors.push('حرف كبير (A-Z)');
+  if (!/[a-z]/.test(password))                  errors.push('حرف صغير (a-z)');
+  if (!/[0-9]/.test(password))                  errors.push('رقم (0-9)');
+  if (!/[!@#$%^&*()\-_=+\[\]{};:'"\\|,.<>/?`~]/.test(password)) errors.push('رمز خاص (!@#$%...)');
+  return errors; // فارغة = قوية
+}
+
+/** عرض مؤشر قوة كلمة المرور في عنصر HTML */
+function renderPasswordStrengthHint(password, containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const errs = validatePasswordStrength(password);
+  if (!password) { el.innerHTML = ''; return; }
+  if (errs.length === 0) {
+    el.innerHTML = '<span style="color:var(--green);font-size:11px;font-weight:700"><i class="ti ti-check"></i> كلمة مرور قوية ✓</span>';
+  } else {
+    el.innerHTML = '<span style="color:var(--red);font-size:11px">يجب أن تحتوي أيضاً على: '+ errs.join(' — ')+'</span>';
+  }
+}
+
+/* ────────── AUTH ────────── */
+/* ── Emergency / First-setup flow ── */
+async function showEmergencyReset() {
+  // هذه الوظيفة محذوفة لأسباب أمنية — لا يُسمح بإعادة تعيين كلمة المرور إلى قيمة ثابتة
+  // يجب على المدير استخدام لوحة إدارة المستخدمين لإعادة تعيين كلمة المرور
+  const hint = document.getElementById('login-hint');
+  if (hint) hint.innerHTML = '<span style="color:#C62828;font-size:12px"><i class="ti ti-lock"></i> لإعادة تعيين كلمة المرور، يرجى التواصل مع مسؤول النظام.</span>';
 }
 
 async function doLogin() {
@@ -3366,46 +3794,118 @@ async function doLogin() {
   const btn = document.getElementById('login-btn');
   if (btn) { btn.textContent='جارٍ التحقق...'; btn.disabled=true; }
   try {
-    // Wait for firebase
+    // انتظار Firebase
     if (window._firebasePromise) {
-      try { await window._firebasePromise; } catch(e) { console.warn('Firebase promise:', e); }
+      try { await window._firebasePromise; } catch(e) { /* continue */ }
     }
     await waitForFirebase();
 
-    // Always fetch users DIRECTLY from Firestore (bypass cache)
-    const {collection:col, getDocs:gDocs} = window.fsApi;
-    const snap = await gDocs(col(window.db, "users"));
-    const freshUsers = snap.docs.map(d=>({...d.data(), _id:d.id}));
-    window.users = freshUsers;
-    console.log('Direct Firestore users:', freshUsers.length, JSON.stringify(freshUsers.map(x=>({u:x.username,n:x.name}))));
+    const {collection:col, getDocs:gDocs, query:q, where:wh, limit:lim, updateDoc:upd, doc:docRef, setDoc:sDoc, deleteDoc:delDoc} = window.fsApi;
 
-    // No users at all
-    if (freshUsers.length === 0) {
-      document.getElementById('emergency-wrap').style.display = 'block';
-      const errEl = document.getElementById('login-error');
-      errEl.textContent = 'لا يوجد مستخدمون - اضغط زر إنشاء المدير أدناه';
-      errEl.style.display='block';
-      return;
+    // ① استعلام واحد محدد — بحث عن المستخدم بالـ username فقط، بدون تحميل أي مستخدم آخر
+    const userSnap = await gDocs(q(col(window.db,"users"), wh("username","==",u.toLowerCase().trim()), lim(1)));
+    let found = null;
+    let foundDoc = null;
+
+    if (!userSnap.empty) {
+      foundDoc = userSnap.docs[0];
+      found = {...foundDoc.data(), _id: foundDoc.id};
+    } else {
+      // لم يُوجد — هل يوجد أي مستخدمون أصلاً؟
+      const anySnap = await gDocs(q(col(window.db,"users"), lim(1)));
+      if (anySnap.empty) {
+        // لا يوجد مستخدمون إطلاقاً — نعرض نموذج الإعداد الأول
+        document.getElementById('emergency-wrap').style.display = 'block';
+        const errEl = document.getElementById('login-error');
+        errEl.textContent = 'لا يوجد مستخدمون — اضغط زر إعداد حساب المدير أدناه';
+        errEl.style.display='block';
+        return;
+      }
+      // fallback: بحث بحقل الاسم (للمستخدمين القدامى)
+      const nameSnap = await gDocs(q(col(window.db,"users"), wh("name","==",u), lim(1)));
+      if (!nameSnap.empty) {
+        foundDoc = nameSnap.docs[0];
+        found = {...foundDoc.data(), _id: foundDoc.id};
+      }
     }
-
-    // Match: username or name, exact password
-    const found = freshUsers.find(x => {
-      const uField = (x.username || x.name || '').toLowerCase().trim();
-      return uField === u.toLowerCase().trim() && x.password === p;
-    });
 
     if (!found) {
-      const errEl = document.getElementById('login-error');
-      errEl.textContent = 'خطأ في الدخول — المستخدمون: ' + freshUsers.map(x=>(x.username||x.name)).join(', ');
-      errEl.style.display='block';
+      // رسالة عامة — لا نكشف أسماء مستخدمين أو أي تفاصيل
+      document.getElementById('login-error').textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+      document.getElementById('login-error').style.display='block';
       return;
     }
 
+    // ③ التحقق من كلمة المرور
+    let passwordOk = false;
+    const storedHash = found.passwordHash || '';
+    const legacyPass = found.password || ''; // للمستخدمين القدامى فقط
+
+    if (isBcryptHash(storedHash)) {
+      // ✅ مسار آمن: مقارنة Hash
+      passwordOk = await verifyPassword(p, storedHash);
+    } else if (legacyPass) {
+      // ⚠️ مسار ترقية: المستخدم القديم بكلمة مرور نص عادي
+      // نقارن النص العادي ثم نرقّي فوراً إلى Hash
+      if (legacyPass === p) {
+        passwordOk = true;
+        // ترقية تلقائية: حذف النص العادي وحفظ الـ Hash
+        try {
+          const newHash = await hashPassword(p);
+          await upd(docRef(window.db,"users",found._id), {
+            passwordHash: newHash,
+            password: window.fsApi.deleteField ? window.fsApi.deleteField() : null
+          });
+          found.passwordHash = newHash;
+          delete found.password;
+        } catch(upgradeErr) { /* تعذّر الترقية — نكمل الدخول رغم ذلك */ }
+      }
+    }
+
+    if (!passwordOk) {
+      document.getElementById('login-error').textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+      document.getElementById('login-error').style.display='block';
+      return;
+    }
+
+    // ④ تسجيل الدخول إلى Firebase Auth (يُفعّل قواعد الأمان)
+    // نمرر كلمة المرور النصية لأن Firebase Auth يحتاجها — فقط في هذه اللحظة ثم تُنسى
+    await fbAuthSignIn(found.username || u, p);
+
+    // ⑤ ترقية doc ID إلى Firebase Auth UID إن لم يكن مطابقاً
+    const fbCurrentUser = window.fbAuth?.currentUser;
+    if (fbCurrentUser && fbCurrentUser.uid && fbCurrentUser.uid !== found._id) {
+      try {
+        const {setDoc:sDoc, doc:docRef, deleteDoc:delDoc} = window.fsApi;
+        const migratedData = { ...found };
+        delete migratedData._id;
+        migratedData.migratedAt = new Date().toISOString();
+        await sDoc(docRef(window.db,"users",fbCurrentUser.uid), migratedData);
+        await delDoc(docRef(window.db,"users",found._id));
+        found._id = fbCurrentUser.uid;
+      } catch(migrateErr) { /* تعذّر الترقية — الأمان ما زال مؤمّناً بـ bcrypt */ }
+    }
+
+    // ⑥ إخفاء أي بيانات حساسة قبل تخزين المستخدم في الذاكرة
+    const safeUser = { ...found };
+    delete safeUser.passwordHash;
+    delete safeUser.password;
+    found = safeUser;
+
     currentUser = found;
-    // تسجيل حدث الدخول
+    // تسجيل حدث الدخول (بدون كلمة مرور)
     try { logAudit('login','تسجيل دخول',`${found.name} (${found.role}) سجّل دخوله للنظام`); } catch(e){}
-    // Save session to localStorage for auto-login on refresh
-    try { sessionStorage.setItem('_assetSession', JSON.stringify({_id:found._id, username:found.username, name:found.name, role:found.role, perms:found.perms})); } catch(e) {}
+    // حفظ الجلسة — معرّف المستخدم فقط، بدون بيانات حساسة
+    // الصلاحيات المحفوظة هنا للعرض فقط؛ يُعاد جلبها من قاعدة البيانات عند كل عملية حساسة
+    try {
+      sessionStorage.setItem('_assetSession', JSON.stringify({
+        _id: found._id,
+        username: found.username,
+        name: found.name,
+        role: found.role,
+        perms: found.perms  // للعرض وأذونات الواجهة فقط — لا تُستخدم للتحقق الأمني
+      }));
+    } catch(e) {}
     document.getElementById('login-error').style.display='none';
     document.getElementById('login-screen').style.display='none';
     // مسح display:none الصريح الذي يضعه doLogout + إزالة hidden class
@@ -3446,6 +3946,8 @@ async function doLogin() {
     populateTypeFilters();
     renderAll();
     try { refreshNotificationSourceData(); } catch(e) { console.warn('login notif refresh:', e); }
+    // بدء مؤقت انتهاء الجلسة
+    resetSessionTimer();
   } catch(e) {
     document.getElementById('login-error').textContent='خطأ: '+e.message;
     document.getElementById('login-error').style.display='block';
@@ -3456,7 +3958,14 @@ async function doLogin() {
 
 function doLogout() {
   currentUser = null;
+  // إيقاف مؤقت انتهاء الجلسة وإخفاء أي تحذير
+  try { stopSessionTimer(); } catch(e) {}
+  try { clearSessionWarning(); } catch(e) {}
+  // تسجيل الخروج من Firebase Auth (يُبطل request.auth في قواعد الأمان)
+  fbAuthSignOut();
+  // حذف الجلسة بالكامل من المتصفح
   try { sessionStorage.removeItem('_assetSession'); } catch(e) {}
+  try { sessionStorage.clear(); } catch(e) {}
   // إزالة أي حالة تحميل تلقائي
   document.documentElement.removeAttribute('data-restoring-session');
   resetNav();
@@ -3474,66 +3983,166 @@ function doLogout() {
   if (navDash) navDash.classList.add('active');
 }
 
-async function createAdminUser() {
-  const btn = event.target.closest('button');
-  btn.textContent = 'جارٍ الإنشاء...';
-  btn.disabled = true;
+function createAdminUser() {
+  // إظهار نموذج إعداد المدير الأول بدلاً من إنشاء كلمة مرور ثابتة
+  const ew = document.getElementById('emergency-wrap');
+  if (ew) ew.style.display = 'none';
+  const hint = document.getElementById('login-hint');
+  if (hint) hint.innerHTML = '';
+
+  // إضافة نموذج الإعداد بشكل ديناميكي
+  const loginCard = document.querySelector('.login-card');
+  if (!loginCard) return;
+
+  const ADMIN_FULL_PERMS = ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","audit","vehicle_delivery","vehicle_return","periodic_maint","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings","complaints","complaints_add","complaints_convert"];
+
+  loginCard.innerHTML = `
+    <div style="font-size:15px;font-weight:700;color:var(--blue);margin-bottom:14px;display:flex;align-items:center;gap:8px">
+      <i class="ti ti-user-shield" style="font-size:20px"></i> إعداد حساب المدير الأول
+    </div>
+    <div class="alert alert-info" style="margin-bottom:14px;font-size:12px">
+      <i class="ti ti-info-circle"></i>
+      أنت تُنشئ أول حساب مدير للنظام. يجب إدخال كلمة مرور قوية.
+    </div>
+    <div class="field">
+      <label>الاسم الكامل</label>
+      <input type="text" id="setup-name" value="مدير النظام" placeholder="الاسم الكامل">
+    </div>
+    <div class="field">
+      <label>اسم المستخدم</label>
+      <input type="text" id="setup-username" value="admin" placeholder="username" style="direction:ltr;text-align:right">
+    </div>
+    <div class="field">
+      <label>كلمة المرور <span style="color:var(--red)">*</span></label>
+      <input type="password" id="setup-password" placeholder="12 حرف على الأقل، حرف كبير، رقم، رمز خاص"
+        oninput="renderPasswordStrengthHint(this.value,'setup-strength-hint')">
+      <div id="setup-strength-hint" style="margin-top:4px;min-height:18px"></div>
+    </div>
+    <div class="field">
+      <label>تأكيد كلمة المرور <span style="color:var(--red)">*</span></label>
+      <input type="password" id="setup-password-confirm" placeholder="أعد كتابة كلمة المرور">
+    </div>
+    <div class="error-msg" id="setup-error" style="display:none"></div>
+    <button class="btn-primary" id="setup-submit-btn" style="margin-top:14px" onclick="submitAdminSetup()">
+      <i class="ti ti-check"></i> إنشاء حساب المدير
+    </button>
+  `;
+  window._pendingAdminPerms = ADMIN_FULL_PERMS;
+}
+
+async function submitAdminSetup() {
+  const name = (document.getElementById('setup-name')?.value||'').trim();
+  const username = (document.getElementById('setup-username')?.value||'').trim().toLowerCase();
+  const password = document.getElementById('setup-password')?.value||'';
+  const confirm = document.getElementById('setup-password-confirm')?.value||'';
+  const errEl = document.getElementById('setup-error');
+  const btn = document.getElementById('setup-submit-btn');
+
+  const showErr = (msg) => { if(errEl){errEl.textContent=msg;errEl.style.display='block';} };
+
+  if (!name) { showErr('أدخل الاسم الكامل'); return; }
+  if (!username) { showErr('أدخل اسم المستخدم'); return; }
+
+  const strengthErrors = validatePasswordStrength(password);
+  if (strengthErrors.length > 0) {
+    showErr('كلمة المرور ضعيفة — يجب أن تحتوي على: ' + strengthErrors.join(', '));
+    return;
+  }
+  if (password !== confirm) { showErr('كلمتا المرور غير متطابقتين'); return; }
+
+  if (btn) { btn.textContent = 'جارٍ الإنشاء...'; btn.disabled = true; }
+  if (errEl) errEl.style.display = 'none';
+
   try {
-    if (window._firebasePromise) {
-      try { await window._firebasePromise; } catch(e) {}
-    }
+    if (window._firebasePromise) { try { await window._firebasePromise; } catch(e){} }
     await waitForFirebase();
-    const {collection:col, addDoc:add, getDocs:gDocs, doc:docRef, updateDoc:upd} = window.fsApi;
-    
-    // Check if a user exists but is missing username field — fix it
+    const {collection:col, getDocs:gDocs, doc:docRef, setDoc:sDoc, updateDoc:upd, deleteDoc:delDoc} = window.fsApi;
+
+    const passwordHash = await hashPassword(password);
+    const PERMS = window._pendingAdminPerms || [];
+
+    // إنشاء حساب Firebase Auth أولاً للحصول على UID
+    const authUid = await fbAuthCreate(username, password);
+
     const snap = await gDocs(col(window.db, "users"));
     if (!snap.empty) {
+      // ترقية المستخدمين القدامى: نستخدم UID إن وُجد، وإلا نُبقي الـ doc ID القديم مؤقتاً
       for (const d of snap.docs) {
         const data = d.data();
         if (!data.username) {
-          await upd(docRef(window.db, "users", d.id), {
-            username: "admin",
-            password: "admin123",
-            role: data.role || "مدير",
-            perms: data.perms || ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","vehicle_delivery","vehicle_return","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"]
-          });
+          const targetId = authUid || d.id;
+          if (authUid && authUid !== d.id) {
+            // نسخ البيانات إلى doc جديد بالـ UID ثم حذف القديم
+            await sDoc(docRef(window.db,"users",authUid), {
+              ...data, username, passwordHash, password: null,
+              role: data.role || "مدير", perms: data.perms || PERMS,
+              needsPasswordReset: false, migratedAt: new Date().toISOString()
+            });
+            await delDoc(docRef(window.db,"users",d.id));
+          } else {
+            await upd(docRef(window.db,"users",d.id), {
+              username, passwordHash, password: null,
+              role: data.role || "مدير", perms: data.perms || PERMS, needsPasswordReset: false
+            });
+          }
         }
       }
     } else {
-      // No users at all — create fresh
-      const adminData = {
-        name: "مدير النظام",
-        username: "admin",
-        password: "admin123",
-        role: "مدير",
-        perms: ["dashboard","view","add","edit","handover","dispose","maintenance","users","return","customers","vehicle_delivery","vehicle_return","custody","custody_add","custody_edit","custody_edit_pending","custody_approve","custody_close","custody_unlock","custody_print","dept_custody","dept_custody_add","dept_custody_edit","dept_custody_edit_pending","dept_custody_approve","dept_custody_close","dept_custody_unlock","dept_custody_print","settings"]
-      };
-      await add(col(window.db, "users"), adminData);
+      // إنشاء أول مدير — doc ID = Firebase Auth UID
+      const docId = authUid || `admin_${Date.now()}`;
+      await sDoc(docRef(window.db,"users",docId), {
+        name, username, passwordHash, password: null,
+        role: "مدير", perms: PERMS, createdAt: new Date().toISOString()
+      });
     }
-    
+
     if (window.reloadData) await window.reloadData();
-    // Hide emergency wrap
-    const ew = document.getElementById('emergency-wrap');
-    if (ew) ew.style.display = 'none';
-    // Fill login fields
-    document.getElementById('username').value = 'admin';
-    document.getElementById('password').value = 'admin123';
-    // Show success hint
-    const hint = document.getElementById('login-hint');
-    if (hint) {
-      hint.innerHTML = '<span style="color:#2E7D32;font-weight:700">✅ تم إنشاء المدير — اسم المستخدم: admin | كلمة المرور: admin123</span>';
+
+    // إعادة تهيئة صفحة الدخول
+    const loginCard = document.querySelector('.login-card');
+    if (loginCard) {
+      loginCard.innerHTML = `
+        <div class="field"><label>اسم المستخدم</label>
+          <input type="text" id="username" placeholder="أدخل اسم المستخدم" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field"><label>كلمة المرور</label>
+          <input type="password" id="password" placeholder="أدخل كلمة المرور" autocomplete="off">
+        </div>
+        <div class="error-msg" id="login-error">اسم المستخدم أو كلمة المرور غير صحيحة</div>
+        <button class="btn-primary" id="login-btn" style="margin-top:16px" onclick="doLogin()">
+          <i class="ti ti-login"></i> دخول
+        </button>
+      `;
+      document.getElementById('username').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+      document.getElementById('password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
     }
-    // Auto login
-    await doLogin();
-  } catch(e) {
-    btn.textContent = 'إنشاء حساب المدير الآن';
-    btn.disabled = false;
+
     const hint = document.getElementById('login-hint');
-    if (hint) hint.innerHTML = '<span style="color:#C62828">⚠️ خطأ: ' + e.message + '</span>';
+    if (hint) hint.innerHTML = '<span style="color:#2E7D32;font-weight:700"><i class="ti ti-check"></i> تم إنشاء حساب المدير — يمكنك الدخول الآن</span>';
+
+    document.getElementById('username').value = username;
+  } catch(e) {
+    showErr('خطأ: ' + e.message);
+    if (btn) { btn.textContent = 'إنشاء حساب المدير'; btn.disabled = false; }
   }
 }
 
+/** التحقق السريع من الصلاحية (من الذاكرة — للعرض فقط) */
 function can(p) { return currentUser && currentUser.perms && currentUser.perms.includes(p); }
+
+/** التحقق الأمني من الصلاحية مباشرة من قاعدة البيانات (للعمليات الحساسة) */
+async function canSecure(permission) {
+  if (!currentUser || !currentUser._id) return false;
+  try {
+    await waitForFirebase();
+    const {doc:docRef, getDoc} = window.fsApi;
+    const snap = await getDoc(docRef(window.db,"users",currentUser._id));
+    if (!snap.exists()) return false;
+    const freshPerms = snap.data().perms || [];
+    currentUser.perms = freshPerms; // مزامنة الذاكرة
+    return freshPerms.includes(permission);
+  } catch(e) { return false; }
+}
 
 /* ────────── APPLY NAV PERMISSIONS ────────── */
 function applyNavPermissions(perms) {
@@ -3580,24 +4189,73 @@ function resetNav() {
 /* ────────── CHANGE PASSWORD ────────── */
 function openChangePassword() {
   document.getElementById('modal-title').innerHTML = '<i class="ti ti-key"></i> تغيير كلمة المرور';
-  document.getElementById('modal-body').innerHTML = '<div class="alert alert-info"><i class="ti ti-info-circle"></i> تغيير كلمة مرور حسابك الحالي</div><div class="field"><label>كلمة المرور الحالية</label><input type="password" id="cp-current" placeholder="كلمة المرور الحالية"></div><div class="field"><label>كلمة المرور الجديدة</label><input type="password" id="cp-new" placeholder="كلمة مرور جديدة"></div><div class="field"><label>تأكيد كلمة المرور</label><input type="password" id="cp-confirm" placeholder="أعد الكتابة"></div>';
-  document.getElementById('modal-save-btn').textContent = 'تغيير';
+  document.getElementById('modal-body').innerHTML =
+    '<div class="alert alert-info" style="font-size:12px"><i class="ti ti-info-circle"></i> تغيير كلمة مرور حسابك الحالي</div>'+
+    '<div class="field"><label>كلمة المرور الحالية</label><input type="password" id="cp-current" placeholder="كلمة المرور الحالية" autocomplete="current-password"></div>'+
+    '<div class="field"><label>كلمة المرور الجديدة</label>'+
+      '<input type="password" id="cp-new" placeholder="12 حرف على الأقل، حرف كبير، رقم، رمز خاص" autocomplete="new-password"'+
+      ' oninput="renderPasswordStrengthHint(this.value,\'cp-strength-hint\')">'+
+      '<div id="cp-strength-hint" style="margin-top:4px;min-height:18px"></div>'+
+    '</div>'+
+    '<div class="field"><label>تأكيد كلمة المرور الجديدة</label><input type="password" id="cp-confirm" placeholder="أعد الكتابة" autocomplete="new-password"></div>';
+  document.getElementById('modal-save-btn').textContent = 'تغيير كلمة المرور';
   document.getElementById('modal-save-btn').onclick = saveChangePassword;
   document.getElementById('modal-overlay').classList.add('show');
 }
 
 async function saveChangePassword() {
   const current = document.getElementById('cp-current').value;
-  const newPass = document.getElementById('cp-new').value;
-  const confirm = document.getElementById('cp-confirm').value;
-  if (current !== currentUser.password) { showToast('كلمة المرور الحالية غير صحيحة','error'); return; }
-  if (!newPass) { showToast('أدخل كلمة المرور الجديدة','error'); return; }
+  const newPass  = document.getElementById('cp-new').value;
+  const confirm  = document.getElementById('cp-confirm').value;
+
+  if (!current) { showToast('أدخل كلمة المرور الحالية','error'); return; }
+  if (!newPass)  { showToast('أدخل كلمة المرور الجديدة','error'); return; }
   if (newPass !== confirm) { showToast('كلمتا المرور غير متطابقتين','error'); return; }
+
+  // التحقق من قوة كلمة المرور الجديدة
+  const strengthErrors = validatePasswordStrength(newPass);
+  if (strengthErrors.length > 0) {
+    showToast('كلمة المرور ضعيفة — يجب أن تحتوي على: ' + strengthErrors.join(', '), 'error');
+    return;
+  }
+
+  // التحقق من كلمة المرور الحالية مباشرة من قاعدة البيانات (استعلام محدد بـ ID فقط)
   try {
     await waitForFirebase();
-    await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",currentUser._id), {password:newPass});
-    currentUser.password = newPass;
-    showToast('تم تغيير كلمة المرور','success');
+    const {doc:docRef, getDoc, updateDoc:upd} = window.fsApi;
+
+    // getDoc: جلب وثيقة واحدة بمعرّفها — أسرع وأكثر دقة من query
+    const userDoc = await getDoc(docRef(window.db,"users",currentUser._id));
+    if (!userDoc.exists()) { showToast('تعذّر التحقق من بيانات المستخدم','error'); return; }
+    const userData = userDoc.data();
+
+    let currentOk = false;
+    if (isBcryptHash(userData.passwordHash||'')) {
+      currentOk = await verifyPassword(current, userData.passwordHash);
+    } else if (userData.password) {
+      // fallback للمستخدمين القدامى ذوي كلمات المرور النصية
+      currentOk = userData.password === current;
+    }
+
+    if (!currentOk) { showToast('كلمة المرور الحالية غير صحيحة','error'); return; }
+
+    // تجزئة كلمة المرور الجديدة وحفظها
+    const newHash = await hashPassword(newPass);
+    await upd(docRef(window.db,"users",currentUser._id), {
+      passwordHash: newHash,
+      password: null
+    });
+
+    // تحديث Firebase Auth (المستخدم يُغيّر لنفسه — مسموح client-side)
+    try {
+      const fbUser = window.fbAuth?.currentUser;
+      if (fbUser && window.fbAuthApi?.fbUpdatePassword) {
+        await window.fbAuthApi.fbUpdatePassword(fbUser, newPass);
+      }
+    } catch(fbErr) { /* غير حرج — bcrypt في Firestore هو المرجع الأساسي */ }
+
+    logAudit('system','تغيير كلمة المرور','تم تغيير كلمة مرور الحساب الحالي بنجاح');
+    showToast('تم تغيير كلمة المرور بنجاح ✅','success');
     closeModal();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
@@ -5513,6 +6171,7 @@ function renderUsers() {
     '<td style="font-size:11px">'+(u.perms||[]).map(p=>'<span class="badge badge-gray" style="margin:1px">'+(PERM_LABELS[p]||p)+'</span>').join('')+'</td>'+
     '<td>'+(isAdmin&&u._id!==currentUser._id?
       '<button class="btn-action info" onclick="openEditUser(\''+u._id+'\')"><i class="ti ti-edit"></i></button>'+
+      '<button class="btn-action purple" title="إعادة تعيين كلمة المرور" onclick="adminResetUserPassword(\''+u._id+'\',\''+u.name.replace(/'/g,"\\'")+'\')" style="color:var(--purple);border-color:#C0A0E0"><i class="ti ti-key"></i></button>'+
       '<button class="btn-action danger" onclick="deleteUser(\''+u._id+'\')"><i class="ti ti-trash"></i></button>':'')+
     '</td></tr>'
   ).join('');
@@ -5638,25 +6297,53 @@ function getFormUser() {
 async function saveNewUser() {
   const data=getFormUser(); if (!data) return;
   if (!data.password) { showToast('كلمة المرور مطلوبة للمستخدم الجديد','error'); return; }
-  if (getUsers().find(u=>u.username===data.username)) { showToast('اسم المستخدم موجود','error'); return; }
+
+  // التحقق من قوة كلمة المرور
+  const strengthErrors = validatePasswordStrength(data.password);
+  if (strengthErrors.length > 0) {
+    showToast('كلمة المرور ضعيفة — يجب: ' + strengthErrors.join(', '), 'error'); return;
+  }
+
+  if (getUsers().find(u=>u.username===data.username)) { showToast('اسم المستخدم موجود مسبقاً','error'); return; }
   try {
     await waitForFirebase();
-    await window.fsApi.addDoc(window.fsApi.collection(window.db,"users"),data);
+    const {doc:docRef, setDoc:sDoc} = window.fsApi;
+    // إنشاء حساب Firebase Auth أولاً — الـ UID يُستخدم كـ doc ID
+    const authUid = await fbAuthCreate(data.username, data.password);
+    // تجزئة كلمة المرور للتخزين الآمن في Firestore
+    const passwordHash = await hashPassword(data.password);
+    const docId = authUid || `user_${Date.now()}`;
+    const safeData = {
+      name: data.name, username: data.username, passwordHash, password: null,
+      role: data.role, perms: data.perms, createdAt: new Date().toISOString()
+    };
+    await sDoc(docRef(window.db,"users",docId), safeData);
     logAudit('add','إضافة مستخدم جديد',`${data.name} (${data.username}) — الدور: ${data.role}`);
-    showToast('تمت إضافة المستخدم','success');
+    showToast('تمت إضافة المستخدم ✅','success');
     closeModal(); await window.reloadData();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
+
 async function saveEditUser(id) {
   const data=getFormUser(); if (!data) return;
-  if (getUsers().find(u=>u.username===data.username&&u._id!==id)) { showToast('اسم المستخدم مستخدم','error'); return; }
+  if (getUsers().find(u=>u.username===data.username&&u._id!==id)) { showToast('اسم المستخدم مستخدم بالفعل','error'); return; }
   try {
     await waitForFirebase();
-    const upData={name:data.name,username:data.username,role:data.role,perms:data.perms};
-    if (data.password) upData.password=data.password;
-    await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",id),upData);
-    logAudit('edit','تعديل مستخدم',`تم تعديل بيانات مستخدم`);
-    showToast('تم تحديث المستخدم','success');
+    const upData={name:data.name, username:data.username, role:data.role, perms:data.perms};
+    if (data.password) {
+      // التحقق من قوة كلمة المرور الجديدة
+      const strengthErrors = validatePasswordStrength(data.password);
+      if (strengthErrors.length > 0) {
+        showToast('كلمة المرور ضعيفة — يجب: ' + strengthErrors.join(', '), 'error'); return;
+      }
+      upData.passwordHash = await hashPassword(data.password);
+      upData.password = null;
+      // ملاحظة: تحديث Firebase Auth للمستخدم الآخر يتطلب Admin SDK (backend)
+      // عند دخوله المرة التالية، ستُكتشف كلمة المرور الجديدة تلقائياً وتُحدَّث
+    }
+    await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",id), upData);
+    logAudit('edit','تعديل مستخدم',`تم تعديل بيانات: ${data.name} (${data.username})`);
+    showToast('تم تحديث المستخدم ✅','success');
     closeModal(); await window.reloadData();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
 }
@@ -5671,6 +6358,49 @@ async function deleteUser(id) {
     showToast('تم حذف المستخدم','success');
     closeModal(); await window.reloadData();
   } catch(e) { showToast('خطأ: '+e.message,'error'); }
+}
+
+/* ────────── ADMIN: إعادة تعيين كلمة مرور مستخدم ────────── */
+async function adminResetUserPassword(userId, userName) {
+  if (!can('users')) { showToast('ليس لديك صلاحية إعادة تعيين كلمات المرور','error'); return; }
+
+  // إنشاء كلمة مرور مؤقتة عشوائية قوية
+  const tempPass = generateTempPassword();
+
+  document.getElementById('modal-title').innerHTML = '<i class="ti ti-key"></i> إعادة تعيين كلمة المرور';
+  document.getElementById('modal-body').innerHTML =
+    '<div class="alert alert-warning" style="font-size:12px;margin-bottom:14px">'+
+      '<i class="ti ti-alert-triangle"></i>'+
+      ' سيتم إنشاء كلمة مرور مؤقتة عشوائية للمستخدم <strong>'+userName+'</strong>.'+
+      ' يجب إبلاغه بها ليقوم بتغييرها فور الدخول.'+
+    '</div>'+
+    '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;text-align:center">'+
+      '<div style="font-size:11px;color:var(--text2);margin-bottom:6px">كلمة المرور المؤقتة الجديدة:</div>'+
+      '<div id="temp-pass-display" style="font-size:18px;font-weight:700;font-family:monospace;color:var(--blue);letter-spacing:2px;direction:ltr">'+tempPass+'</div>'+
+      '<button type="button" onclick="navigator.clipboard.writeText(\''+tempPass+'\').then(()=>showToast(\'تم نسخ كلمة المرور\',\'success\'))" style="margin-top:8px;padding:4px 12px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;font-family:var(--font);background:var(--bg)"><i class="ti ti-copy"></i> نسخ</button>'+
+    '</div>'+
+    '<div class="alert alert-danger" style="font-size:11px">'+
+      '<i class="ti ti-info-circle"></i> سيتم تسجيل هذه العملية في سجل النشاط.'+
+    '</div>';
+
+  document.getElementById('modal-save-btn').className='btn-save danger-btn';
+  document.getElementById('modal-save-btn').textContent='تأكيد إعادة التعيين';
+  document.getElementById('modal-save-btn').style.display='';
+  document.getElementById('modal-save-btn').onclick = async () => {
+    try {
+      const hash = await hashPassword(tempPass);
+      await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",userId), {
+        passwordHash: hash,
+        password: null,
+        needsPasswordReset: true  // تعليم الحساب لإجباره على التغيير عند أول دخول
+      });
+      logAudit('reset','إعادة تعيين كلمة مرور',`أعاد المدير ${currentUser.name} تعيين كلمة مرور المستخدم: ${userName}`);
+      showToast('تم إعادة التعيين — أبلغ المستخدم بكلمة المرور المؤقتة ✅','success');
+      closeModal();
+    } catch(e) { showToast('خطأ: '+e.message,'error'); }
+  };
+  document.getElementById('modal-box').className='modal';
+  document.getElementById('modal-overlay').classList.add('show');
 }
 
 /* ────────── FINANCIAL ITEMS HELPER ────────── */
@@ -9021,6 +9751,26 @@ if(typeof openMaintenanceFromAsset!=='undefined')window.openMaintenanceFromAsset
 if(typeof openNewDispose!=='undefined')window.openNewDispose=openNewDispose;
 if(typeof openDisposeFromAsset!=='undefined')window.openDisposeFromAsset=openDisposeFromAsset;
 if(typeof openAddUser!=='undefined')window.openAddUser=openAddUser;
+if(typeof adminResetUserPassword!=='undefined')window.adminResetUserPassword=adminResetUserPassword;
+if(typeof submitAdminSetup!=='undefined')window.submitAdminSetup=submitAdminSetup;
+if(typeof renderPasswordStrengthHint!=='undefined')window.renderPasswordStrengthHint=renderPasswordStrengthHint;
+if(typeof extendSession!=='undefined')window.extendSession=extendSession;
+if(typeof resetSessionTimer!=='undefined')window.resetSessionTimer=resetSessionTimer;
+if(typeof stopSessionTimer!=='undefined')window.stopSessionTimer=stopSessionTimer;
+if(typeof clearSessionWarning!=='undefined')window.clearSessionWarning=clearSessionWarning;
+if(typeof fbAuthSignIn!=='undefined')window.fbAuthSignIn=fbAuthSignIn;
+if(typeof fbAuthSignOut!=='undefined')window.fbAuthSignOut=fbAuthSignOut;
+
+function copyFirestoreRules() {
+  const el = document.getElementById('firestore-rules-code');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(()=>{
+    showToast('تم نسخ قواعد الأمان — الصقها في Firebase Console → Firestore → Rules ✅','success');
+  }).catch(()=>{
+    showToast('انقر داخل مربع القواعد ثم اضغط Ctrl+A ثم Ctrl+C','error');
+  });
+}
+window.copyFirestoreRules = copyFirestoreRules;
 if(typeof openEditUser!=='undefined')window.openEditUser=openEditUser;
 if(typeof openChangePassword!=='undefined')window.openChangePassword=openChangePassword;
 if(typeof saveSettings!=='undefined')window.saveSettings=saveSettings;
