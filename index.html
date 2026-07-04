@@ -3942,6 +3942,10 @@ async function doLogin() {
         window.fbAuth, authEmail, password
       );
     } catch(authErr) {
+      console.error("Firebase Auth Error");
+      console.error("Code:", authErr.code);
+      console.error("Message:", authErr.message);
+      console.error(authErr);
       const noAccount = ['auth/user-not-found','auth/invalid-credential',
                          'auth/wrong-password','auth/invalid-login-credentials',
                          'auth/too-many-requests'].includes(authErr.code);
