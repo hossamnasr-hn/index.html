@@ -1710,8 +1710,10 @@ window._firebaseReady = true;
 (window._firebaseReadyCallbacks||[]).forEach(fn=>fn());
 console.log("✅ Firebase connected");
 
-async function initDefaultData() {
-  // Always check users first
+// initDefaultData: ترقية وهجرة البيانات — للمدير فقط
+// السبب: تستعلم كل المستخدمين ← Firestore يرفض ذلك لغير المدير
+async function initDefaultData(isAdminUser = false) {
+  if (!isAdminUser) return; // غير المدير لا يحتاج هذه الترقية
   const usersSnap = await getDocs(collection(db,"users"));
   const existingUsers = usersSnap.docs.map(d=>({...d.data(),_id:d.id}));
   
@@ -1780,8 +1782,21 @@ async function initDefaultData() {
 }
 
 async function loadAllData() {
-  const [usersSnap,typesSnap,subTypesSnap,attrSnap,assetsSnap,handoversSnap,maintsSnap,disposesSnap,custodySnap,customersSnap,returnsSnap,settingsSnap,deptCustodySnap,vehicleDeliverySnap,periodicMaintSnap,pmInspectionsSnap] = await Promise.all([
-    getDocs(collection(db,"users")),
+  // ① تحميل users بشكل منفصل — غير المدير لا يملك صلاحية قراءة جميع المستخدمين
+  //   نتجنّب وضعها في Promise.all لأن فشلها يُفشل الكل
+  let usersSnap = { docs: [] };
+  try {
+    usersSnap = await getDocs(collection(db,"users"));
+  } catch(e) {
+    // غير المدير: نتجاهل الخطأ — window.users سيبقى فارغاً أو يحتوي المستخدم الحالي فقط
+    if (window.currentUser) {
+      // نضع المستخدم الحالي في القائمة كحد أدنى
+      usersSnap = { docs: [] };
+    }
+  }
+
+  // ② تحميل باقي المجموعات دفعةً واحدة
+  const [typesSnap,subTypesSnap,attrSnap,assetsSnap,handoversSnap,maintsSnap,disposesSnap,custodySnap,customersSnap,returnsSnap,settingsSnap,deptCustodySnap,vehicleDeliverySnap,periodicMaintSnap,pmInspectionsSnap] = await Promise.all([
     getDocs(collection(db,"assetTypes")),
     getDocs(collection(db,"assetSubTypes")),
     getDocs(collection(db,"attributes")),
@@ -1798,9 +1813,9 @@ async function loadAllData() {
     getDocs(collection(db,"periodicMaintenance")),
     getDocs(collection(db,"pmInspections")),
   ]);
-  // إزالة حقول كلمة المرور من الذاكرة المحلية — لا يجب أن تظهر في المتصفح
+
+  // إزالة حقول كلمة المرور من الذاكرة المحلية
   window.users = usersSnap.docs.map(d=>{ const u={...d.data(),_id:d.id}; delete u.passwordHash; delete u.password; return u; });
-  // لا يُطبع أي معلومات حساسة في الـ console
   window.assetTypes = typesSnap.docs.map(d=>({name:d.data().name,_id:d.id}));
   window.assetSubTypes = subTypesSnap.docs.map(d=>({...d.data(),_id:d.id}));
   window.assetAttributes = attrSnap.docs.map(d=>({...d.data(),_id:d.id}));
@@ -1815,13 +1830,11 @@ async function loadAllData() {
   window.vehicleDeliveries = vehicleDeliverySnap.docs.map(d=>({...d.data(),_id:d.id}));
   window.periodicMaintenance = periodicMaintSnap.docs.map(d=>({...d.data(),_id:d.id}));
   window.pmInspections = pmInspectionsSnap.docs.map(d=>({...d.data(),_id:d.id}));
-  // Load settings
   if (!settingsSnap.empty) {
     const s = settingsSnap.docs[0].data();
     window._settings = {...s, _id:settingsSnap.docs[0].id};
     if (s.companyName) if(window.applyCompanySettings)window.applyCompanySettings(s.companyName, s.logoUrl||'');
   }
-  // renderAll is in same scope now (IIFE converted)
   try { renderAll(); populateTypeFilters(); } catch(e) { console.warn("Initial render:", e.message); }
 }
 
@@ -1830,6 +1843,11 @@ window.reloadData = async function() {
   renderAll();
   populateTypeFilters();
 };
+
+// تعريض الدوال الداخلية على window حتى يتمكن doLogin (في script منفصل) من استدعائها
+// هذا هو سبب ReferenceError — الدوال محلية داخل IIFE ولا يراها الكود الخارجي
+window._loadAllData      = loadAllData;
+window._initDefaultData  = initDefaultData;
 
 // ════════════════════════════════════════════════════════
 //  🔑 نقطة التحكم المركزية: onAuthStateChanged
@@ -1850,85 +1868,95 @@ const initialFbUser = await onAuthStateReady;
 if (initialFbUser) {
   // ─── المستخدم مصادق (تحديث صفحة أو session موجودة) ───────────────
   try {
-    await initDefaultData();
+    // ① أولاً: جلب وثيقة المستخدم الحالي بـ UID (استعلام واحد محدد)
+    const {doc: docRef, getDoc} = window.fsApi;
+    const userDoc = await getDoc(docRef(window.db,"users",initialFbUser.uid));
+
+    if (!userDoc.exists()) {
+      // Firebase Auth نشط لكن لا يوجد doc — خروج آمن
+      await fbSignOut(auth);
+      sessionStorage.clear();
+      document.documentElement.removeAttribute('data-restoring-session');
+      const hint2 = document.getElementById('login-hint');
+      if (hint2) hint2.innerHTML = '<span style="color:#2E7D32;font-weight:700"><i class="ti ti-check"></i> البرنامج جاهز</span>';
+      return;
+    }
+
+    const fresh = {...userDoc.data(), _id: initialFbUser.uid};
+    delete fresh.passwordHash;
+    delete fresh.password;
+    const isAdminUser = Array.isArray(fresh.perms) && fresh.perms.includes('users');
+
+    // ② تحميل كل البيانات (users يُحمَّل فقط إذا كان مديراً — داخل loadAllData)
+    window.currentUser = fresh; // نضعه مبكراً حتى تعمل loadAllData بشكل صحيح
     await loadAllData();
     window._dataReady = true;
+
+    // ③ ترقية المستخدمين القدامى (للمدير فقط — يحتاج صلاحية قراءة كل المستخدمين)
+    if (isAdminUser) {
+      try { await initDefaultData(true); } catch(e) { console.warn('initDefaultData:', e); }
+    }
+
     try { refreshNotificationSourceData(); } catch(e) {}
 
-    // استعادة الجلسة — Firebase Auth موثوق به، نجلب وثيقة المستخدم مباشرة
-    try {
-      const {doc: docRef, getDoc} = window.fsApi;
-      const userDoc = await getDoc(docRef(window.db,"users",initialFbUser.uid));
-      if (userDoc.exists()) {
-        const fresh = {...userDoc.data(), _id: initialFbUser.uid};
-        delete fresh.passwordHash;
-        delete fresh.password;
+    // ④ استعادة الجلسة وإظهار التطبيق
+    currentUser = fresh;
+    document.documentElement.removeAttribute('data-restoring-session');
 
-        currentUser = fresh;
-        document.documentElement.removeAttribute('data-restoring-session');
+    const loginEl = document.getElementById('login-screen');
+    const appEl   = document.getElementById('app-shell');
+    if (loginEl) loginEl.style.display = 'none';
+    if (appEl)   { appEl.classList.remove('hidden'); appEl.style.display = ''; }
 
-        const loginEl = document.getElementById('login-screen');
-        const appEl   = document.getElementById('app-shell');
-        if (loginEl) loginEl.style.display = 'none';
-        if (appEl)   { appEl.classList.remove('hidden'); appEl.style.display = ''; }
+    document.getElementById('header-avatar').textContent =
+      fresh.name.split(' ').map(w=>w[0]).join('').slice(0,2);
+    const nameEl = document.getElementById('header-name');
+    if (nameEl) nameEl.textContent = fresh.name;
+    document.getElementById('header-role').textContent = fresh.role;
 
-        document.getElementById('header-avatar').textContent =
-          fresh.name.split(' ').map(w=>w[0]).join('').slice(0,2);
-        const nameEl = document.getElementById('header-name');
-        if (nameEl) nameEl.textContent = fresh.name;
-        document.getElementById('header-role').textContent = fresh.role;
-
-        // ترقية صلاحيات المديرين القدامى إن لزم
-        const ADMIN_REQUIRED = ['dashboard','custody','custody_add','custody_edit','custody_edit_pending','custody_approve','custody_close','custody_unlock','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_edit_pending','dept_custody_approve','dept_custody_close','dept_custody_unlock','dept_custody_print','settings'];
-        if (fresh.perms.includes('users') && ADMIN_REQUIRED.some(p=>!fresh.perms.includes(p))) {
-          const upgraded = [...new Set([...fresh.perms, ...ADMIN_REQUIRED])];
-          fresh.perms = upgraded;
-          currentUser = fresh;
-          try { await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",fresh._id),{perms:upgraded}); } catch(e){}
-        }
-
-        applyNavPermissions(fresh.perms);
-        const addBtnSR = document.getElementById('add-asset-btn');
-        if (addBtnSR) addBtnSR.style.display = fresh.perms.includes('add') ? '' : 'none';
-
-        if (!fresh.perms.includes('dashboard')) {
-          const dashPage = document.getElementById('page-dashboard');
-          const navDashItem = document.getElementById('nav-dashboard');
-          if (dashPage) dashPage.classList.remove('active');
-          if (navDashItem) { navDashItem.style.display='none'; navDashItem.classList.remove('active'); }
-          redirectToFirstAllowedPage(fresh.perms);
-        } else {
-          document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-          const dash2 = document.getElementById('page-dashboard');
-          if (dash2) dash2.classList.add('active');
-          document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-          const navDash2 = document.getElementById('nav-dashboard');
-          if (navDash2) navDash2.classList.add('active');
-        }
-
-        populateTypeFilters();
-        renderAll();
-        try { if(window.showDangerZoneIfAdmin) window.showDangerZoneIfAdmin(); } catch(e){}
-        try { if(typeof refreshNotificationSourceData==='function') refreshNotificationSourceData(); } catch(e){}
-        resetSessionTimer();
-
-      } else {
-        // Firebase Auth نشط لكن لا توجد وثيقة Firestore — نُسجّل الخروج
-        await fbSignOut(auth);
-        sessionStorage.clear();
-        document.documentElement.removeAttribute('data-restoring-session');
-      }
-    } catch(restoreErr) {
-      console.warn('Session restore error:', restoreErr);
+    // ترقية صلاحيات المديرين القدامى إن لزم
+    const ADMIN_REQUIRED = ['dashboard','custody','custody_add','custody_edit','custody_edit_pending','custody_approve','custody_close','custody_unlock','custody_print','dept_custody','dept_custody_add','dept_custody_edit','dept_custody_edit_pending','dept_custody_approve','dept_custody_close','dept_custody_unlock','dept_custody_print','settings'];
+    if (fresh.perms.includes('users') && ADMIN_REQUIRED.some(p=>!fresh.perms.includes(p))) {
+      const upgraded = [...new Set([...fresh.perms, ...ADMIN_REQUIRED])];
+      fresh.perms = upgraded;
+      currentUser = fresh;
+      try { await window.fsApi.updateDoc(window.fsApi.doc(window.db,"users",fresh._id),{perms:upgraded}); } catch(e){}
     }
+
+    applyNavPermissions(fresh.perms);
+    const addBtnSR = document.getElementById('add-asset-btn');
+    if (addBtnSR) addBtnSR.style.display = fresh.perms.includes('add') ? '' : 'none';
+
+    if (!fresh.perms.includes('dashboard')) {
+      const dashPage = document.getElementById('page-dashboard');
+      const navDashItem = document.getElementById('nav-dashboard');
+      if (dashPage) dashPage.classList.remove('active');
+      if (navDashItem) { navDashItem.style.display='none'; navDashItem.classList.remove('active'); }
+      redirectToFirstAllowedPage(fresh.perms);
+    } else {
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+      const dash2 = document.getElementById('page-dashboard');
+      if (dash2) dash2.classList.add('active');
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+      const navDash2 = document.getElementById('nav-dashboard');
+      if (navDash2) navDash2.classList.add('active');
+    }
+
+    populateTypeFilters();
+    renderAll();
+    try { if(window.showDangerZoneIfAdmin) window.showDangerZoneIfAdmin(); } catch(e){}
+    try { if(typeof refreshNotificationSourceData==='function') refreshNotificationSourceData(); } catch(e){}
+    resetSessionTimer();
+
   } catch(loadErr) {
-    console.error('Data load failed:', loadErr);
+    console.error('Session/data restore error:', loadErr);
+    document.documentElement.removeAttribute('data-restoring-session');
   }
 
 } else {
   // ─── غير مصادق — عرض شاشة الدخول فقط، صفر استعلامات Firestore ────
   document.documentElement.removeAttribute('data-restoring-session');
-  sessionStorage.clear(); // مسح أي جلسة قديمة
+  sessionStorage.clear();
 }
 
 // تحديث نص الحالة في شاشة الدخول
@@ -3965,18 +3993,13 @@ async function doLogin() {
     const uid = fbCredential.user.uid;
 
     // ════════════════════════════════════════════════════════
-    //  ② الآن request.auth نشط — نُحمّل البيانات ثم نجلب وثيقة المستخدم بـ UID مباشرة
-    //  لا نُحمّل أي وثيقة أخرى في هذه المرحلة
+    //  ② جلب وثيقة المستخدم مباشرة بـ UID (BEFORE loading any other data)
+    //  request.auth.uid == uid → القاعدة مُحقَّقة بدون isAdmin()
     // ════════════════════════════════════════════════════════
-    await initDefaultData();
-    await loadAllData();
-    window._dataReady = true;
-
     const {doc: docRef, getDoc} = window.fsApi;
     const userDoc = await getDoc(docRef(window.db, "users", uid));
 
     if (!userDoc.exists()) {
-      // حساب Firebase Auth موجود لكن لا توجد وثيقة Firestore مقابلة
       await fbAuthSignOut();
       showErr('الحساب غير مكتمل — تواصل مع مدير النظام');
       return;
@@ -3986,8 +4009,6 @@ async function doLogin() {
 
     // ════════════════════════════════════════════════════════
     //  ③ التحقق الإضافي بـ bcrypt (طبقة دفاع ثانية)
-    //  حالة طبيعية: Firebase Auth و bcrypt متزامنان دائماً
-    //  حالة استثنائية: إذا اختلفا نرفض الدخول ونُسجّل خروجاً
     // ════════════════════════════════════════════════════════
     if (isBcryptHash(found.passwordHash || '')) {
       const bcryptOk = await verifyPassword(password, found.passwordHash);
@@ -3997,19 +4018,39 @@ async function doLogin() {
         return;
       }
     }
-    // إذا لم يوجد passwordHash (حساب قديم لم يُرقَّ بعد) — Firebase Auth كافٍ
 
     // ════════════════════════════════════════════════════════
-    //  ④ إزالة الحقول الحساسة من الذاكرة قبل تعيين currentUser
+    //  ④ إزالة الحقول الحساسة وتعيين currentUser
     // ════════════════════════════════════════════════════════
     delete found.passwordHash;
     delete found.password;
     currentUser = found;
+    window.currentUser = found; // مرجع عالمي يحتاجه loadAllData
 
-    // ⑤ تسجيل حدث الدخول
+    // ════════════════════════════════════════════════════════
+    //  ⑤ تحميل كل بيانات التطبيق
+    //  window._loadAllData معرَّفة داخل الـ IIFE وتُكشَف عبر window
+    //  (هذا يحل ReferenceError: loadAllData is not defined)
+    // ════════════════════════════════════════════════════════
+    if (typeof window._loadAllData === 'function') {
+      await window._loadAllData();
+    }
+    window._dataReady = true;
+
+    // ════════════════════════════════════════════════════════
+    //  ⑥ ترقية البيانات القديمة — للمدير فقط
+    //  (هذا يحل ReferenceError: initDefaultData is not defined)
+    //  (هذا يحل Missing permissions — نمرر علم المدير)
+    // ════════════════════════════════════════════════════════
+    const isAdminUser = Array.isArray(found.perms) && found.perms.includes('users');
+    if (isAdminUser && typeof window._initDefaultData === 'function') {
+      try { await window._initDefaultData(true); } catch(e) { console.warn('initDefaultData:', e); }
+    }
+
+    // ⑦ تسجيل حدث الدخول
     try { logAudit('login','تسجيل دخول',`${found.name} (${found.role}) سجّل دخوله`); } catch(e){}
 
-    // ⑥ حفظ الجلسة (الـ UID فقط — بدون بيانات حساسة)
+    // ⑧ حفظ الجلسة
     try {
       sessionStorage.setItem('_assetSession', JSON.stringify({
         _id: found._id, username: found.username,
@@ -4232,11 +4273,12 @@ async function submitAdminSetup() {
       createdAt: new Date().toISOString()
     });
 
-    // ════════════════════════════════════════════════════════
-    //  ③ تحميل البيانات وإعداد الجلسة
-    // ════════════════════════════════════════════════════════
-    await initDefaultData();
-    await loadAllData();
+    // ③ تحميل البيانات وإعداد الجلسة
+    window.currentUser = { _id: uid, name, username, role: "مدير", perms: PERMS };
+    if (typeof window._loadAllData === 'function') await window._loadAllData();
+    if (typeof window._initDefaultData === 'function') {
+      try { await window._initDefaultData(true); } catch(e) {}
+    }
     window._dataReady = true;
 
     const currentUserData = { _id: uid, name, username, role: "مدير", perms: PERMS };
